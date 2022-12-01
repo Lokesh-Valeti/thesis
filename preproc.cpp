@@ -83,14 +83,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, char **args)
         T1 = std::make_tuple(X1, Y1, Z1);
         mpcsrvio.p0io.queue(&T0, sizeof(T0));
         mpcsrvio.p1io.queue(&T1, sizeof(T1));
-        // Flush the queue every so often
-        if ((i % 1000) == 999) {
-            mpcsrvio.p0io.send();
-            mpcsrvio.p1io.send();
-        }
     }
-    mpcsrvio.p0io.send();
-    mpcsrvio.p1io.send();
 
     // That's all
     type = 0x00;

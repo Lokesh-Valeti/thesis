@@ -116,6 +116,12 @@ public:
 
     void queue(const void *data, size_t len) {
         dataqueue.append((const char *)data, len);
+
+        // If we already have some full packets worth of data, may as
+        // well send it.
+        if (dataqueue.size() > 28800) {
+            send();
+        }
     }
 
     void send() {
