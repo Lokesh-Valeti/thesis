@@ -30,7 +30,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
     // Queue up the work to be done
     boost::asio::post(io_context, [&]{
         if (preprocessing) {
-            preprocessing_comp(mpcio, args);
+            preprocessing_comp(mpcio, num_threads, args);
         }
     });
 

@@ -1,14 +1,17 @@
+#include <vector>
 #include <bsd/stdlib.h> // arc4random_buf
 
 #include "preproc.hpp"
 
-// Open a file for writing with name the given prefix, and ".pX" suffix,
-// where X is the (one-digit) player number
-static std::ofstream openfile(const char *prefix, unsigned player)
+// Open a file for writing with name the given prefix, and ".pX.tY"
+// suffix, where X is the (one-digit) player number and Y is the thread
+// number
+static std::ofstream openfile(const char *prefix, unsigned player,
+    unsigned thread_num)
 {
     std::string filename(prefix);
-    char suffix[4];
-    sprintf(suffix, ".p%d", player%10);
+    char suffix[20];
+    sprintf(suffix, ".p%d.t%u", player%10, thread_num);
     filename.append(suffix);
     std::ofstream f;
     f.open(filename);
@@ -33,8 +36,11 @@ static std::ofstream openfile(const char *prefix, unsigned player)
 // Then that number of objects
 //
 // Repeat the whole thing until type == 0x00 is received
+//
+// The incoming objects are written into num_threads files in a
+// round-robin manner
 
-void preprocessing_comp(MPCIO &mpcio, char **args)
+void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
 {
     while(1) {
         unsigned char type = 0;
@@ -44,15 +50,22 @@ void preprocessing_comp(MPCIO &mpcio, char **args)
         mpcio.serverio.recv(&num, 4);
         if (type == 0x80) {
             // Multiplication triples
-            std::ofstream tripfile = openfile("triples", mpcio.player);
+            std::vector<std::ofstream> tripfiles;
+            for (int i=0; i<num_threads; ++i) {
+                tripfiles.push_back(openfile("triples", mpcio.player, i));
+            }
+            unsigned thread_num = 0;
             
             MultTriple T;
             for (unsigned int i=0; i<num; ++i) {
                 res = mpcio.serverio.recv(&T, sizeof(T));
                 if (res < sizeof(T)) break;
-                tripfile.write((const char *)&T, sizeof(T));
+                tripfiles[thread_num].write((const char *)&T, sizeof(T));
+                thread_num = (thread_num + 1) % num_threads;
             }
-            tripfile.close();
+            for (int i=0; i<num_threads; ++i) {
+                tripfiles[i].close();
+            }
         }
     }
 }

@@ -24,7 +24,7 @@ template<typename T>
 class PreCompStorage {
 public:
     PreCompStorage(unsigned player, bool preprocessing,
-        const char *filenameprefix);
+        const char *filenameprefix, unsigned thread_num);
     void get(T& nextval);
 private:
     std::ifstream storage;
@@ -32,11 +32,11 @@ private:
 
 template<typename T>
 PreCompStorage<T>::PreCompStorage(unsigned player, bool preprocessing,
-        const char *filenameprefix) {
+        const char *filenameprefix, unsigned thread_num) {
     if (preprocessing) return;
     std::string filename(filenameprefix);
-    char suffix[4];
-    sprintf(suffix, ".p%d", player%10);
+    char suffix[20];
+    sprintf(suffix, ".p%d.t%u", player%10, thread_num);
     filename.append(suffix);
     storage.open(filename);
     if (storage.fail()) {
@@ -188,12 +188,15 @@ struct MPCIO {
     // culprit), but you can have a deque of those for some reason.
     std::deque<MPCSingleIO> peerios;
     MPCSingleIO serverio;
-    PreCompStorage<MultTriple> triples;
+    std::vector<PreCompStorage<MultTriple>> triples;
 
     MPCIO(unsigned player, bool preprocessing,
             std::deque<tcp::socket> &peersocks, tcp::socket &&serversock) :
-        player(player), serverio(std::move(serversock)),
-        triples(player, preprocessing, "triples") {
+        player(player), serverio(std::move(serversock)) {
+        unsigned num_threads = unsigned(peersocks.size());
+        for (unsigned i=0; i<num_threads; ++i) {
+            triples.emplace_back(player, preprocessing, "triples", i);
+        }
         for (auto &&sock : peersocks) {
             peerios.emplace_back(std::move(sock));
         }
