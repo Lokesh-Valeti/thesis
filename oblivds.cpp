@@ -1,11 +1,14 @@
 #include <iostream>
+#include <deque>
 
 #include "mpcio.hpp"
 #include "preproc.hpp"
 
 static void usage(const char *progname)
 {
-    std::cerr << "Usage: " << progname << " [-p] player_num player_addrs args ...\n";
+    std::cerr << "Usage: " << progname << " [-p] [-t num] player_num player_addrs args ...\n";
+    std::cerr << "-p: preprocessing mode\n";
+    std::cerr << "-t num: use num threads for the computational players\n";
     std::cerr << "player_num = 0 or 1 for the computational players\n";
     std::cerr << "player_num = 2 for the server player\n";
     std::cerr << "player_addrs is omitted for player 0\n";
@@ -15,13 +18,14 @@ static void usage(const char *progname)
 }
 
 static void comp_player_main(boost::asio::io_context &io_context,
-    unsigned player, bool preprocessing, const char *p0addr, char **args)
+    unsigned player, bool preprocessing, int num_threads, const char *p0addr,
+    char **args)
 {
-    tcp::socket peersock(io_context), serversock(io_context);
-    mpcio_setup_computational(player, io_context,
-        p0addr, peersock, serversock);
-    MPCIO mpcio(player, preprocessing, std::move(peersock),
-        std::move(serversock));
+    tcp::socket serversock(io_context);
+    std::deque<tcp::socket> peersocks;
+    mpcio_setup_computational(player, io_context, p0addr, num_threads,
+        peersocks, serversock);
+    MPCIO mpcio(player, preprocessing, peersocks, std::move(serversock));
 
     // Queue up the work to be done
     boost::asio::post(io_context, [&]{
@@ -64,11 +68,25 @@ int main(int argc, char **argv)
     char **args = argv+1; // Skip argv[0] (the program name)
     bool preprocessing = false;
     unsigned player = 0;
+    int num_threads = 1;
     const char *p0addr = NULL;
     const char *p1addr = NULL;
-    if (argc > 1 && !strcmp("-p", *args)) {
-        preprocessing = true;
-        ++args;
+    // Get the options
+    while (*args && *args[0] == '-') {
+        if (!strcmp("-p", *args)) {
+            preprocessing = true;
+            ++args;
+        } else if (!strcmp("-t", *args)) {
+            if (args[1]) {
+                num_threads = atoi(args[1]);
+                if (num_threads < 1) {
+                    usage(argv[0]);
+                }
+                args += 2;
+            } else {
+                usage(argv[0]);
+            }
+        }
     }
     if (*args == NULL) {
         // No arguments?
@@ -100,6 +118,7 @@ int main(int argc, char **argv)
     /*
     std::cout << "Preprocessing = " <<
             (preprocessing ? "true" : "false") << "\n";
+    std::cout << "Thread count = " << num_threads << "\n";
     std::cout << "Player = " << player << "\n";
     if (p0addr) {
         std::cout << "Player 0 addr = " << p0addr << "\n";
@@ -118,7 +137,7 @@ int main(int argc, char **argv)
     boost::asio::io_context io_context;
 
     if (player < 2) {
-        comp_player_main(io_context, player, preprocessing, p0addr, args);
+        comp_player_main(io_context, player, preprocessing, num_threads, p0addr, args);
     } else {
         server_player_main(io_context, preprocessing, p0addr, p1addr, args);
     }

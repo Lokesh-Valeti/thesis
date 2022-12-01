@@ -5,6 +5,7 @@
 #include <fstream>
 #include <tuple>
 #include <vector>
+#include <deque>
 #include <queue>
 #include <string>
 #include <cstdint>
@@ -182,15 +183,21 @@ public:
 
 struct MPCIO {
     int player;
-    MPCSingleIO peerio;
+    // We use a deque here instead of a vector because you can't have a
+    // vector of a type without a copy constructor (tcp::socket is the
+    // culprit), but you can have a deque of those for some reason.
+    std::deque<MPCSingleIO> peerios;
     MPCSingleIO serverio;
     PreCompStorage<MultTriple> triples;
 
     MPCIO(unsigned player, bool preprocessing,
-            tcp::socket &&peersock, tcp::socket &&serversock) :
-        player(player),
-        peerio(std::move(peersock)), serverio(std::move(serversock)),
-        triples(player, preprocessing, "triples") {}
+            std::deque<tcp::socket> &peersocks, tcp::socket &&serversock) :
+        player(player), serverio(std::move(serversock)),
+        triples(player, preprocessing, "triples") {
+        for (auto &&sock : peersocks) {
+            peerios.emplace_back(std::move(sock));
+        }
+    }
 };
 
 // A class to represent all of the server party's IO, either to
@@ -215,7 +222,8 @@ struct MPCServerIO {
 void mpcio_setup_computational(unsigned player,
     boost::asio::io_context &io_context,
     const char *p0addr,  // can be NULL when player=0
-    tcp::socket &peersock, tcp::socket &serversock);
+    int num_threads,
+    std::deque<tcp::socket> &peersocks, tcp::socket &serversock);
 
 // Server calls this version with player=2
 

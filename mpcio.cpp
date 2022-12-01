@@ -12,7 +12,8 @@ static const unsigned short port_p2_p1 = 2117;
 void mpcio_setup_computational(unsigned player,
     boost::asio::io_context &io_context,
     const char *p0addr,  // can be NULL when player=0
-    tcp::socket &peersock, tcp::socket &serversock)
+    int num_threads,
+    std::deque<tcp::socket> &peersocks, tcp::socket &serversock)
 {
     if (player == 0) {
         // Listen for connections from P1 and from P2
@@ -21,21 +22,45 @@ void mpcio_setup_computational(unsigned player,
         tcp::acceptor acceptor_p2(io_context,
             tcp::endpoint(tcp::v4(), port_p2_p0));
 
-        peersock = acceptor_p1.accept();
+        for (int i=0;i<num_threads;++i) {
+            peersocks.emplace_back(io_context);
+        }
+        for (int i=0;i<num_threads;++i) {
+            tcp::socket peersock = acceptor_p1.accept();
+            // Read 2 bytes from the socket, which will be the thread
+            // number
+            unsigned short thread_num;
+            boost::asio::read(peersock,
+                boost::asio::buffer(&thread_num, sizeof(thread_num)));
+            if (thread_num >= num_threads) {
+                std::cerr << "Received bad thread number from peer\n";
+            } else {
+                peersocks[thread_num] = std::move(peersock);
+            }
+        }
         serversock = acceptor_p2.accept();
     } else if (player == 1) {
-        // Listen for connections from P2, make a connection to P0
+        // Listen for connections from P2, make num_threads connections to P0
         tcp::acceptor acceptor_p2(io_context,
             tcp::endpoint(tcp::v4(), port_p2_p1));
 
         tcp::resolver resolver(io_context);
         boost::system::error_code err;
-        while(1) {
-            boost::asio::connect(peersock,
-                resolver.resolve(p0addr, std::to_string(port_p1_p0)), err);
-            if (!err) break;
-            std::cerr << "Connection to p0 refused, will retry.\n";
-            sleep(1);
+        peersocks.clear();
+        for (unsigned short thread_num = 0; thread_num < num_threads; ++thread_num) {
+            tcp::socket peersock(io_context);
+            while(1) {
+                boost::asio::connect(peersock,
+                    resolver.resolve(p0addr, std::to_string(port_p1_p0)), err);
+                if (!err) break;
+                std::cerr << "Connection to p0 refused, will retry.\n";
+                sleep(1);
+            }
+            // Write 2 bytes to the socket indicating which thread
+            // number this socket is for
+            boost::asio::write(peersock,
+                boost::asio::buffer(&thread_num, sizeof(thread_num)));
+            peersocks.push_back(std::move(peersock));
         }
         serversock = acceptor_p2.accept();
     } else {
