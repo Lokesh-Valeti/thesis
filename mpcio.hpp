@@ -19,6 +19,7 @@ using boost::asio::ip::tcp;
 // Classes to represent stored precomputed data (e.g., multiplicative triples)
 
 typedef std::tuple<uint64_t, uint64_t, uint64_t> MultTriple;
+typedef std::tuple<uint64_t, uint64_t> HalfTriple;
 
 template<typename T>
 class PreCompStorage {

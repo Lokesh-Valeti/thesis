@@ -55,7 +55,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                 tripfiles.push_back(openfile("triples", mpcio.player, i));
             }
             unsigned thread_num = 0;
-            
+
             MultTriple T;
             for (unsigned int i=0; i<num; ++i) {
                 res = mpcio.serverio.recv(&T, sizeof(T));
@@ -66,24 +66,33 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
             for (int i=0; i<num_threads; ++i) {
                 tripfiles[i].close();
             }
+        } else if (type == 0x81) {
+            // Multiplication half triples
+            std::vector<std::ofstream> halffiles;
+            for (int i=0; i<num_threads; ++i) {
+                halffiles.push_back(openfile("halves", mpcio.player, i));
+            }
+            unsigned thread_num = 0;
+
+            HalfTriple H;
+            for (unsigned int i=0; i<num; ++i) {
+                res = mpcio.serverio.recv(&H, sizeof(H));
+                if (res < sizeof(H)) break;
+                halffiles[thread_num].write((const char *)&H, sizeof(H));
+                thread_num = (thread_num + 1) % num_threads;
+            }
+            for (int i=0; i<num_threads; ++i) {
+                halffiles[i].close();
+            }
         }
     }
 }
 
-void preprocessing_server(MPCServerIO &mpcsrvio, char **args)
+// Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
+// (X0*Y1 + Y0*X1) = (Z0+Z1)
+static void create_triples(MPCServerIO &mpcsrvio, unsigned num)
 {
-    unsigned int numtriples = 100;
-    if (*args) {
-        numtriples = atoi(*args);
-        ++args;
-    }
-    unsigned char type = 0x80;
-    mpcsrvio.p0io.queue(&type, 1);
-    mpcsrvio.p0io.queue(&numtriples, 4);
-    mpcsrvio.p1io.queue(&type, 1);
-    mpcsrvio.p1io.queue(&numtriples, 4);
-
-    for (unsigned int i=0; i<numtriples; ++i) {
+    for (unsigned int i=0; i<num; ++i) {
         uint64_t X0, Y0, Z0, X1, Y1, Z1;
         arc4random_buf(&X0, sizeof(X0));
         arc4random_buf(&Y0, sizeof(Y0));
@@ -97,11 +106,61 @@ void preprocessing_server(MPCServerIO &mpcsrvio, char **args)
         mpcsrvio.p0io.queue(&T0, sizeof(T0));
         mpcsrvio.p1io.queue(&T1, sizeof(T1));
     }
+}
 
+// Create half-triples (X0,Z0),(Y1,Z1) such that
+// X0*Y1 = Z0 + Z1
+static void create_halftriples(MPCServerIO &mpcsrvio, unsigned num)
+{
+    for (unsigned int i=0; i<num; ++i) {
+        uint64_t X0, Z0, Y1, Z1;
+        arc4random_buf(&X0, sizeof(X0));
+        arc4random_buf(&Z0, sizeof(Z0));
+        arc4random_buf(&Y1, sizeof(Y1));
+        Z1 = X0 * Y1 - Z0;
+        HalfTriple H0, H1;
+        H0 = std::make_tuple(X0, Z0);
+        H1 = std::make_tuple(Y1, Z1);
+        mpcsrvio.p0io.queue(&H0, sizeof(H0));
+        mpcsrvio.p1io.queue(&H1, sizeof(H1));
+    }
+}
+
+void preprocessing_server(MPCServerIO &mpcsrvio, char **args)
+{
+    while (*args) {
+        char *colon = strchr(*args, ':');
+        if (!colon) {
+            std::cerr << "Args must be type:num\n";
+            ++args;
+            continue;
+        }
+        unsigned num = atoi(colon+1);
+        *colon = '\0';
+        char *type = *args;
+        if (!strcmp(type, "t")) {
+            unsigned char typetag = 0x80;
+            mpcsrvio.p0io.queue(&typetag, 1);
+            mpcsrvio.p0io.queue(&num, 4);
+            mpcsrvio.p1io.queue(&typetag, 1);
+            mpcsrvio.p1io.queue(&num, 4);
+
+            create_triples(mpcsrvio, num);
+        } else if (!strcmp(type, "h")) {
+            unsigned char typetag = 0x81;
+            mpcsrvio.p0io.queue(&typetag, 1);
+            mpcsrvio.p0io.queue(&num, 4);
+            mpcsrvio.p1io.queue(&typetag, 1);
+            mpcsrvio.p1io.queue(&num, 4);
+
+            create_halftriples(mpcsrvio, num);
+        }
+        ++args;
+    }
     // That's all
-    type = 0x00;
-    mpcsrvio.p0io.queue(&type, 1);
-    mpcsrvio.p1io.queue(&type, 1);
+    unsigned char typetag = 0x00;
+    mpcsrvio.p0io.queue(&typetag, 1);
+    mpcsrvio.p1io.queue(&typetag, 1);
     mpcsrvio.p0io.send();
     mpcsrvio.p1io.send();
 }
