@@ -190,6 +190,7 @@ struct MPCIO {
     std::deque<MPCSingleIO> peerios;
     MPCSingleIO serverio;
     std::vector<PreCompStorage<MultTriple>> triples;
+    std::vector<PreCompStorage<HalfTriple>> halftriples;
 
     MPCIO(unsigned player, bool preprocessing,
             std::deque<tcp::socket> &peersocks, tcp::socket &&serversock) :
@@ -197,6 +198,9 @@ struct MPCIO {
         unsigned num_threads = unsigned(peersocks.size());
         for (unsigned i=0; i<num_threads; ++i) {
             triples.emplace_back(player, preprocessing, "triples", i);
+        }
+        for (unsigned i=0; i<num_threads; ++i) {
+            halftriples.emplace_back(player, preprocessing, "halves", i);
         }
         for (auto &&sock : peersocks) {
             peerios.emplace_back(std::move(sock));
