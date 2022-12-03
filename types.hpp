@@ -4,11 +4,13 @@
 #include <tuple>
 #include <cstdint>
 
+// The number of bits in an MPC secret-shared memory word
+
 #ifndef VALUE_BITS
 #define VALUE_BITS 64
 #endif
 
-// Values in memory are of this type
+// Values in MPC secret-shared memory are of this type
 
 #if VALUE_BITS == 64
 typedef uint64_t value_t;
@@ -16,6 +18,29 @@ typedef uint64_t value_t;
 typedef uint32_t value_t;
 #else
 #error "Unsupported value of VALUE_BITS"
+#endif
+
+// The _maximum_ number of bits in an MPC address; the actual size of
+// the memory will typically be set at runtime, but it cannot exceed
+// this value.  It is more efficient (in terms of communication) in some
+// places for this value to be at most 32.
+
+#ifndef ADDRESS_MAX_BITS
+#define ADDRESS_MAX_BITS 32
+#endif
+
+// Addresses of MPC secret-shared memory are of this type
+
+#if ADDRESS_MAX_BITS <= 32
+typedef uint32_t address_t;
+#elif ADDRESS_MAX_BITS <= 64
+typedef uint64_t address_t;
+#else
+#error "Unsupported value of ADDRESS_MAX_BITS"
+#endif
+
+#if ADDRESS_MAX_BITS > VALUE_BITS
+#error "VALUE_BITS must be at least as large as ADDRESS_MAX_BITS"
 #endif
 
 // A multiplication triple is a triple (X0,Y0,Z0) held by P0 (and
