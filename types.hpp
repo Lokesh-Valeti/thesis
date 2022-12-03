@@ -43,6 +43,12 @@ typedef uint64_t address_t;
 #error "VALUE_BITS must be at least as large as ADDRESS_MAX_BITS"
 #endif
 
+// Secret-shared bits are of this type.  Note that it is standards
+// compliant to treat a bool as an unsigned integer type with values 0
+// and 1.
+
+typedef bool bit_t;
+
 // A multiplication triple is a triple (X0,Y0,Z0) held by P0 (and
 // correspondingly (X1,Y1,Z1) held by P1), with all values random,
 // but subject to the relation that X0*Y1 + Y0*X1 = Z0+Z1
