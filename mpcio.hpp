@@ -180,6 +180,7 @@ public:
 
 struct MPCIO {
     int player;
+    bool preprocessing;
     // We use a deque here instead of a vector because you can't have a
     // vector of a type without a copy constructor (tcp::socket is the
     // culprit), but you can have a deque of those for some reason.
@@ -190,7 +191,8 @@ struct MPCIO {
 
     MPCIO(unsigned player, bool preprocessing,
             std::deque<tcp::socket> &peersocks, tcp::socket &&serversock) :
-        player(player), serverio(std::move(serversock)) {
+        player(player), preprocessing(preprocessing),
+        serverio(std::move(serversock)) {
         unsigned num_threads = unsigned(peersocks.size());
         for (unsigned i=0; i<num_threads; ++i) {
             triples.emplace_back(player, preprocessing, "triples", i);
@@ -208,6 +210,29 @@ struct MPCIO {
             p.send();
         }
         serverio.send();
+    }
+
+    // Functions to get precomputed values.  If we're in the online
+    // phase, get them from PreCompStorage.  If we're in the
+    // preprocessing phase, read them from the server.
+    MultTriple triple(unsigned thread_num) {
+        MultTriple val;
+        if (preprocessing) {
+            serverio.recv(boost::asio::buffer(&val, sizeof(val)));
+        } else {
+            triples[thread_num].get(val);
+        }
+        return val;
+    }
+
+    HalfTriple halftriple(unsigned thread_num) {
+        HalfTriple val;
+        if (preprocessing) {
+            serverio.recv(boost::asio::buffer(&val, sizeof(val)));
+        } else {
+            halftriples[thread_num].get(val);
+        }
+        return val;
     }
 };
 

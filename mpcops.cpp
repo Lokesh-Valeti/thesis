@@ -13,11 +13,11 @@
 // consumes 1 MultTriple
 void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
     value_t &as_z, value_t as_x, value_t as_y,
-    MultTriple &T, nbits_t nbits)
+    nbits_t nbits)
 {
     value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
-    auto [X, Y, Z] = T;
+    auto [X, Y, Z] = mpcio.triple(thread_num);
 
     // Send x+X and y+Y
     value_t blind_x = (as_x + X) & mask;
@@ -46,11 +46,11 @@ void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
 // consumes 1 HalfTriple
 void mpc_valuemul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
     value_t &as_z, value_t x,
-    HalfTriple &H, nbits_t nbits)
+    nbits_t nbits)
 {
     value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
-    auto [X, Z] = H;
+    auto [X, Z] = mpcio.halftriple(thread_num);
 
     // Send x+X
     value_t blind_x = (x + X) & mask;

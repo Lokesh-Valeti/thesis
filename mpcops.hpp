@@ -18,7 +18,7 @@
 // consumes 1 MultTriple
 void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
     value_t &as_z, value_t as_x, value_t as_y,
-    MultTriple &T, nbits_t nbits = VALUE_BITS);
+    nbits_t nbits = VALUE_BITS);
 
 // P0 holds the (complete) value x, P1 holds the (complete) value y;
 // compute additive shares of z = x*y.  x, y, and z are each at most
@@ -30,6 +30,6 @@ void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
 // consumes 1 HalfTriple
 void mpc_valuemul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
     value_t &as_z, value_t x,
-    HalfTriple &H, nbits_t nbits = VALUE_BITS);
+    nbits_t nbits = VALUE_BITS);
 
 #endif

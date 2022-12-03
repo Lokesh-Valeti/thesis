@@ -21,15 +21,11 @@ void online_comp(MPCIO &mpcio, int num_threads, char **args)
     std::vector<coro_t> coroutines;
     coroutines.emplace_back(
         [&](yield_t &yield) {
-            MultTriple T;
-            mpcio.triples[0].get(T);
-            mpc_mul(mpcio, 0, yield, A[3], A[0], A[1], T, nbits);
+            mpc_mul(mpcio, 0, yield, A[3], A[0], A[1], nbits);
         });
     coroutines.emplace_back(
         [&](yield_t &yield) {
-            HalfTriple H;
-            mpcio.halftriples[0].get(H);
-            mpc_valuemul(mpcio, 0, yield, A[4], A[2], H, nbits);
+            mpc_valuemul(mpcio, 0, yield, A[4], A[2], nbits);
         });
     run_coroutines(mpcio, coroutines);
     std::cout << A[3] << "\n";
