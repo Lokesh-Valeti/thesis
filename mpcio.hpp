@@ -9,7 +9,6 @@
 #include <string>
 
 #include <boost/asio.hpp>
-#include <boost/coroutine2/all.hpp>
 #include <boost/thread.hpp>
 
 #include "types.hpp"
@@ -202,6 +201,13 @@ struct MPCIO {
         for (auto &&sock : peersocks) {
             peerios.emplace_back(std::move(sock));
         }
+    }
+
+    void sendall() {
+        for (auto &p: peerios) {
+            p.send();
+        }
+        serverio.send();
     }
 };
 

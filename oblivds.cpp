@@ -3,6 +3,7 @@
 
 #include "mpcio.hpp"
 #include "preproc.hpp"
+#include "online.hpp"
 
 static void usage(const char *progname)
 {
@@ -31,6 +32,8 @@ static void comp_player_main(boost::asio::io_context &io_context,
     boost::asio::post(io_context, [&]{
         if (preprocessing) {
             preprocessing_comp(mpcio, num_threads, args);
+        } else {
+            online_comp(mpcio, num_threads, args);
         }
     });
 
@@ -53,6 +56,8 @@ static void server_player_main(boost::asio::io_context &io_context,
     boost::asio::post(io_context, [&]{
         if (preprocessing) {
             preprocessing_server(mpcserverio, args);
+        } else {
+            online_server(mpcserverio, args);
         }
     });
 

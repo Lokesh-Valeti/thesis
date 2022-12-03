@@ -49,6 +49,18 @@ typedef uint64_t address_t;
 
 typedef bool bit_t;
 
+// Counts of the number of bits in a value are of this type, which must
+// be large enough to store the _value_ VALUE_BITS
+typedef uint8_t nbits_t;
+
+// Convert a number of bits to the number of bytes required to store (or
+// more to the point, send) them.
+#define BITBYTES(nbits) (((nbits)+7)>>3)
+
+// A mask of this many bits; the test is to prevent 1<<nbits from
+// overflowing if nbits == VALUE_BITS
+#define MASKBITS(nbits) (((nbits) < VALUE_BITS) ? (value_t(1)<<(nbits))-1 : ~0)
+
 // A multiplication triple is a triple (X0,Y0,Z0) held by P0 (and
 // correspondingly (X1,Y1,Z1) held by P1), with all values random,
 // but subject to the relation that X0*Y1 + Y0*X1 = Z0+Z1
