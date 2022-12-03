@@ -1,6 +1,7 @@
 #include <vector>
 #include <bsd/stdlib.h> // arc4random_buf
 
+#include "types.hpp"
 #include "preproc.hpp"
 
 // Open a file for writing with name the given prefix, and ".pX.tY"
@@ -93,7 +94,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
 static void create_triples(MPCServerIO &mpcsrvio, unsigned num)
 {
     for (unsigned int i=0; i<num; ++i) {
-        uint64_t X0, Y0, Z0, X1, Y1, Z1;
+        value_t X0, Y0, Z0, X1, Y1, Z1;
         arc4random_buf(&X0, sizeof(X0));
         arc4random_buf(&Y0, sizeof(Y0));
         arc4random_buf(&Z0, sizeof(Z0));
@@ -113,7 +114,7 @@ static void create_triples(MPCServerIO &mpcsrvio, unsigned num)
 static void create_halftriples(MPCServerIO &mpcsrvio, unsigned num)
 {
     for (unsigned int i=0; i<num; ++i) {
-        uint64_t X0, Z0, Y1, Z1;
+        value_t X0, Z0, Y1, Z1;
         arc4random_buf(&X0, sizeof(X0));
         arc4random_buf(&Z0, sizeof(Z0));
         arc4random_buf(&Y1, sizeof(Y1));

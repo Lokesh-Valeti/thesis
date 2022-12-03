@@ -3,23 +3,20 @@
 
 #include <iostream>
 #include <fstream>
-#include <tuple>
 #include <vector>
 #include <deque>
 #include <queue>
 #include <string>
-#include <cstdint>
 
 #include <boost/asio.hpp>
 #include <boost/coroutine2/all.hpp>
 #include <boost/thread.hpp>
 
+#include "types.hpp"
+
 using boost::asio::ip::tcp;
 
-// Classes to represent stored precomputed data (e.g., multiplicative triples)
-
-typedef std::tuple<uint64_t, uint64_t, uint64_t> MultTriple;
-typedef std::tuple<uint64_t, uint64_t> HalfTriple;
+// Classes to represent stored precomputed data (e.g., multiplication triples)
 
 template<typename T>
 class PreCompStorage {

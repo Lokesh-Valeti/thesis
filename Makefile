@@ -10,9 +10,9 @@ OBJS=oblivds.o mpcio.o preproc.o
 $(BIN): $(OBJS)
 	g++ $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-oblivds.o: preproc.hpp mpcio.hpp
-mpcio.o: mpcio.hpp
-preproc.o: preproc.hpp mpcio.hpp
+oblivds.o: preproc.hpp mpcio.hpp types.hpp
+mpcio.o: mpcio.hpp types.hpp
+preproc.o: preproc.hpp mpcio.hpp types.hpp
 
 clean:
 	-rm -f $(BIN) $(OBJS) *.p[01].t*
