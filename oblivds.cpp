@@ -9,7 +9,7 @@ static void usage(const char *progname)
 {
     std::cerr << "Usage: " << progname << " [-p] [-t num] player_num player_addrs args ...\n";
     std::cerr << "-p: preprocessing mode\n";
-    std::cerr << "-t num: use num threads for the computational players\n";
+    std::cerr << "-t num: use num threads\n";
     std::cerr << "player_num = 0 or 1 for the computational players\n";
     std::cerr << "player_num = 2 for the server player\n";
     std::cerr << "player_addrs is omitted for player 0\n";
@@ -22,11 +22,10 @@ static void comp_player_main(boost::asio::io_context &io_context,
     unsigned player, bool preprocessing, int num_threads, const char *p0addr,
     char **args)
 {
-    tcp::socket serversock(io_context);
-    std::deque<tcp::socket> peersocks;
+    std::deque<tcp::socket> peersocks, serversocks;
     mpcio_setup_computational(player, io_context, p0addr, num_threads,
-        peersocks, serversock);
-    MPCIO mpcio(player, preprocessing, peersocks, std::move(serversock));
+        peersocks, serversocks);
+    MPCIO mpcio(player, preprocessing, peersocks, serversocks);
 
     // Queue up the work to be done
     boost::asio::post(io_context, [&]{
@@ -45,19 +44,20 @@ static void comp_player_main(boost::asio::io_context &io_context,
 }
 
 static void server_player_main(boost::asio::io_context &io_context,
-    bool preprocessing, const char *p0addr, const char *p1addr, char **args)
+    bool preprocessing, int num_threads, const char *p0addr,
+    const char *p1addr, char **args)
 {
-    tcp::socket p0sock(io_context), p1sock(io_context);
-    mpcio_setup_server(io_context, p0addr, p1addr, p0sock, p1sock);
-    MPCServerIO mpcserverio(preprocessing, std::move(p0sock),
-        std::move(p1sock));
+    std::deque<tcp::socket> p0socks, p1socks;
+    mpcio_setup_server(io_context, p0addr, p1addr, num_threads,
+        p0socks, p1socks);
+    MPCServerIO mpcserverio(preprocessing, p0socks, p1socks);
 
     // Queue up the work to be done
     boost::asio::post(io_context, [&]{
         if (preprocessing) {
-            preprocessing_server(mpcserverio, args);
+            preprocessing_server(mpcserverio, num_threads, args);
         } else {
-            online_server(mpcserverio, args);
+            online_server(mpcserverio, num_threads, args);
         }
     });
 
@@ -144,7 +144,7 @@ int main(int argc, char **argv)
     if (player < 2) {
         comp_player_main(io_context, player, preprocessing, num_threads, p0addr, args);
     } else {
-        server_player_main(io_context, preprocessing, p0addr, p1addr, args);
+        server_player_main(io_context, preprocessing, num_threads, p0addr, p1addr, args);
     }
 
     return 0;

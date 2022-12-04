@@ -37,61 +37,53 @@ static std::ofstream openfile(const char *prefix, unsigned player,
 // Then that number of objects
 //
 // Repeat the whole thing until type == 0x00 is received
-//
-// The incoming objects are written into num_threads files in a
-// round-robin manner
 
 void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
 {
-    while(1) {
-        unsigned char type = 0;
-        unsigned int num = 0;
-        size_t res = mpcio.serverio.recv(&type, 1);
-        if (res < 1 || type == 0) break;
-        mpcio.serverio.recv(&num, 4);
-        if (type == 0x80) {
-            // Multiplication triples
-            std::vector<std::ofstream> tripfiles;
-            for (int i=0; i<num_threads; ++i) {
-                tripfiles.push_back(openfile("triples", mpcio.player, i));
-            }
-            unsigned thread_num = 0;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num] {
+            MPCTIO tio(mpcio, thread_num);
+            while(1) {
+                unsigned char type = 0;
+                unsigned int num = 0;
+                size_t res = tio.recv_server(&type, 1);
+                if (res < 1 || type == 0) break;
+                tio.recv_server(&num, 4);
+                if (type == 0x80) {
+                    // Multiplication triples
+                    std::ofstream tripfile = openfile("triples",
+                        mpcio.player, thread_num);
 
-            MultTriple T;
-            for (unsigned int i=0; i<num; ++i) {
-                res = mpcio.serverio.recv(&T, sizeof(T));
-                if (res < sizeof(T)) break;
-                tripfiles[thread_num].write((const char *)&T, sizeof(T));
-                thread_num = (thread_num + 1) % num_threads;
-            }
-            for (int i=0; i<num_threads; ++i) {
-                tripfiles[i].close();
-            }
-        } else if (type == 0x81) {
-            // Multiplication half triples
-            std::vector<std::ofstream> halffiles;
-            for (int i=0; i<num_threads; ++i) {
-                halffiles.push_back(openfile("halves", mpcio.player, i));
-            }
-            unsigned thread_num = 0;
+                    MultTriple T;
+                    for (unsigned int i=0; i<num; ++i) {
+                        res = tio.recv_server(&T, sizeof(T));
+                        if (res < sizeof(T)) break;
+                        tripfile.write((const char *)&T, sizeof(T));
+                    }
+                    tripfile.close();
+                } else if (type == 0x81) {
+                    // Multiplication half triples
+                    std::ofstream halffile = openfile("halves",
+                        mpcio.player, thread_num);
 
-            HalfTriple H;
-            for (unsigned int i=0; i<num; ++i) {
-                res = mpcio.serverio.recv(&H, sizeof(H));
-                if (res < sizeof(H)) break;
-                halffiles[thread_num].write((const char *)&H, sizeof(H));
-                thread_num = (thread_num + 1) % num_threads;
+                    HalfTriple H;
+                    for (unsigned int i=0; i<num; ++i) {
+                        res = tio.recv_server(&H, sizeof(H));
+                        if (res < sizeof(H)) break;
+                        halffile.write((const char *)&H, sizeof(H));
+                    }
+                    halffile.close();
+                }
             }
-            for (int i=0; i<num_threads; ++i) {
-                halffiles[i].close();
-            }
-        }
+        });
     }
+    pool.join();
 }
 
 // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
 // (X0*Y1 + Y0*X1) = (Z0+Z1)
-static void create_triples(MPCServerIO &mpcsrvio, unsigned num)
+static void create_triples(MPCServerTIO &stio, unsigned num)
 {
     for (unsigned int i=0; i<num; ++i) {
         value_t X0, Y0, Z0, X1, Y1, Z1;
@@ -104,14 +96,14 @@ static void create_triples(MPCServerIO &mpcsrvio, unsigned num)
         MultTriple T0, T1;
         T0 = std::make_tuple(X0, Y0, Z0);
         T1 = std::make_tuple(X1, Y1, Z1);
-        mpcsrvio.p0io.queue(&T0, sizeof(T0));
-        mpcsrvio.p1io.queue(&T1, sizeof(T1));
+        stio.queue_p0(&T0, sizeof(T0));
+        stio.queue_p1(&T1, sizeof(T1));
     }
 }
 
 // Create half-triples (X0,Z0),(Y1,Z1) such that
 // X0*Y1 = Z0 + Z1
-static void create_halftriples(MPCServerIO &mpcsrvio, unsigned num)
+static void create_halftriples(MPCServerTIO &stio, unsigned num)
 {
     for (unsigned int i=0; i<num; ++i) {
         value_t X0, Z0, Y1, Z1;
@@ -122,46 +114,56 @@ static void create_halftriples(MPCServerIO &mpcsrvio, unsigned num)
         HalfTriple H0, H1;
         H0 = std::make_tuple(X0, Z0);
         H1 = std::make_tuple(Y1, Z1);
-        mpcsrvio.p0io.queue(&H0, sizeof(H0));
-        mpcsrvio.p1io.queue(&H1, sizeof(H1));
+        stio.queue_p0(&H0, sizeof(H0));
+        stio.queue_p1(&H1, sizeof(H1));
     }
 }
 
-void preprocessing_server(MPCServerIO &mpcsrvio, char **args)
+void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
 {
-    while (*args) {
-        char *colon = strchr(*args, ':');
-        if (!colon) {
-            std::cerr << "Args must be type:num\n";
-            ++args;
-            continue;
-        }
-        unsigned num = atoi(colon+1);
-        *colon = '\0';
-        char *type = *args;
-        if (!strcmp(type, "t")) {
-            unsigned char typetag = 0x80;
-            mpcsrvio.p0io.queue(&typetag, 1);
-            mpcsrvio.p0io.queue(&num, 4);
-            mpcsrvio.p1io.queue(&typetag, 1);
-            mpcsrvio.p1io.queue(&num, 4);
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcsrvio, thread_num, args] {
+            char **threadargs = args;
+            MPCServerTIO stio(mpcsrvio, thread_num);
+            while (*threadargs) {
+                char *arg = strdup(*threadargs);
+                char *colon = strchr(arg, ':');
+                if (!colon) {
+                    std::cerr << "Args must be type:num\n";
+                    ++threadargs;
+                    free(arg);
+                    continue;
+                }
+                unsigned num = atoi(colon+1);
+                *colon = '\0';
+                char *type = arg;
+                if (!strcmp(type, "t")) {
+                    unsigned char typetag = 0x80;
+                    stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&num, 4);
+                    stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&num, 4);
 
-            create_triples(mpcsrvio, num);
-        } else if (!strcmp(type, "h")) {
-            unsigned char typetag = 0x81;
-            mpcsrvio.p0io.queue(&typetag, 1);
-            mpcsrvio.p0io.queue(&num, 4);
-            mpcsrvio.p1io.queue(&typetag, 1);
-            mpcsrvio.p1io.queue(&num, 4);
+                    create_triples(stio, num);
+                } else if (!strcmp(type, "h")) {
+                    unsigned char typetag = 0x81;
+                    stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&num, 4);
+                    stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&num, 4);
 
-            create_halftriples(mpcsrvio, num);
-        }
-        ++args;
+                    create_halftriples(stio, num);
+                }
+                free(arg);
+                ++threadargs;
+            }
+            // That's all
+            unsigned char typetag = 0x00;
+            stio.queue_p0(&typetag, 1);
+            stio.queue_p1(&typetag, 1);
+            stio.send();
+        });
     }
-    // That's all
-    unsigned char typetag = 0x00;
-    mpcsrvio.p0io.queue(&typetag, 1);
-    mpcsrvio.p1io.queue(&typetag, 1);
-    mpcsrvio.p0io.send();
-    mpcsrvio.p1io.send();
+    pool.join();
 }

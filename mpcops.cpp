@@ -11,27 +11,27 @@
 // Cost:
 // 1 word sent in 1 message
 // consumes 1 MultTriple
-void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
+void mpc_mul(MPCTIO &tio, yield_t &yield,
     value_t &as_z, value_t as_x, value_t as_y,
     nbits_t nbits)
 {
     value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
-    auto [X, Y, Z] = mpcio.triple(thread_num);
+    auto [X, Y, Z] = tio.triple();
 
     // Send x+X and y+Y
     value_t blind_x = (as_x + X) & mask;
     value_t blind_y = (as_y + Y) & mask;
 
-    mpcio.peerios[thread_num].queue(&blind_x, nbytes);
-    mpcio.peerios[thread_num].queue(&blind_y, nbytes);
+    tio.queue_peer(&blind_x, nbytes);
+    tio.queue_peer(&blind_y, nbytes);
 
     yield();
 
     // Read the peer's x+X and y+Y
     value_t  peer_blind_x, peer_blind_y;
-    mpcio.peerios[thread_num].recv(&peer_blind_x, nbytes);
-    mpcio.peerios[thread_num].recv(&peer_blind_y, nbytes);
+    tio.recv_peer(&peer_blind_x, nbytes);
+    tio.recv_peer(&peer_blind_y, nbytes);
 
     as_z = ((as_x * (as_y + peer_blind_y)) - Y * peer_blind_x + Z) & mask;
 }
@@ -44,28 +44,28 @@ void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
 // Cost:
 // 1 word sent in 1 message
 // consumes 1 HalfTriple
-void mpc_valuemul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
+void mpc_valuemul(MPCTIO &tio, yield_t &yield,
     value_t &as_z, value_t x,
     nbits_t nbits)
 {
     value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
-    auto [X, Z] = mpcio.halftriple(thread_num);
+    auto [X, Z] = tio.halftriple();
 
     // Send x+X
     value_t blind_x = (x + X) & mask;
 
-    mpcio.peerios[thread_num].queue(&blind_x, nbytes);
+    tio.queue_peer(&blind_x, nbytes);
 
     yield();
 
     // Read the peer's y+Y
     value_t  peer_blind_y;
-    mpcio.peerios[thread_num].recv(&peer_blind_y, nbytes);
+    tio.recv_peer(&peer_blind_y, nbytes);
 
-    if (mpcio.player == 0) {
+    if (tio.player() == 0) {
         as_z = ((x * peer_blind_y) + Z) & mask;
-    } else if (mpcio.player == 1) {
+    } else if (tio.player() == 1) {
         as_z = ((-X * peer_blind_y) + Z) & mask;
     }
 }

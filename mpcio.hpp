@@ -185,14 +185,14 @@ struct MPCIO {
     // vector of a type without a copy constructor (tcp::socket is the
     // culprit), but you can have a deque of those for some reason.
     std::deque<MPCSingleIO> peerios;
-    MPCSingleIO serverio;
+    std::deque<MPCSingleIO> serverios;
     std::vector<PreCompStorage<MultTriple>> triples;
     std::vector<PreCompStorage<HalfTriple>> halftriples;
 
     MPCIO(unsigned player, bool preprocessing,
-            std::deque<tcp::socket> &peersocks, tcp::socket &&serversock) :
-        player(player), preprocessing(preprocessing),
-        serverio(std::move(serversock)) {
+            std::deque<tcp::socket> &peersocks,
+            std::deque<tcp::socket> &serversocks):
+        player(player), preprocessing(preprocessing) {
         unsigned num_threads = unsigned(peersocks.size());
         for (unsigned i=0; i<num_threads; ++i) {
             triples.emplace_back(player, preprocessing, "triples", i);
@@ -203,49 +203,136 @@ struct MPCIO {
         for (auto &&sock : peersocks) {
             peerios.emplace_back(std::move(sock));
         }
+        for (auto &&sock : serversocks) {
+            serverios.emplace_back(std::move(sock));
+        }
+    }
+};
+
+// A handle to one thread's sockets and streams in a MPCIO
+
+class MPCTIO {
+    int thread_num;
+    MPCIO &mpcio;
+
+public:
+    MPCTIO(MPCIO &mpcio, int thread_num):
+        thread_num(thread_num), mpcio(mpcio) {}
+
+    // Queue up data to the peer or to the server
+
+    void queue_peer(const void *data, size_t len) {
+        mpcio.peerios[thread_num].queue(data, len);
     }
 
-    void sendall() {
-        for (auto &p: peerios) {
-            p.send();
-        }
-        serverio.send();
+    void queue_server(const void *data, size_t len) {
+        mpcio.serverios[thread_num].queue(data, len);
+    }
+
+    // Receive data from the peer or to the server
+
+    size_t recv_peer(void *data, size_t len) {
+        return mpcio.peerios[thread_num].recv(data, len);
+    }
+
+    size_t recv_server(void *data, size_t len) {
+        return mpcio.serverios[thread_num].recv(data, len);
+    }
+
+    // Send all queued data for this thread
+    void send() {
+        mpcio.peerios[thread_num].send();
+        mpcio.serverios[thread_num].send();
     }
 
     // Functions to get precomputed values.  If we're in the online
     // phase, get them from PreCompStorage.  If we're in the
     // preprocessing phase, read them from the server.
-    MultTriple triple(unsigned thread_num) {
+    MultTriple triple() {
         MultTriple val;
-        if (preprocessing) {
-            serverio.recv(boost::asio::buffer(&val, sizeof(val)));
+        if (mpcio.preprocessing) {
+            mpcio.serverios[thread_num].recv(boost::asio::buffer(&val, sizeof(val)));
         } else {
-            triples[thread_num].get(val);
+            mpcio.triples[thread_num].get(val);
         }
         return val;
     }
 
-    HalfTriple halftriple(unsigned thread_num) {
+    HalfTriple halftriple() {
         HalfTriple val;
-        if (preprocessing) {
-            serverio.recv(boost::asio::buffer(&val, sizeof(val)));
+        if (mpcio.preprocessing) {
+            mpcio.serverios[thread_num].recv(boost::asio::buffer(&val, sizeof(val)));
         } else {
-            halftriples[thread_num].get(val);
+            mpcio.halftriples[thread_num].get(val);
         }
         return val;
     }
+
+    // Accessors
+    inline int player() { return mpcio.player; }
+    inline bool preprocessing() { return mpcio.preprocessing; }
 };
 
 // A class to represent all of the server party's IO, either to
 // computational parties or to local storage
 
 struct MPCServerIO {
-    MPCSingleIO p0io;
-    MPCSingleIO p1io;
+    bool preprocessing;
+    std::deque<MPCSingleIO> p0ios;
+    std::deque<MPCSingleIO> p1ios;
 
-    MPCServerIO(bool preprocessing, tcp::socket &&p0sock,
-            tcp::socket &&p1sock) :
-        p0io(std::move(p0sock)), p1io(std::move(p1sock)) {}
+    MPCServerIO(bool preprocessing,
+            std::deque<tcp::socket> &p0socks,
+            std::deque<tcp::socket> &p1socks) :
+        preprocessing(preprocessing) {
+        for (auto &&sock : p0socks) {
+            p0ios.emplace_back(std::move(sock));
+        }
+        for (auto &&sock : p1socks) {
+            p1ios.emplace_back(std::move(sock));
+        }
+    }
+};
+
+// A handle to one thread's sockets and streams in a MPCServerIO
+
+class MPCServerTIO {
+    int thread_num;
+    MPCServerIO &mpcsrvio;
+
+public:
+    MPCServerTIO(MPCServerIO &mpcsrvio, int thread_num):
+        thread_num(thread_num), mpcsrvio(mpcsrvio) { std::cerr <<
+        "Creating " << thread_num << "\n";}
+
+    // Queue up data to p0 or p1
+
+    void queue_p0(const void *data, size_t len) {
+        mpcsrvio.p0ios[thread_num].queue(data, len);
+    }
+
+    void queue_p1(const void *data, size_t len) {
+        mpcsrvio.p1ios[thread_num].queue(data, len);
+    }
+
+    // Receive data from p0 or p1
+
+    size_t recv_p0(void *data, size_t len) {
+        return mpcsrvio.p0ios[thread_num].recv(data, len);
+    }
+
+    size_t recv_p1(void *data, size_t len) {
+        return mpcsrvio.p1ios[thread_num].recv(data, len);
+    }
+
+    // Send all queued data for this thread
+    void send() {
+        mpcsrvio.p0ios[thread_num].send();
+        mpcsrvio.p1ios[thread_num].send();
+    }
+
+    // Accessors
+    inline bool preprocessing() { return mpcsrvio.preprocessing; }
 };
 
 // Set up the socket connections between the two computational parties
@@ -259,12 +346,14 @@ void mpcio_setup_computational(unsigned player,
     boost::asio::io_context &io_context,
     const char *p0addr,  // can be NULL when player=0
     int num_threads,
-    std::deque<tcp::socket> &peersocks, tcp::socket &serversock);
+    std::deque<tcp::socket> &peersocks,
+    std::deque<tcp::socket> &serversocks);
 
-// Server calls this version with player=2
+// Server calls this version
 
 void mpcio_setup_server(boost::asio::io_context &io_context,
-    const char *p0addr, const char *p1addr,
-    tcp::socket &p0sock, tcp::socket &p1sock);
+    const char *p0addr, const char *p1addr, int num_threads,
+    std::deque<tcp::socket> &p0socks,
+    std::deque<tcp::socket> &p1socks);
 
 #endif

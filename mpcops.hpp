@@ -16,7 +16,7 @@
 // Cost:
 // 1 word sent in 1 message
 // consumes 1 MultTriple
-void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
+void mpc_mul(MPCTIO &tio, yield_t &yield,
     value_t &as_z, value_t as_x, value_t as_y,
     nbits_t nbits = VALUE_BITS);
 
@@ -28,7 +28,7 @@ void mpc_mul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
 // Cost:
 // 1 word sent in 1 message
 // consumes 1 HalfTriple
-void mpc_valuemul(MPCIO &mpcio, size_t thread_num, yield_t &yield,
+void mpc_valuemul(MPCTIO &tio, yield_t &yield,
     value_t &as_z, value_t x,
     nbits_t nbits = VALUE_BITS);
 

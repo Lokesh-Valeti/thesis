@@ -4,6 +4,6 @@
 #include "mpcio.hpp"
 
 void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args);
-void preprocessing_server(MPCServerIO &mpcio, char **args);
+void preprocessing_server(MPCServerIO &mpcio, int num_threads, char **args);
 
 #endif
