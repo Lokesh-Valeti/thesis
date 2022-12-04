@@ -12,7 +12,9 @@ void online_comp(MPCIO &mpcio, int num_threads, char **args)
         nbits = atoi(*args);
     }
 
-    value_t A[5];
+    size_t memsize = 5;
+
+    value_t *A = new value_t[memsize];
 
     arc4random_buf(A, 3*sizeof(value_t));
     std::cout << A[0] << "\n";
@@ -30,6 +32,20 @@ void online_comp(MPCIO &mpcio, int num_threads, char **args)
     run_coroutines(mpcio, coroutines);
     std::cout << A[3] << "\n";
     std::cout << A[4] << "\n";
+
+    // Check the answers
+    if (mpcio.player) {
+        mpcio.peerios[0].queue(A, memsize*sizeof(value_t));
+        mpcio.sendall();
+    } else {
+        value_t *B = new value_t[memsize];
+        mpcio.peerios[0].recv(B, memsize*sizeof(value_t));
+        printf("%016lx\n", ((A[0]+B[0])*(A[1]+B[1])-(A[3]+B[3])));
+        printf("%016lx\n", (A[2]*B[2])-(A[4]+B[4]));
+        delete[] B;
+    }
+
+    delete[] A;
 }
 
 void online_server(MPCServerIO &mpcio, char **args)
