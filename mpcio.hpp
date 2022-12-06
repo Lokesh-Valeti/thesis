@@ -302,8 +302,7 @@ class MPCServerTIO {
 
 public:
     MPCServerTIO(MPCServerIO &mpcsrvio, int thread_num):
-        thread_num(thread_num), mpcsrvio(mpcsrvio) { std::cerr <<
-        "Creating " << thread_num << "\n";}
+        thread_num(thread_num), mpcsrvio(mpcsrvio) {}
 
     // Queue up data to p0 or p1
 
