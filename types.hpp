@@ -13,9 +13,9 @@
 // Values in MPC secret-shared memory are of this type
 
 #if VALUE_BITS == 64
-typedef uint64_t value_t;
+using value_t = uint64_t;
 #elif VALUE_BITS == 32
-typedef uint32_t value_t;
+using value_t = uint32_t;
 #else
 #error "Unsupported value of VALUE_BITS"
 #endif
@@ -32,9 +32,9 @@ typedef uint32_t value_t;
 // Addresses of MPC secret-shared memory are of this type
 
 #if ADDRESS_MAX_BITS <= 32
-typedef uint32_t address_t;
+using address_t = uint32_t;
 #elif ADDRESS_MAX_BITS <= 64
-typedef uint64_t address_t;
+using address_t = uint64_t;
 #else
 #error "Unsupported value of ADDRESS_MAX_BITS"
 #endif
@@ -47,11 +47,11 @@ typedef uint64_t address_t;
 // compliant to treat a bool as an unsigned integer type with values 0
 // and 1.
 
-typedef bool bit_t;
+using bit_t = bool;
 
 // Counts of the number of bits in a value are of this type, which must
 // be large enough to store the _value_ VALUE_BITS
-typedef uint8_t nbits_t;
+using nbits_t = uint8_t;
 
 // Convert a number of bits to the number of bytes required to store (or
 // more to the point, send) them.
@@ -65,12 +65,12 @@ typedef uint8_t nbits_t;
 // correspondingly (X1,Y1,Z1) held by P1), with all values random,
 // but subject to the relation that X0*Y1 + Y0*X1 = Z0+Z1
 
-typedef std::tuple<value_t, value_t, value_t> MultTriple;
+using MultTriple = std::tuple<value_t, value_t, value_t>;
 
 // A half-triple is (X0,Z0) held by P0 (and correspondingly (Y1,Z1) held
 // by P1), with all values random, but subject to the relation that
 // X0*Y1 = Z0+Z1
 
-typedef std::tuple<value_t, value_t> HalfTriple;
+using HalfTriple = std::tuple<value_t, value_t>;
 
 #endif
