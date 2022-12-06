@@ -13,8 +13,8 @@ $(BIN): $(OBJS)
 oblivds.o: preproc.hpp mpcio.hpp types.hpp
 mpcio.o: mpcio.hpp types.hpp
 preproc.o: preproc.hpp mpcio.hpp types.hpp
-online.o: online.hpp mpcops.hpp
-mpcops.o: mpcops.hpp
+online.o: online.hpp mpcops.hpp coroutine.hpp
+mpcops.o: mpcops.hpp coroutine.hpp
 
 clean:
 	-rm -f $(BIN) $(OBJS) *.p[01].t*
