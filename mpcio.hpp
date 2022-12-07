@@ -237,6 +237,14 @@ struct MPCPeerIO : public MPCIO {
         }
         os << "\n";
     }
+
+    void reset_precomp_stats()
+    {
+        for (size_t i=0; i<triples.size(); ++i) {
+            triples[i].reset_stats();
+            halftriples[i].reset_stats();
+        }
+    }
 };
 
 // A class to represent all of the server party's IO, either to
