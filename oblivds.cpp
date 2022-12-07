@@ -32,7 +32,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
         if (preprocessing) {
             preprocessing_comp(mpcio, num_threads, args);
         } else {
-            online_comp(mpcio, num_threads, args);
+            online_main(mpcio, num_threads, args);
         }
     });
 
@@ -57,7 +57,7 @@ static void server_player_main(boost::asio::io_context &io_context,
         if (preprocessing) {
             preprocessing_server(mpcserverio, num_threads, args);
         } else {
-            online_server(mpcserverio, num_threads, args);
+            online_main(mpcserverio, num_threads, args);
         }
     });
 

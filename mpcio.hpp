@@ -350,6 +350,7 @@ public:
     // Accessors
     inline int player() { return mpcio.player; }
     inline bool preprocessing() { return mpcio.preprocessing; }
+    inline bool is_server() { return mpcio.player == 2; }
 };
 
 // Set up the socket connections between the two computational parties

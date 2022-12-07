@@ -4,7 +4,7 @@
 #include "mpcops.hpp"
 
 
-void online_comp(MPCIO &mpcio, int num_threads, char **args)
+static void online_test(MPCIO &mpcio, int num_threads, char **args)
 {
     nbits_t nbits = VALUE_BITS;
 
@@ -48,10 +48,10 @@ void online_comp(MPCIO &mpcio, int num_threads, char **args)
     printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i]);
 
     // Check the answers
-    if (mpcio.player) {
+    if (mpcio.player == 1) {
         tio.queue_peer(A, memsize*sizeof(value_t));
         tio.send();
-    } else {
+    } else if (mpcio.player == 0) {
         value_t *B = new value_t[memsize];
         value_t *S = new value_t[memsize];
         tio.recv_peer(B, memsize*sizeof(value_t));
@@ -66,6 +66,15 @@ void online_comp(MPCIO &mpcio, int num_threads, char **args)
     delete[] A;
 }
 
-void online_server(MPCServerIO &mpcio, int num_threads, char **args)
+void online_main(MPCIO &mpcio, int num_threads, char **args)
 {
+    if (!*args) {
+        std::cerr << "Mode is required as the first argument when not preprocessing.\n";
+        return;
+    } else if (!strcmp(*args, "test")) {
+        ++args;
+        online_test(mpcio, num_threads, args);
+    } else {
+        std::cerr << "Unknown mode " << *args << "\n";
+    }
 }
