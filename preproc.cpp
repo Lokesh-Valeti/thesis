@@ -1,5 +1,4 @@
 #include <vector>
-#include <bsd/stdlib.h> // arc4random_buf
 
 #include "types.hpp"
 #include "preproc.hpp"
@@ -57,8 +56,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
 
                     MultTriple T;
                     for (unsigned int i=0; i<num; ++i) {
-                        res = tio.recv_server(&T, sizeof(T));
-                        if (res < sizeof(T)) break;
+                        T = tio.triple();
                         tripfile.write((const char *)&T, sizeof(T));
                     }
                     tripfile.close();
@@ -79,44 +77,6 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
         });
     }
     pool.join();
-}
-
-// Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
-// (X0*Y1 + Y0*X1) = (Z0+Z1)
-static void create_triples(MPCTIO &stio, unsigned num)
-{
-    for (unsigned int i=0; i<num; ++i) {
-        value_t X0, Y0, Z0, X1, Y1, Z1;
-        arc4random_buf(&X0, sizeof(X0));
-        arc4random_buf(&Y0, sizeof(Y0));
-        arc4random_buf(&Z0, sizeof(Z0));
-        arc4random_buf(&X1, sizeof(X1));
-        arc4random_buf(&Y1, sizeof(Y1));
-        Z1 = X0 * Y1 + X1 * Y0 - Z0;
-        MultTriple T0, T1;
-        T0 = std::make_tuple(X0, Y0, Z0);
-        T1 = std::make_tuple(X1, Y1, Z1);
-        stio.queue_p0(&T0, sizeof(T0));
-        stio.queue_p1(&T1, sizeof(T1));
-    }
-}
-
-// Create half-triples (X0,Z0),(Y1,Z1) such that
-// X0*Y1 = Z0 + Z1
-static void create_halftriples(MPCTIO &stio, unsigned num)
-{
-    for (unsigned int i=0; i<num; ++i) {
-        value_t X0, Z0, Y1, Z1;
-        arc4random_buf(&X0, sizeof(X0));
-        arc4random_buf(&Z0, sizeof(Z0));
-        arc4random_buf(&Y1, sizeof(Y1));
-        Z1 = X0 * Y1 - Z0;
-        HalfTriple H0, H1;
-        H0 = std::make_tuple(X0, Z0);
-        H1 = std::make_tuple(Y1, Z1);
-        stio.queue_p0(&H0, sizeof(H0));
-        stio.queue_p1(&H1, sizeof(H1));
-    }
 }
 
 void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
@@ -145,7 +105,9 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
                     stio.queue_p1(&typetag, 1);
                     stio.queue_p1(&num, 4);
 
-                    create_triples(stio, num);
+                    for (unsigned int i=0; i<num; ++i) {
+                        stio.triple();
+                    }
                 } else if (!strcmp(type, "h")) {
                     unsigned char typetag = 0x81;
                     stio.queue_p0(&typetag, 1);
@@ -153,7 +115,9 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
                     stio.queue_p1(&typetag, 1);
                     stio.queue_p1(&num, 4);
 
-                    create_halftriples(stio, num);
+                    for (unsigned int i=0; i<num; ++i) {
+                        stio.halftriple();
+                    }
                 }
                 free(arg);
                 ++threadargs;

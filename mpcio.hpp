@@ -7,6 +7,7 @@
 #include <deque>
 #include <queue>
 #include <string>
+#include <bsd/stdlib.h> // arc4random_buf
 
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
@@ -254,57 +255,69 @@ public:
     // Queue up data to the peer or to the server
 
     void queue_peer(const void *data, size_t len) {
-        assert(mpcio.player < 2);
-        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        mpcpio.peerios[thread_num].queue(data, len);
+        if (mpcio.player < 2) {
+            MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+            mpcpio.peerios[thread_num].queue(data, len);
+        }
     }
 
     void queue_server(const void *data, size_t len) {
-        assert(mpcio.player < 2);
-        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        mpcpio.serverios[thread_num].queue(data, len);
+        if (mpcio.player < 2) {
+            MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+            mpcpio.serverios[thread_num].queue(data, len);
+        }
     }
 
     // Receive data from the peer or to the server
 
     size_t recv_peer(void *data, size_t len) {
-        assert(mpcio.player < 2);
-        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        return mpcpio.peerios[thread_num].recv(data, len);
+        if (mpcio.player < 2) {
+            MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+            return mpcpio.peerios[thread_num].recv(data, len);
+        }
+        return 0;
     }
 
     size_t recv_server(void *data, size_t len) {
-        assert(mpcio.player < 2);
-        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        return mpcpio.serverios[thread_num].recv(data, len);
+        if (mpcio.player < 2) {
+            MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+            return mpcpio.serverios[thread_num].recv(data, len);
+        }
+        return 0;
     }
 
     // Queue up data to p0 or p1
 
     void queue_p0(const void *data, size_t len) {
-        assert(mpcio.player == 2);
-        MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
-        mpcsrvio.p0ios[thread_num].queue(data, len);
+        if (mpcio.player == 2) {
+            MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
+            mpcsrvio.p0ios[thread_num].queue(data, len);
+        }
     }
 
     void queue_p1(const void *data, size_t len) {
-        assert(mpcio.player == 2);
-        MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
-        mpcsrvio.p1ios[thread_num].queue(data, len);
+        if (mpcio.player == 2) {
+            MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
+            mpcsrvio.p1ios[thread_num].queue(data, len);
+        }
     }
 
     // Receive data from p0 or p1
 
     size_t recv_p0(void *data, size_t len) {
-        assert(mpcio.player == 2);
-        MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
-        return mpcsrvio.p0ios[thread_num].recv(data, len);
+        if (mpcio.player == 2) {
+            MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
+            return mpcsrvio.p0ios[thread_num].recv(data, len);
+        }
+        return 0;
     }
 
     size_t recv_p1(void *data, size_t len) {
-        assert(mpcio.player == 2);
-        MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
-        return mpcsrvio.p1ios[thread_num].recv(data, len);
+        if (mpcio.player == 2) {
+            MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
+            return mpcsrvio.p1ios[thread_num].recv(data, len);
+        }
+        return 0;
     }
 
     // Send all queued data for this thread
@@ -324,25 +337,55 @@ public:
     // phase, get them from PreCompStorage.  If we're in the
     // preprocessing phase, read them from the server.
     MultTriple triple() {
-        assert(mpcio.player < 2);
-        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         MultTriple val;
-        if (mpcpio.preprocessing) {
-            mpcpio.serverios[thread_num].recv(boost::asio::buffer(&val, sizeof(val)));
-        } else {
-            mpcpio.triples[thread_num].get(val);
+        if (mpcio.player < 2) {
+            MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+            if (mpcpio.preprocessing) {
+                recv_server(&val, sizeof(val));
+            } else {
+                mpcpio.triples[thread_num].get(val);
+            }
+        } else if (mpcio.preprocessing) {
+            // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
+            // (X0*Y1 + Y0*X1) = (Z0+Z1)
+            value_t X0, Y0, Z0, X1, Y1, Z1;
+            arc4random_buf(&X0, sizeof(X0));
+            arc4random_buf(&Y0, sizeof(Y0));
+            arc4random_buf(&Z0, sizeof(Z0));
+            arc4random_buf(&X1, sizeof(X1));
+            arc4random_buf(&Y1, sizeof(Y1));
+            Z1 = X0 * Y1 + X1 * Y0 - Z0;
+            MultTriple T0, T1;
+            T0 = std::make_tuple(X0, Y0, Z0);
+            T1 = std::make_tuple(X1, Y1, Z1);
+            queue_p0(&T0, sizeof(T0));
+            queue_p1(&T1, sizeof(T1));
         }
         return val;
     }
 
     HalfTriple halftriple() {
-        assert(mpcio.player < 2);
-        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         HalfTriple val;
-        if (mpcpio.preprocessing) {
-            mpcpio.serverios[thread_num].recv(boost::asio::buffer(&val, sizeof(val)));
-        } else {
-            mpcpio.halftriples[thread_num].get(val);
+        if (mpcio.player < 2) {
+            MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+            if (mpcpio.preprocessing) {
+                mpcpio.serverios[thread_num].recv(boost::asio::buffer(&val, sizeof(val)));
+            } else {
+                mpcpio.halftriples[thread_num].get(val);
+            }
+        } else if (mpcio.preprocessing) {
+            // Create half-triples (X0,Z0),(Y1,Z1) such that
+            // X0*Y1 = Z0 + Z1
+            value_t X0, Z0, Y1, Z1;
+            arc4random_buf(&X0, sizeof(X0));
+            arc4random_buf(&Z0, sizeof(Z0));
+            arc4random_buf(&Y1, sizeof(Y1));
+            Z1 = X0 * Y1 - Z0;
+            HalfTriple H0, H1;
+            H0 = std::make_tuple(X0, Z0);
+            H1 = std::make_tuple(Y1, Z1);
+            queue_p0(&H0, sizeof(H0));
+            queue_p1(&H1, sizeof(H1));
         }
         return val;
     }

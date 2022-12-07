@@ -15,13 +15,16 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
     size_t memsize = 13;
 
     MPCTIO tio(mpcio, 0);
+    bool is_server = (mpcio.player == 2);
 
     value_t *A = new value_t[memsize];
 
-    arc4random_buf(A, memsize*sizeof(value_t));
-    A[5] &= 1;
-    A[8] &= 1;
-    printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i]);
+    if (!is_server) {
+        arc4random_buf(A, memsize*sizeof(value_t));
+        A[5] &= 1;
+        A[8] &= 1;
+        printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i]);
+    }
     std::vector<coro_t> coroutines;
     coroutines.emplace_back(
         [&](yield_t &yield) {
@@ -44,8 +47,10 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
             mpc_xs_to_as(tio, yield, A[12], A[11], nbits);
         });
     run_coroutines(tio, coroutines);
-    printf("\n");
-    printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i]);
+    if (!is_server) {
+        printf("\n");
+        printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i]);
+    }
 
     // Check the answers
     if (mpcio.player == 1) {

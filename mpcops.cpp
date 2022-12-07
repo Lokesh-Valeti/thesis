@@ -16,8 +16,6 @@ void mpc_mul(MPCTIO &tio, yield_t &yield,
     value_t &as_z, value_t as_x, value_t as_y,
     nbits_t nbits)
 {
-    if (tio.is_server()) return;
-
     const value_t mask = MASKBITS(nbits);
     // Compute as_z to be an additive share of (x0*y1+y0*x1)
     mpc_cross(tio, yield, as_z, as_x, as_y, nbits);
@@ -36,8 +34,6 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
     value_t &as_z, value_t as_x, value_t as_y,
     nbits_t nbits)
 {
-    if (tio.is_server()) return;
-
     const value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
     auto [X, Y, Z] = tio.triple();
@@ -71,8 +67,6 @@ void mpc_valuemul(MPCTIO &tio, yield_t &yield,
     value_t &as_z, value_t x,
     nbits_t nbits)
 {
-    if (tio.is_server()) return;
-
     const value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
     auto [X, Z] = tio.halftriple();
@@ -107,8 +101,6 @@ void mpc_flagmult(MPCTIO &tio, yield_t &yield,
     value_t &as_z, bit_t bs_f, value_t as_y,
     nbits_t nbits)
 {
-    if (tio.is_server()) return;
-
     const value_t mask = MASKBITS(nbits);
 
     // Compute additive shares of [(1-2*f0)*y0]*f1 + [(1-2*f1)*y1]*f0
@@ -136,8 +128,6 @@ void mpc_select(MPCTIO &tio, yield_t &yield,
     value_t &as_z, bit_t bs_f, value_t as_x, value_t as_y,
     nbits_t nbits)
 {
-    if (tio.is_server()) return;
-
     const value_t mask = MASKBITS(nbits);
 
     // The desired result is z = x + f * (y-x)
@@ -158,8 +148,6 @@ void mpc_oswap(MPCTIO &tio, yield_t &yield,
     value_t &as_x, value_t &as_y, bit_t bs_f,
     nbits_t nbits)
 {
-    if (tio.is_server()) return;
-
     const value_t mask = MASKBITS(nbits);
 
     // Let s = f*(y-x).  Then the desired result is
@@ -180,8 +168,6 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     value_t &as_x, value_t xs_x,
     nbits_t nbits)
 {
-    if (tio.is_server()) return;
-
     const value_t mask = MASKBITS(nbits);
 
     // We use the fact that for any nbits-bit A and B,
