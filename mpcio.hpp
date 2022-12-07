@@ -24,8 +24,12 @@ public:
     PreCompStorage(unsigned player, bool preprocessing,
         const char *filenameprefix, unsigned thread_num);
     void get(T& nextval);
+
+    inline size_t get_stats() { return count; }
+    inline void reset_stats() { count = 0; }
 private:
     std::ifstream storage;
+    size_t count;
 };
 
 template<typename T>
@@ -41,6 +45,7 @@ PreCompStorage<T>::PreCompStorage(unsigned player, bool preprocessing,
         std::cerr << "Failed to open " << filename << "\n";
         exit(1);
     }
+    count = 0;
 }
 
 template<typename T>
@@ -50,6 +55,7 @@ void PreCompStorage<T>::get(T& nextval) {
         std::cerr << "Failed to read precomputed value from storage\n";
         exit(1);
     }
+    ++count;
 }
 
 // A class to wrap a socket to another MPC party.  This wrapping allows
@@ -218,6 +224,18 @@ struct MPCPeerIO : public MPCIO {
         for (auto &&sock : serversocks) {
             serverios.emplace_back(std::move(sock));
         }
+    }
+
+    void dump_precomp_stats(std::ostream &os)
+    {
+        for (size_t i=0; i<triples.size(); ++i) {
+            if (i > 0) {
+                os << " ";
+            }
+            os << "T" << i << " t:" << triples[i].get_stats() <<
+                " h:" << halftriples[i].get_stats();
+        }
+        os << "\n";
     }
 };
 
