@@ -25,7 +25,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
     std::deque<tcp::socket> peersocks, serversocks;
     mpcio_setup_computational(player, io_context, p0addr, num_threads,
         peersocks, serversocks);
-    MPCIO mpcio(player, preprocessing, peersocks, serversocks);
+    MPCPeerIO mpcio(player, preprocessing, peersocks, serversocks);
 
     // Queue up the work to be done
     boost::asio::post(io_context, [&]{

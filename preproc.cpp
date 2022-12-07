@@ -83,7 +83,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
 
 // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
 // (X0*Y1 + Y0*X1) = (Z0+Z1)
-static void create_triples(MPCServerTIO &stio, unsigned num)
+static void create_triples(MPCTIO &stio, unsigned num)
 {
     for (unsigned int i=0; i<num; ++i) {
         value_t X0, Y0, Z0, X1, Y1, Z1;
@@ -103,7 +103,7 @@ static void create_triples(MPCServerTIO &stio, unsigned num)
 
 // Create half-triples (X0,Z0),(Y1,Z1) such that
 // X0*Y1 = Z0 + Z1
-static void create_halftriples(MPCServerTIO &stio, unsigned num)
+static void create_halftriples(MPCTIO &stio, unsigned num)
 {
     for (unsigned int i=0; i<num; ++i) {
         value_t X0, Z0, Y1, Z1;
@@ -125,7 +125,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcsrvio, thread_num, args] {
             char **threadargs = args;
-            MPCServerTIO stio(mpcsrvio, thread_num);
+            MPCTIO stio(mpcsrvio, thread_num);
             while (*threadargs) {
                 char *arg = strdup(*threadargs);
                 char *colon = strchr(arg, ':');
