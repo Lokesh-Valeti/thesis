@@ -86,7 +86,24 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
         boost::asio::post(pool, [&mpcsrvio, thread_num, args] {
             char **threadargs = args;
             MPCTIO stio(mpcsrvio, thread_num);
-            while (*threadargs) {
+            if (*threadargs && threadargs[0][0] == 'T') {
+                // Per-thread initialization.  The args look like:
+                // T0 t:50 h:10 T1 t:20 h:30 T2 h:20
+
+                // Skip to the arg marking our thread
+                char us[20];
+                sprintf(us, "T%u", thread_num);
+                while (*threadargs && strcmp(*threadargs, us)) {
+                    ++threadargs;
+                }
+                // Now skip to the next arg if there is one
+                if (*threadargs) {
+                    ++threadargs;
+                }
+            }
+            // Stop scanning for args when we get to the end or when we
+            // get to another per-thread initialization marker
+            while (*threadargs && threadargs[0][0] != 'T') {
                 char *arg = strdup(*threadargs);
                 char *colon = strchr(arg, ':');
                 if (!colon) {
