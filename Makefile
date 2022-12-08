@@ -5,16 +5,11 @@ LDFLAGS=-ggdb
 LDLIBS=-lbsd -lboost_system -lboost_context -lboost_thread -lpthread
 
 BIN=oblivds
-OBJS=oblivds.o mpcio.o preproc.o online.o mpcops.o
+SRCS=oblivds.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp
+OBJS=$(SRCS:.cpp=.o)
 
 $(BIN): $(OBJS)
 	g++ $(LDFLAGS) -o $@ $^ $(LDLIBS)
-
-oblivds.o: preproc.hpp mpcio.hpp types.hpp
-mpcio.o: mpcio.hpp types.hpp
-preproc.o: preproc.hpp mpcio.hpp types.hpp
-online.o: online.hpp mpcops.hpp coroutine.hpp
-mpcops.o: mpcops.hpp coroutine.hpp
 
 # Remove the files created by the preprocessing phase
 reset:
@@ -22,3 +17,14 @@ reset:
 
 clean: reset
 	-rm -f $(BIN) $(OBJS)
+
+depend:
+	makedepend -Y -- $(CXXFLAGS) -- $(SRCS)
+
+# DO NOT DELETE THIS LINE -- make depend depends on it.
+
+oblivds.o: mpcio.hpp types.hpp preproc.hpp online.hpp
+mpcio.o: mpcio.hpp types.hpp
+preproc.o: types.hpp preproc.hpp mpcio.hpp
+online.o: online.hpp mpcio.hpp types.hpp mpcops.hpp coroutine.hpp
+mpcops.o: mpcops.hpp types.hpp mpcio.hpp coroutine.hpp
