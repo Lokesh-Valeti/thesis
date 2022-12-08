@@ -65,7 +65,9 @@ void PreCompStorage<T>::get(T& nextval) {
 class MPCSingleIO {
     tcp::socket sock;
     size_t totread, totwritten;
+#ifdef RECORD_IOTRACE
     std::vector<ssize_t> iotrace;
+#endif
 
     // To avoid blocking if both we and our peer are trying to send
     // something very large, and neither side is receiving, we will send
@@ -134,7 +136,9 @@ public:
         // Ignore spurious calls to send()
         if (thissize == 0) return;
 
+#ifdef RECORD_IOTRACE
         iotrace.push_back(thissize);
+#endif
 
         messagequeuelock.lock();
         // Move the current message to send into the message queue (this
@@ -150,16 +154,21 @@ public:
 
     size_t recv(const boost::asio::mutable_buffer& buffer) {
         size_t res = boost::asio::read(sock, buffer);
+#ifdef RECORD_IOTRACE
         iotrace.push_back(-(ssize_t(res)));
+#endif
         return res;
     }
 
     size_t recv(void *data, size_t len) {
         size_t res = boost::asio::read(sock, boost::asio::buffer(data, len));
+#ifdef RECORD_IOTRACE
         iotrace.push_back(-(ssize_t(res)));
+#endif
         return res;
     }
 
+#ifdef RECORD_IOTRACE
     void dumptrace(std::ostream &os, const char *label = NULL) {
         if (label) {
             os << label << " ";
@@ -174,6 +183,7 @@ public:
     void resettrace() {
         iotrace.clear();
     }
+#endif
 };
 
 // A base class to represent all of a computation peer or server's IO,
