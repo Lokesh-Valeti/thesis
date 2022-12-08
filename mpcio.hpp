@@ -148,12 +148,6 @@ public:
         messagequeuelock.unlock();
     }
 
-    size_t recv(const std::vector<boost::asio::mutable_buffer>& buffers) {
-        size_t res = boost::asio::read(sock, buffers);
-        iotrace.push_back(-(ssize_t(res)));
-        return res;
-    }
-
     size_t recv(const boost::asio::mutable_buffer& buffer) {
         size_t res = boost::asio::read(sock, buffer);
         iotrace.push_back(-(ssize_t(res)));
