@@ -77,6 +77,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
         });
     }
     pool.join();
+    std::cout << "Lamport clock = " << mpcio.lamport << "\n";
 }
 
 void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
@@ -147,4 +148,5 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
         });
     }
     pool.join();
+    std::cout << "Lamport clock = " << mpcsrvio.lamport << "\n";
 }

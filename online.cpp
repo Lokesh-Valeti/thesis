@@ -73,6 +73,8 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
         mpcpio.dump_precomp_stats(std::cout);
     }
 
+    std::cout << "Lamport clock = " << mpcio.lamport << "\n";
+
     delete[] A;
 }
 
