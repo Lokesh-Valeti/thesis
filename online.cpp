@@ -78,6 +78,35 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
     delete[] A;
 }
 
+static void lamport_test(MPCIO &mpcio, int num_threads, char **args)
+{
+    // Create a bunch of threads and send a bunch of data to the other
+    // peer, and receive their data.  If an arg is specified, repeat
+    // that many times.  The Lamport clock at the end should be just the
+    // number of repetitions.
+    size_t niters = (*args == NULL) ? 1 : atoi(*args);
+
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num, niters] {
+            MPCTIO tio(mpcio, thread_num);
+            const size_t bufsize = 1<<20;
+            char *sendbuf = new char[bufsize];
+            char *recvbuf = new char[bufsize];
+            for (size_t i=0; i<niters; ++i) {
+                arc4random_buf(sendbuf, bufsize);
+                tio.queue_peer(sendbuf, bufsize);
+                tio.send();
+                tio.recv_peer(recvbuf, bufsize);
+            }
+            delete[] recvbuf;
+            delete[] sendbuf;
+        });
+    }
+    pool.join();
+    std::cout << "Lamport clock = " << mpcio.lamport << "\n";
+}
+
 void online_main(MPCIO &mpcio, int num_threads, char **args)
 {
     if (!*args) {
@@ -86,6 +115,9 @@ void online_main(MPCIO &mpcio, int num_threads, char **args)
     } else if (!strcmp(*args, "test")) {
         ++args;
         online_test(mpcio, num_threads, args);
+    } else if (!strcmp(*args, "lamporttest")) {
+        ++args;
+        lamport_test(mpcio, num_threads, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
