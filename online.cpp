@@ -83,21 +83,37 @@ static void lamport_test(MPCIO &mpcio, int num_threads, char **args)
     // Create a bunch of threads and send a bunch of data to the other
     // peer, and receive their data.  If an arg is specified, repeat
     // that many times.  The Lamport clock at the end should be just the
-    // number of repetitions.
-    size_t niters = (*args == NULL) ? 1 : atoi(*args);
+    // number of repetitions.  Subsequent args are the chunk size and
+    // the number of chunks per message
+    size_t niters = 1;
+    size_t chunksize = 1<<20;
+    size_t numchunks = 1;
+    if (*args) {
+        niters = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        chunksize = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        numchunks = atoi(*args);
+        ++args;
+    }
 
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, niters] {
+        boost::asio::post(pool, [&mpcio, thread_num, niters, chunksize, numchunks] {
             MPCTIO tio(mpcio, thread_num);
-            const size_t bufsize = 1<<20;
-            char *sendbuf = new char[bufsize];
-            char *recvbuf = new char[bufsize];
+            char *sendbuf = new char[chunksize];
+            char *recvbuf = new char[chunksize*numchunks];
             for (size_t i=0; i<niters; ++i) {
-                arc4random_buf(sendbuf, bufsize);
-                tio.queue_peer(sendbuf, bufsize);
+                for (size_t chunk=0; chunk<numchunks; ++chunk) {
+                    arc4random_buf(sendbuf, chunksize);
+                    tio.queue_peer(sendbuf, chunksize);
+                }
                 tio.send();
-                tio.recv_peer(recvbuf, bufsize);
+                tio.recv_peer(recvbuf, chunksize*numchunks);
             }
             delete[] recvbuf;
             delete[] sendbuf;
