@@ -120,7 +120,6 @@ static void lamport_test(MPCIO &mpcio, int num_threads, char **args)
         });
     }
     pool.join();
-    std::cout << "Lamport clock = " << mpcio.lamport << "\n";
 }
 
 void online_main(MPCIO &mpcio, int num_threads, char **args)

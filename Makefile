@@ -2,7 +2,7 @@ all: oblivds
 
 CXXFLAGS=-std=c++17 -Wall -ggdb
 LDFLAGS=-ggdb
-LDLIBS=-lbsd -lboost_system -lboost_context -lboost_thread -lpthread
+LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthread
 
 BIN=oblivds
 SRCS=oblivds.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp

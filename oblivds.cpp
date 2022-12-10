@@ -41,6 +41,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
     boost::thread t([&]{io_context.run();});
     io_context.run();
     t.join();
+    mpcio.dump_stats(std::cout);
 }
 
 static void server_player_main(boost::asio::io_context &io_context,
@@ -66,6 +67,7 @@ static void server_player_main(boost::asio::io_context &io_context,
     boost::thread t([&]{io_context.run();});
     io_context.run();
     t.join();
+    mpcserverio.dump_stats(std::cout);
 }
 
 int main(int argc, char **argv)
