@@ -68,13 +68,6 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
         delete[] S;
     }
 
-    if (!is_server) {
-        MPCPeerIO &mpcpio = static_cast<MPCPeerIO &>(mpcio);
-        mpcpio.dump_precomp_stats(std::cout);
-    }
-
-    std::cout << "Lamport clock = " << mpcio.lamport << "\n";
-
     delete[] A;
 }
 

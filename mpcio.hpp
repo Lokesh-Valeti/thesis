@@ -422,6 +422,13 @@ struct MPCPeerIO : public MPCIO {
             halftriples[i].reset_stats();
         }
     }
+
+    void dump_stats(std::ostream &os)
+    {
+        MPCIO::dump_stats(os);
+        os << "Precomputed values used: ";
+        dump_precomp_stats(os);
+    }
 };
 
 // A class to represent all of the server party's IO, either to
