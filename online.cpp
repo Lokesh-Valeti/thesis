@@ -12,18 +12,31 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
         nbits = atoi(*args);
     }
 
-    size_t memsize = 13;
+    size_t memsize = 9;
 
     MPCTIO tio(mpcio, 0);
     bool is_server = (mpcio.player == 2);
 
-    value_t *A = new value_t[memsize];
+    RegAS *A = new RegAS[memsize];
+    value_t V;
+    RegBS F0, F1;
+    RegXS X;
 
     if (!is_server) {
-        arc4random_buf(A, memsize*sizeof(value_t));
-        A[5] &= 1;
-        A[8] &= 1;
-        printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i]);
+        A[0].randomize();
+        A[1].randomize();
+        F0.randomize();
+        A[4].randomize();
+        F1.randomize();
+        A[6].randomize();
+        A[7].randomize();
+        X.randomize();
+        arc4random_buf(&V, sizeof(V));
+        printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i].ashare);
+        printf("V  : %016lX\n", V);
+        printf("F0 : %01X\n", F0.bshare);
+        printf("F1 : %01X\n", F1.bshare);
+        printf("X  : %016lX\n", X.xshare);
     }
     std::vector<coro_t> coroutines;
     coroutines.emplace_back(
@@ -32,38 +45,59 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
         });
     coroutines.emplace_back(
         [&](yield_t &yield) {
-            mpc_valuemul(tio, yield, A[4], A[3], nbits);
+            mpc_valuemul(tio, yield, A[3], V, nbits);
         });
     coroutines.emplace_back(
         [&](yield_t &yield) {
-            mpc_flagmult(tio, yield, A[7], A[5], A[6], nbits);
+            mpc_flagmult(tio, yield, A[5], F0, A[4], nbits);
         });
     coroutines.emplace_back(
         [&](yield_t &yield) {
-            mpc_oswap(tio, yield, A[9], A[10], A[8], nbits);
+            mpc_oswap(tio, yield, A[6], A[7], F1, nbits);
         });
     coroutines.emplace_back(
         [&](yield_t &yield) {
-            mpc_xs_to_as(tio, yield, A[12], A[11], nbits);
+            mpc_xs_to_as(tio, yield, A[8], X, nbits);
         });
     run_coroutines(tio, coroutines);
     if (!is_server) {
         printf("\n");
-        printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i]);
+        printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i].ashare);
     }
 
     // Check the answers
     if (mpcio.player == 1) {
-        tio.queue_peer(A, memsize*sizeof(value_t));
+        tio.queue_peer(A, memsize*sizeof(RegAS));
+        tio.queue_peer(&V, sizeof(V));
+        tio.queue_peer(&F0, sizeof(RegBS));
+        tio.queue_peer(&F1, sizeof(RegBS));
+        tio.queue_peer(&X, sizeof(RegXS));
         tio.send();
     } else if (mpcio.player == 0) {
-        value_t *B = new value_t[memsize];
+        RegAS *B = new RegAS[memsize];
+        RegBS BF0, BF1;
+        RegXS BX;
+        value_t BV;
         value_t *S = new value_t[memsize];
-        tio.recv_peer(B, memsize*sizeof(value_t));
-        for(size_t i=0; i<memsize; ++i) S[i] = A[i]+B[i];
+        bit_t SF0, SF1;
+        value_t SX;
+        tio.recv_peer(B, memsize*sizeof(RegAS));
+        tio.recv_peer(&BV, sizeof(BV));
+        tio.recv_peer(&BF0, sizeof(RegBS));
+        tio.recv_peer(&BF1, sizeof(RegBS));
+        tio.recv_peer(&BX, sizeof(RegXS));
+        for(size_t i=0; i<memsize; ++i) S[i] = A[i].ashare+B[i].ashare;
+        SF0 = F0.bshare ^ BF0.bshare;
+        SF1 = F1.bshare ^ BF1.bshare;
+        SX = X.xshare ^ BX.xshare;
         printf("S:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, S[i]);
+        printf("SF0: %01X\n", SF0);
+        printf("SF1: %01X\n", SF1);
+        printf("SX : %016lX\n", SX);
         printf("\n%016lx\n", S[0]*S[1]-S[2]);
-        printf("%016lx\n", (A[3]*B[3])-S[4]);
+        printf("%016lx\n", (V*BV)-S[3]);
+        printf("%016lx\n", (SF0*S[4])-S[5]);
+        printf("%016lx\n", S[8]-SX);
         delete[] B;
         delete[] S;
     }

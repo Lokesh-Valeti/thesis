@@ -1,10 +1,5 @@
 #include "mpcops.hpp"
 
-// as_ denotes additive shares
-// xs_ denotes xor shares
-// bs_ denotes a share of a single bit (which is effectively both an xor
-//     share and an additive share mod 2)
-
 // P0 and P1 both hold additive shares of x (shares are x0 and x1) and y
 // (shares are y0 and y1); compute additive shares of z = x*y =
 // (x0+x1)*(y0+y1). x, y, and z are each at most nbits bits long.
@@ -13,14 +8,14 @@
 // 2 words sent in 1 message
 // consumes 1 MultTriple
 void mpc_mul(MPCTIO &tio, yield_t &yield,
-    value_t &as_z, value_t as_x, value_t as_y,
+    RegAS &z, RegAS x, RegAS y,
     nbits_t nbits)
 {
     const value_t mask = MASKBITS(nbits);
-    // Compute as_z to be an additive share of (x0*y1+y0*x1)
-    mpc_cross(tio, yield, as_z, as_x, as_y, nbits);
+    // Compute z to be an additive share of (x0*y1+y0*x1)
+    mpc_cross(tio, yield, z, x, y, nbits);
     // Add x0*y0 (the peer will add x1*y1)
-    as_z = (as_z + as_x * as_y) & mask;
+    z.ashare = (z.ashare + x.ashare * y.ashare) & mask;
 }
 
 // P0 and P1 both hold additive shares of x (shares are x0 and x1) and y
@@ -31,7 +26,7 @@ void mpc_mul(MPCTIO &tio, yield_t &yield,
 // 2 words sent in 1 message
 // consumes 1 MultTriple
 void mpc_cross(MPCTIO &tio, yield_t &yield,
-    value_t &as_z, value_t as_x, value_t as_y,
+    RegAS &z, RegAS x, RegAS y,
     nbits_t nbits)
 {
     const value_t mask = MASKBITS(nbits);
@@ -39,8 +34,8 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
     auto [X, Y, Z] = tio.triple();
 
     // Send x+X and y+Y
-    value_t blind_x = (as_x + X) & mask;
-    value_t blind_y = (as_y + Y) & mask;
+    value_t blind_x = (x.ashare + X) & mask;
+    value_t blind_y = (y.ashare + Y) & mask;
 
     tio.queue_peer(&blind_x, nbytes);
     tio.queue_peer(&blind_y, nbytes);
@@ -52,7 +47,7 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
     tio.recv_peer(&peer_blind_x, nbytes);
     tio.recv_peer(&peer_blind_y, nbytes);
 
-    as_z = ((as_x * peer_blind_y) - (Y * peer_blind_x) + Z) & mask;
+    z.ashare = ((x.ashare * peer_blind_y) - (Y * peer_blind_x) + Z) & mask;
 }
 
 // P0 holds the (complete) value x, P1 holds the (complete) value y;
@@ -64,7 +59,7 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
 // 1 word sent in 1 message
 // consumes 1 HalfTriple
 void mpc_valuemul(MPCTIO &tio, yield_t &yield,
-    value_t &as_z, value_t x,
+    RegAS &z, value_t x,
     nbits_t nbits)
 {
     const value_t mask = MASKBITS(nbits);
@@ -83,9 +78,9 @@ void mpc_valuemul(MPCTIO &tio, yield_t &yield,
     tio.recv_peer(&peer_blind_y, nbytes);
 
     if (tio.player() == 0) {
-        as_z = ((x * peer_blind_y) + Z) & mask;
+        z.ashare = ((x * peer_blind_y) + Z) & mask;
     } else if (tio.player() == 1) {
-        as_z = ((-X * peer_blind_y) + Z) & mask;
+        z.ashare = ((-X * peer_blind_y) + Z) & mask;
     }
 }
 
@@ -98,17 +93,19 @@ void mpc_valuemul(MPCTIO &tio, yield_t &yield,
 // 2 words sent in 1 message
 // consumes 1 MultTriple
 void mpc_flagmult(MPCTIO &tio, yield_t &yield,
-    value_t &as_z, bit_t bs_f, value_t as_y,
+    RegAS &z, RegBS f, RegAS y,
     nbits_t nbits)
 {
     const value_t mask = MASKBITS(nbits);
 
     // Compute additive shares of [(1-2*f0)*y0]*f1 + [(1-2*f1)*y1]*f0
-    value_t bs_fval = value_t(bs_f);
-    mpc_cross(tio, yield, as_z, (1-2*bs_fval)*as_y, bs_fval, nbits);
+    value_t bs_fval = value_t(f.bshare);
+    RegAS fval;
+    fval.ashare = bs_fval;
+    mpc_cross(tio, yield, z, y*(1-2*bs_fval), fval, nbits);
 
     // Add f0*y0 (and the peer will add f1*y1)
-    as_z = (as_z + bs_fval*as_y) & mask;
+    z.ashare = (z.ashare + bs_fval*y.ashare) & mask;
 
     // Now the shares add up to:
     // [(1-2*f0)*y0]*f1 + [(1-2*f1)*y1]*f0 + f0*y0 + f1*y1
@@ -125,14 +122,14 @@ void mpc_flagmult(MPCTIO &tio, yield_t &yield,
 // 2 words sent in 1 message
 // consumes 1 MultTriple
 void mpc_select(MPCTIO &tio, yield_t &yield,
-    value_t &as_z, bit_t bs_f, value_t as_x, value_t as_y,
+    RegAS &z, RegBS f, RegAS x, RegAS y,
     nbits_t nbits)
 {
     const value_t mask = MASKBITS(nbits);
 
     // The desired result is z = x + f * (y-x)
-    mpc_flagmult(tio, yield, as_z, bs_f, as_y-as_x, nbits);
-    as_z = (as_z + as_x) & mask;
+    mpc_flagmult(tio, yield, z, f, y-x, nbits);
+    z.ashare = (z.ashare + x.ashare) & mask;
 }
 
 // P0 and P1 hold bit shares f0 and f1 of the single bit f, and additive
@@ -145,17 +142,17 @@ void mpc_select(MPCTIO &tio, yield_t &yield,
 // 2 words sent in 1 message
 // consumes 1 MultTriple
 void mpc_oswap(MPCTIO &tio, yield_t &yield,
-    value_t &as_x, value_t &as_y, bit_t bs_f,
+    RegAS &x, RegAS &y, RegBS f,
     nbits_t nbits)
 {
     const value_t mask = MASKBITS(nbits);
 
     // Let s = f*(y-x).  Then the desired result is
     // x <- x + s, y <- y - s.
-    value_t as_s;
-    mpc_flagmult(tio, yield, as_s, bs_f, as_y-as_x, nbits);
-    as_x = (as_x + as_s) & mask;
-    as_y = (as_y - as_s) & mask;
+    RegAS s;
+    mpc_flagmult(tio, yield, s, f, y-x, nbits);
+    x.ashare = (x.ashare + s.ashare) & mask;
+    y.ashare = (y.ashare - s.ashare) & mask;
 }
 
 // P0 and P1 hold XOR shares of x. Compute additive shares of the same
@@ -165,7 +162,7 @@ void mpc_oswap(MPCTIO &tio, yield_t &yield,
 // nbits-1 words sent in 1 message
 // consumes nbits-1 HalfTriples
 void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
-    value_t &as_x, value_t xs_x,
+    RegAS &as_x, RegXS xs_x,
     nbits_t nbits)
 {
     const value_t mask = MASKBITS(nbits);
@@ -188,18 +185,18 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     // message, then yield, so that all of their messages get sent at
     // once, then each will read their results.
 
-    value_t as_bitand[nbits-1];
+    RegAS as_bitand[nbits-1];
     std::vector<coro_t> coroutines;
     for (nbits_t i=0; i<nbits-1; ++i) {
         coroutines.emplace_back(
             [&](yield_t &yield) {
-                mpc_valuemul(tio, yield, as_bitand[i], (xs_x>>i)&1, nbits);
+                mpc_valuemul(tio, yield, as_bitand[i], (xs_x.xshare>>i)&1, nbits);
             });
     }
     run_coroutines(yield, coroutines);
     value_t as_C = 0;
     for (nbits_t i=0; i<nbits-1; ++i) {
-        as_C += (as_bitand[i]<<(i+1));
+        as_C += (as_bitand[i].ashare<<(i+1));
     }
-    as_x = (xs_x - as_C) & mask;
+    as_x.ashare = (xs_x.xshare - as_C) & mask;
 }
