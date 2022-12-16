@@ -25,6 +25,6 @@ depend:
 
 prac.o: mpcio.hpp types.hpp preproc.hpp online.hpp
 mpcio.o: mpcio.hpp types.hpp
-preproc.o: types.hpp preproc.hpp mpcio.hpp
+preproc.o: types.hpp coroutine.hpp mpcio.hpp preproc.hpp
 online.o: online.hpp mpcio.hpp types.hpp mpcops.hpp coroutine.hpp
 mpcops.o: mpcops.hpp types.hpp mpcio.hpp coroutine.hpp

@@ -4,6 +4,8 @@
 #include <vector>
 #include <boost/coroutine2/coroutine.hpp>
 
+#include "mpcio.hpp"
+
 typedef boost::coroutines2::coroutine<void>::pull_type  coro_t;
 typedef boost::coroutines2::coroutine<void>::push_type  yield_t;
 
