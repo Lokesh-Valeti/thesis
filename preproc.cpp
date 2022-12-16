@@ -3,6 +3,7 @@
 #include "types.hpp"
 #include "coroutine.hpp"
 #include "preproc.hpp"
+#include "rdpf.hpp"
 
 // Open a file for writing with name the given prefix, and ".pX.tY"
 // suffix, where X is the (one-digit) player number and Y is the thread
@@ -80,7 +81,8 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
                             [&](yield_t &yield) {
-                                //rdpf_gen(stio, yield, depth);
+                                RDPF rdpf;
+                                rdpf_gen(tio, yield, rdpf, type);
                             });
                     }
                 }
@@ -162,7 +164,8 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
                         for (unsigned int i=0; i<num; ++i) {
                             coroutines.emplace_back(
                                 [&](yield_t &yield) {
-                                    //rdpf_gen(stio, yield, depth);
+                                    RDPF rdpf;
+                                    rdpf_gen(stio, yield, rdpf, depth);
                                 });
                         }
                     }

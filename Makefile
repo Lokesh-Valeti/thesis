@@ -5,7 +5,7 @@ LDFLAGS=-ggdb
 LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthread
 
 BIN=prac
-SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp
+SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp rdpf.cpp
 OBJS=$(SRCS:.cpp=.o)
 
 $(BIN): $(OBJS)
@@ -25,6 +25,7 @@ depend:
 
 prac.o: mpcio.hpp types.hpp preproc.hpp online.hpp
 mpcio.o: mpcio.hpp types.hpp
-preproc.o: types.hpp coroutine.hpp mpcio.hpp preproc.hpp
+preproc.o: types.hpp coroutine.hpp mpcio.hpp preproc.hpp rdpf.hpp
 online.o: online.hpp mpcio.hpp types.hpp mpcops.hpp coroutine.hpp
 mpcops.o: mpcops.hpp types.hpp mpcio.hpp coroutine.hpp
+rdpf.o: rdpf.hpp mpcio.hpp types.hpp coroutine.hpp bitutils.hpp

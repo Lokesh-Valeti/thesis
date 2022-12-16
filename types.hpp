@@ -3,6 +3,7 @@
 
 #include <tuple>
 #include <cstdint>
+#include <x86intrin.h>  // SSE and AVX intrinsics
 #include <bsd/stdlib.h> // arc4random_buf
 
 // The number of bits in an MPC secret-shared memory word
@@ -176,5 +177,13 @@ using MultTriple = std::tuple<value_t, value_t, value_t>;
 // X0*Y1 = Z0+Z1
 
 using HalfTriple = std::tuple<value_t, value_t>;
+
+// The type of nodes in a DPF
+
+using DPFnode = __m128i;
+
+struct RDPF {
+    DPFnode seed;
+};
 
 #endif
