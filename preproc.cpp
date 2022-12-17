@@ -81,8 +81,9 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
                             [&](yield_t &yield) {
-                                RDPF rdpf;
-                                rdpf_gen(tio, yield, rdpf, type);
+                                RegXS ri;
+                                ri.randomize();
+                                RDPF rdpf(tio, yield, ri, type);
                             });
                     }
                 }
@@ -164,8 +165,8 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
                         for (unsigned int i=0; i<num; ++i) {
                             coroutines.emplace_back(
                                 [&](yield_t &yield) {
-                                    RDPF rdpf;
-                                    rdpf_gen(stio, yield, rdpf, depth);
+                                    RegXS ri;
+                                    RDPF rdpf(stio, yield, ri, depth);
                                 });
                         }
                     }

@@ -189,14 +189,6 @@ using DPFnode = __m128i;
 // only used while creating RDPFs in the preprocessing phase, so we
 // never need to store them.
 
-// You can't put __m128i types directly into a tuple because of
-// alignment attributes, but you can put them in a structure.
-struct AndTriple {
-    DPFnode X, Y, Z;
-};
-
-struct RDPF {
-    DPFnode seed;
-};
+using AndTriple = std::tuple<DPFnode, DPFnode, DPFnode>;
 
 #endif

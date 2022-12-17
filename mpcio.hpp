@@ -165,6 +165,7 @@ struct MPCIO {
     atomic_lamport_t lamport;
     std::vector<size_t> msgs_sent;
     std::vector<size_t> msg_bytes_sent;
+    std::vector<size_t> aes_ops;
     boost::chrono::steady_clock::time_point steady_start;
     boost::chrono::process_cpu_clock::time_point cpu_start;
 
@@ -279,6 +280,7 @@ public:
     inline int player() { return mpcio.player; }
     inline bool preprocessing() { return mpcio.preprocessing; }
     inline bool is_server() { return mpcio.player == 2; }
+    inline size_t& aes_ops() { return mpcio.aes_ops[thread_num]; }
 };
 
 // Set up the socket connections between the two computational parties

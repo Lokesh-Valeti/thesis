@@ -179,9 +179,11 @@ void MPCIO::reset_stats()
 {
     msgs_sent.clear();
     msg_bytes_sent.clear();
+    aes_ops.clear();
     for (size_t i=0; i<num_threads; ++i) {
         msgs_sent.push_back(0);
         msg_bytes_sent.push_back(0);
+        aes_ops.push_back(0);
     }
     steady_start = boost::chrono::steady_clock::now();
     cpu_start = boost::chrono::process_cpu_clock::now();
@@ -191,11 +193,15 @@ void MPCIO::dump_stats(std::ostream &os)
 {
     size_t tot_msgs_sent = 0;
     size_t tot_msg_bytes_sent = 0;
+    size_t tot_aes_ops = 0;
     for (auto& n : msgs_sent) {
         tot_msgs_sent += n;
     }
     for (auto& n : msg_bytes_sent) {
         tot_msg_bytes_sent += n;
+    }
+    for (auto& n : aes_ops) {
+        tot_aes_ops += n;
     }
     auto steady_elapsed =
         boost::chrono::steady_clock::now() - steady_start;
@@ -204,6 +210,7 @@ void MPCIO::dump_stats(std::ostream &os)
 
     os << tot_msgs_sent << " messages sent\n";
     os << tot_msg_bytes_sent << " message bytes sent\n";
+    os << tot_aes_ops << " local AES operations\n";
     os << lamport << " Lamport clock (latencies)\n";
     os << boost::chrono::duration_cast
         <boost::chrono::milliseconds>(steady_elapsed) <<
