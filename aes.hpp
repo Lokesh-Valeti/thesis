@@ -1,3 +1,6 @@
+#ifndef __AES_HPP__
+#define __AES_HPP__
+
 /* Based on reference code from the Intel AES-NI whitepaper
  * http://www.intel.com/content/dam/doc/white-paper/advanced-encryption-standard-new-instructions-set-paper.pdf
  */
@@ -70,3 +73,5 @@ static inline void AES_ECB_encrypt(__m128i &ciphertext, __m128i plaintext, const
     tmp = _mm_aesenclast_si128 (tmp,key[j]);
     ciphertext=tmp;
 }
+
+#endif

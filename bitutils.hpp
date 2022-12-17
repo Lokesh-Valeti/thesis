@@ -5,6 +5,7 @@
 #ifndef __BITUTILS_HPP__
 #define __BITUTILS_HPP__
 
+#include <cstdint>
 #include <x86intrin.h>  // SSE and AVX intrinsics
 
 static const __m128i bool128_mask[2] = {
