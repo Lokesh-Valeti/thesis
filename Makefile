@@ -1,6 +1,6 @@
 all: prac
 
-CXXFLAGS=-std=c++17 -Wall -ggdb
+CXXFLAGS=-march=native -std=c++17 -Wall -ggdb
 LDFLAGS=-ggdb
 LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthread
 
@@ -28,4 +28,4 @@ mpcio.o: mpcio.hpp types.hpp
 preproc.o: types.hpp coroutine.hpp mpcio.hpp preproc.hpp rdpf.hpp
 online.o: online.hpp mpcio.hpp types.hpp mpcops.hpp coroutine.hpp
 mpcops.o: mpcops.hpp types.hpp mpcio.hpp coroutine.hpp
-rdpf.o: rdpf.hpp mpcio.hpp types.hpp coroutine.hpp bitutils.hpp
+rdpf.o: rdpf.hpp mpcio.hpp types.hpp coroutine.hpp bitutils.hpp aes.hpp
