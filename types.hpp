@@ -178,9 +178,22 @@ using MultTriple = std::tuple<value_t, value_t, value_t>;
 
 using HalfTriple = std::tuple<value_t, value_t>;
 
-// The type of nodes in a DPF
+// The type of nodes in a DPF.  This must be at least as many bits as
+// the security parameter, and at least twice as many bits as value_t.
 
 using DPFnode = __m128i;
+
+// An AND triple is a triple of (X0,Y0,Z0) of DPFnodes held by P0 (and
+// correspondingly (X1,Y1,Z1) held by P1), with all values random, but
+// subject to the relation that (X0&Y1) ^ (Y0&X1) = Z0^Z1.  These are
+// only used while creating RDPFs in the preprocessing phase, so we
+// never need to store them.
+
+// You can't put __m128i types directly into a tuple because of
+// alignment attributes, but you can put them in a structure.
+struct AndTriple {
+    DPFnode X, Y, Z;
+};
 
 struct RDPF {
     DPFnode seed;
