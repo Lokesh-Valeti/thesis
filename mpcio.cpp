@@ -466,6 +466,37 @@ HalfTriple MPCTIO::halftriple()
     return val;
 }
 
+AndTriple MPCTIO::andtriple()
+{
+    AndTriple val;
+    if (mpcio.player < 2) {
+        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+        if (mpcpio.preprocessing) {
+            recv_server(&val, sizeof(val));
+        } else {
+            std::cerr << "Attempted to read AndTriple in online phase\n";
+        }
+    } else if (mpcio.preprocessing) {
+        // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
+        // (X0&Y1 ^ Y0&X1) = (Z0^Z1)
+        DPFnode X0, Y0, Z0, X1, Y1, Z1;
+        arc4random_buf(&X0, sizeof(X0));
+        arc4random_buf(&Y0, sizeof(Y0));
+        arc4random_buf(&Z0, sizeof(Z0));
+        arc4random_buf(&X1, sizeof(X1));
+        arc4random_buf(&Y1, sizeof(Y1));
+        Z1 = _mm_xor_si128(
+            _mm_xor_si128(_mm_and_si128(X0, Y1), _mm_and_si128(X1, Y0)),
+            Z0);
+        AndTriple T0, T1;
+        T0 = std::make_tuple(X0, Y0, Z0);
+        T1 = std::make_tuple(X1, Y1, Z1);
+        queue_p0(&T0, sizeof(T0));
+        queue_p1(&T1, sizeof(T1));
+    }
+    return val;
+}
+
 // The port number for the P1 -> P0 connection
 static const unsigned short port_p1_p0 = 2115;
 

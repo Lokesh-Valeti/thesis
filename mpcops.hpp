@@ -86,4 +86,13 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     RegAS &as_x, RegXS xs_x,
     nbits_t nbits = VALUE_BITS);
 
+// P0 and P1 hold bit shares of f, and DPFnode XOR shares x0,y0 and
+// x1,y1 of x and y.  Set z to x=x0^x1 if f=0 and to y=y0^y1 if f=1.
+//
+// Cost:
+// 6 64-bit words sent in 2 messages
+// consumes one AndTriple
+void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
+    DPFnode &z, RegBS f, DPFnode x, DPFnode y);
+
 #endif

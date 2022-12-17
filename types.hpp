@@ -98,6 +98,17 @@ struct RegAS {
     }
 };
 
+// The type of a register holding a bit share
+struct RegBS {
+    bit_t bshare;
+
+    // Set each side's share to a random bit
+    inline void randomize() {
+        arc4random_buf(&bshare, sizeof(bshare));
+        bshare &= 1;
+    }
+};
+
 // The type of a register holding an XOR share of a value
 struct RegXS {
     value_t xshare;
@@ -130,16 +141,12 @@ struct RegXS {
         res &= mask;
         return res;
     }
-};
 
-// The type of a register holding a bit share
-struct RegBS {
-    bit_t bshare;
-
-    // Set each side's share to a random bit
-    inline void randomize() {
-        arc4random_buf(&bshare, sizeof(bshare));
-        bshare &= 1;
+    // Extract a bit share of bit bitnum of the XOR-shared register
+    inline RegBS bit(bit_t bitnum) const {
+        RegBS bs;
+        bs.bshare = !!(xshare & (size_t(1)<<bitnum));
+        return bs;
     }
 };
 

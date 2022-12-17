@@ -1,4 +1,5 @@
 #include "mpcops.hpp"
+#include "bitutils.hpp"
 
 // P0 and P1 both hold additive shares of x (shares are x0 and x1) and y
 // (shares are y0 and y1); compute additive shares of z = x*y =
@@ -199,4 +200,54 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
         as_C += (as_bitand[i].ashare<<(i+1));
     }
     as_x.ashare = (xs_x.xshare - as_C) & mask;
+}
+
+// P0 and P1 hold bit shares of f, and DPFnode XOR shares x0,y0 and
+// x1,y1 of x and y.  Set z to x=x0^x1 if f=0 and to y=y0^y1 if f=1.
+//
+// Cost:
+// 6 64-bit words sent in 2 messages
+// consumes one AndTriple
+void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
+    DPFnode &z, RegBS f, DPFnode x, DPFnode y)
+{
+    // Sign-extend f (so 0 -> 0000...0; 1 -> 1111...1)
+    DPFnode fext = if128_mask[f.bshare];
+
+    // Compute XOR shares of f & (x ^ y)
+    auto [X, Y, Z] = tio.andtriple();
+
+    DPFnode blind_f = _mm_xor_si128(fext, X);
+    DPFnode d = _mm_xor_si128(x, y);
+    DPFnode blind_d = _mm_xor_si128(d, Y);
+
+    // Send the blinded values
+    tio.queue_peer(&blind_f, sizeof(blind_f));
+    tio.queue_peer(&blind_d, sizeof(blind_d));
+
+    yield();
+
+    // Read the peer's values
+    DPFnode peer_blind_f, peer_blind_d;
+    tio.recv_peer(&peer_blind_f, sizeof(peer_blind_f));
+    tio.recv_peer(&peer_blind_d, sizeof(peer_blind_d));
+
+    // Compute _our share_ of f ? x : y = (f & (x ^ y))^x
+    DPFnode zshare = _mm_xor_si128(
+        _mm_xor_si128(
+            _mm_xor_si128(
+                _mm_and_si128(fext, peer_blind_d),
+                _mm_and_si128(Y, peer_blind_f)),
+            _mm_and_si128(fext, d)),
+        _mm_xor_si128(Z, x));
+
+    // Now exchange shares
+    tio.queue_peer(&zshare, sizeof(zshare));
+
+    yield();
+
+    DPFnode peer_zshare;
+    tio.recv_peer(&peer_zshare, sizeof(peer_zshare));
+
+    z = _mm_xor_si128(zshare, peer_zshare);
 }
