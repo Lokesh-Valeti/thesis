@@ -143,9 +143,9 @@ struct RegXS {
     }
 
     // Extract a bit share of bit bitnum of the XOR-shared register
-    inline RegBS bit(bit_t bitnum) const {
+    inline RegBS bit(nbits_t bitnum) const {
         RegBS bs;
-        bs.bshare = !!(xshare & (size_t(1)<<bitnum));
+        bs.bshare = !!(xshare & (value_t(1)<<bitnum));
         return bs;
     }
 };

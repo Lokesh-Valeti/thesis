@@ -82,7 +82,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                         coroutines.emplace_back(
                             [&](yield_t &yield) {
                                 RegXS ri;
-                                ri.randomize();
+                                ri.randomize(type);
                                 RDPF rdpf(tio, yield, ri, type);
                             });
                     }
