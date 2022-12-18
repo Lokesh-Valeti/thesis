@@ -28,6 +28,9 @@ static void dump_level(DPFnode *nodes, size_t num, const char *label = NULL)
 // writes.  The DPF is construction collaboratively by P0 and P1,
 // with the server P2 helping by providing various kinds of
 // correlated randomness, such as MultTriples and AndTriples.
+//
+// This algorithm is based on Appendix C from the Duoram paper, with a
+// small optimization noted below.
 RDPF::RDPF(MPCTIO &tio, yield_t &yield,
     RegXS target, nbits_t depth)
 {
@@ -81,7 +84,7 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
             }
         }
         // If we're going left (bs_choice = 0), we want the correction
-        // work to be the XOR of our right side and our peer's right
+        // word to be the XOR of our right side and our peer's right
         // side; if bs_choice = 1, it should be the XOR or our left side
         // and our peer's left side.
 
@@ -91,6 +94,14 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
         // different _must_ be different.  That is, it's not enough for
         // the nodes of the child selected by choice to be different as
         // 128-bit values; they also have to be different in their lsb.
+
+        // This is where we make a small optimization over Appendix C of
+        // the Duoram paper: instead of keeping separate correction flag
+        // bits for the left and right children, we observe that the low
+        // bit of the overall correction word effectively serves as one
+        // of those bits, so we just need to store one extra bit per
+        // level, not two.  (We arbitrarily choose the one for the right
+        // child.)
 
         // Note that the XOR of our left and right child before and
         // after applying the correction word won't change, since the
