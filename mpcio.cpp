@@ -1,4 +1,5 @@
 #include "mpcio.hpp"
+#include "bitutils.hpp"
 
 template<typename T>
 PreCompStorage<T>::PreCompStorage(unsigned player, bool preprocessing,
@@ -466,31 +467,40 @@ HalfTriple MPCTIO::halftriple()
     return val;
 }
 
-AndTriple MPCTIO::andtriple()
+SelectTriple MPCTIO::selecttriple()
 {
-    AndTriple val;
+    SelectTriple val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         if (mpcpio.preprocessing) {
-            recv_server(&val, sizeof(val));
+            recv_server(&val.X, sizeof(val.X));
+            recv_server(&val.Y, sizeof(val.Y));
+            recv_server(&val.Z, sizeof(val.Z));
         } else {
-            std::cerr << "Attempted to read AndTriple in online phase\n";
+            std::cerr << "Attempted to read SelectTriple in online phase\n";
         }
     } else if (mpcio.preprocessing) {
         // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
-        // (X0&Y1 ^ Y0&X1) = (Z0^Z1)
-        DPFnode X0, Y0, Z0, X1, Y1, Z1;
-        arc4random_buf(&X0, sizeof(X0));
+        // (X0*Y1 ^ Y0*X1) = (Z0^Z1)
+        bit_t X0, X1;
+        DPFnode Y0, Z0, Y1, Z1;
+        X0 = arc4random() & 1;
         arc4random_buf(&Y0, sizeof(Y0));
         arc4random_buf(&Z0, sizeof(Z0));
-        arc4random_buf(&X1, sizeof(X1));
+        X1 = arc4random() & 1;
         arc4random_buf(&Y1, sizeof(Y1));
-        Z1 = ((X0 & Y1) ^ (X1 & Y0)) ^ Z0;
-        AndTriple T0, T1;
-        T0 = std::make_tuple(X0, Y0, Z0);
-        T1 = std::make_tuple(X1, Y1, Z1);
-        queue_p0(&T0, sizeof(T0));
-        queue_p1(&T1, sizeof(T1));
+        DPFnode X0ext, X1ext;
+        // Sign-extend X0 and X1 (so that 0 -> 0000...0 and
+        // 1 -> 1111...1)
+        X0ext = if128_mask[X0];
+        X1ext = if128_mask[X1];
+        Z1 = ((X0ext & Y1) ^ (X1ext & Y0)) ^ Z0;
+        queue_p0(&X0, sizeof(X0));
+        queue_p0(&Y0, sizeof(Y0));
+        queue_p0(&Z0, sizeof(Z0));
+        queue_p1(&X1, sizeof(X1));
+        queue_p1(&Y1, sizeof(Y1));
+        queue_p1(&Z1, sizeof(Z1));
     }
     return val;
 }

@@ -190,12 +190,16 @@ using HalfTriple = std::tuple<value_t, value_t>;
 
 using DPFnode = __m128i;
 
-// An AND triple is a triple of (X0,Y0,Z0) of DPFnodes held by P0 (and
-// correspondingly (X1,Y1,Z1) held by P1), with all values random, but
-// subject to the relation that (X0&Y1) ^ (Y0&X1) = Z0^Z1.  These are
-// only used while creating RDPFs in the preprocessing phase, so we
-// never need to store them.
+// A Select triple is a triple of (X0,Y0,Z0) where X0 is a bit and Y0
+// and Z0 are DPFnodes held by P0 (and correspondingly (X1,Y1,Z1) held
+// by P1), with all values random, but subject to the relation that
+// (X0*Y1) ^ (Y0*X1) = Z0^Z1.  These are only used while creating RDPFs
+// in the preprocessing phase, so we never need to store them.  This is
+// a struct instead of a tuple for alignment reasons.
 
-using AndTriple = std::tuple<DPFnode, DPFnode, DPFnode>;
+struct SelectTriple {
+    bit_t X;
+    DPFnode Y, Z;
+};
 
 #endif

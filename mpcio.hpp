@@ -274,7 +274,7 @@ public:
 
     MultTriple triple();
     HalfTriple halftriple();
-    AndTriple andtriple();
+    SelectTriple selecttriple();
 
     // Accessors
 

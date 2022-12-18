@@ -27,15 +27,16 @@ struct RDPF {
 
     // Construct a DPF with the given (XOR-shared) target location, and
     // of the given depth, to be used for random-access memory reads and
-    // writes.  The DPF is construction collaboratively by P0 and P1,
-    // with the server P2 helping by providing various kinds of
-    // correlated randomness, such as MultTriples and AndTriples.
+    // writes.  The DPF is constructed collaboratively by P0 and P1,
+    // with the server P2 helping by providing correlated randomness,
+    // such as SelectTriples.
     //
     // Cost:
-    // (3 DPFnode + 1 byte)*depth + 1 word communication in
+    // (2 DPFnode + 2 bytes)*depth + 1 word communication in
     // 2*depth + 1 messages
-    // 3*depth DPFnode communication from P2 to each party
-    // 2^{depth+1}-2 local AES operations
+    // (2 DPFnode + 1 byte)*depth communication from P2 to each party
+    // 2^{depth+1}-2 local AES operations for P0,P1
+    // 0 local AES operations for P2
     RDPF(MPCTIO &tio, yield_t &yield,
         RegXS target, nbits_t depth);
 };
