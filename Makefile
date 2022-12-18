@@ -7,6 +7,7 @@ LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthr
 BIN=prac
 SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp rdpf.cpp
 OBJS=$(SRCS:.cpp=.o)
+ASMS=$(SRCS:.cpp=.s)
 
 $(BIN): $(OBJS)
 	g++ $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -19,7 +20,7 @@ reset:
 	-rm -f *.p[01].t*
 
 clean: reset
-	-rm -f $(BIN) $(OBJS)
+	-rm -f $(BIN) $(OBJS) $(ASMS)
 
 depend:
 	makedepend -Y -- $(CXXFLAGS) -- $(SRCS)
