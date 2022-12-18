@@ -90,8 +90,8 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
             for(size_t i=0;i<curlevel_size;++i) {
                 DPFnode lchild, rchild;
                 prgboth(lchild, rchild, curlevel[i], aesops);
-                L = _mm_xor_si128(L, lchild);
-                R = _mm_xor_si128(R, rchild);
+                L = (L ^ lchild);
+                R = (R ^ rchild);
                 if (nextlevel) {
                     nextlevel[2*i] = lchild;
                     nextlevel[2*i+1] = rchild;
@@ -142,7 +142,7 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
         // = 1 because everything cancels out except player (for which
         // one player is 0 and the other is 1).
 
-        bool our_parity_bit = get_lsb(_mm_xor_si128(L,R)) ^ !!player;
+        bool our_parity_bit = get_lsb(L ^ R) ^ !!player;
         DPFnode our_parity = lsb128_mask[our_parity_bit];
 
         DPFnode CW;
@@ -159,12 +159,12 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
         coroutines.emplace_back(
             [&](yield_t &yield) {
                 mpc_reconstruct_choice(tio, yield, CW, bs_choice,
-                    _mm_xor_si128(R,our_parity), L);
+                    (R ^ our_parity), L);
             });
         run_coroutines(yield, coroutines);
         bool parity_bit = our_parity_bit ^ peer_parity_bit;
         cfbits |= (size_t(parity_bit)<<level);
-        DPFnode CWR = _mm_xor_si128(CW,lsb128_mask[parity_bit]);
+        DPFnode CWR = CW ^ lsb128_mask[parity_bit];
         if (player < 2) {
             if (level < depth-1) {
                 for(size_t i=0;i<curlevel_size;++i) {

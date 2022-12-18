@@ -217,9 +217,9 @@ void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
     // Compute XOR shares of f & (x ^ y)
     auto [X, Y, Z] = tio.andtriple();
 
-    DPFnode blind_f = _mm_xor_si128(fext, X);
-    DPFnode d = _mm_xor_si128(x, y);
-    DPFnode blind_d = _mm_xor_si128(d, Y);
+    DPFnode blind_f = fext ^ X;
+    DPFnode d = x ^ y;
+    DPFnode blind_d = d ^ Y;
 
     // Send the blinded values
     tio.queue_peer(&blind_f, sizeof(blind_f));
@@ -233,13 +233,9 @@ void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
     tio.recv_peer(&peer_blind_d, sizeof(peer_blind_d));
 
     // Compute _our share_ of f ? x : y = (f & (x ^ y))^x
-    DPFnode zshare = _mm_xor_si128(
-        _mm_xor_si128(
-            _mm_xor_si128(
-                _mm_and_si128(fext, peer_blind_d),
-                _mm_and_si128(Y, peer_blind_f)),
-            _mm_and_si128(fext, d)),
-        _mm_xor_si128(Z, x));
+    DPFnode zshare =
+            (fext & peer_blind_d) ^ (Y & peer_blind_f) ^
+            (fext & d) ^ (Z ^ x);
 
     // Now exchange shares
     tio.queue_peer(&zshare, sizeof(zshare));
@@ -249,5 +245,5 @@ void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
     DPFnode peer_zshare;
     tio.recv_peer(&peer_zshare, sizeof(peer_zshare));
 
-    z = _mm_xor_si128(zshare, peer_zshare);
+    z = zshare ^ peer_zshare;
 }

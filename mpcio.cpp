@@ -485,9 +485,7 @@ AndTriple MPCTIO::andtriple()
         arc4random_buf(&Z0, sizeof(Z0));
         arc4random_buf(&X1, sizeof(X1));
         arc4random_buf(&Y1, sizeof(Y1));
-        Z1 = _mm_xor_si128(
-            _mm_xor_si128(_mm_and_si128(X0, Y1), _mm_and_si128(X1, Y0)),
-            Z0);
+        Z1 = ((X0 & Y1) ^ (X1 & Y0)) ^ Z0;
         AndTriple T0, T1;
         T0 = std::make_tuple(X0, Y0, Z0);
         T1 = std::make_tuple(X1, Y1, Z1);
