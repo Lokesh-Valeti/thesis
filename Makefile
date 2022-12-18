@@ -11,6 +11,9 @@ OBJS=$(SRCS:.cpp=.o)
 $(BIN): $(OBJS)
 	g++ $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
+%.s: %.cpp
+	g++ $(CXXFLAGS) -S -o $@ $^
+
 # Remove the files created by the preprocessing phase
 reset:
 	-rm -f *.p[01].t*
