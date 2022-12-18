@@ -473,7 +473,9 @@ SelectTriple MPCTIO::selecttriple()
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         if (mpcpio.preprocessing) {
-            recv_server(&val.X, sizeof(val.X));
+            uint8_t Xbyte;
+            recv_server(&Xbyte, sizeof(Xbyte));
+            val.X = Xbyte & 1;
             recv_server(&val.Y, sizeof(val.Y));
             recv_server(&val.Z, sizeof(val.Z));
         } else {

@@ -154,7 +154,9 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
             [&](yield_t &yield) {
                 tio.queue_peer(&our_parity_bit, 1);
                 yield();
-                tio.recv_peer(&peer_parity_bit, 1);
+                uint8_t peer_parity_byte;
+                tio.recv_peer(&peer_parity_byte, 1);
+                peer_parity_bit = peer_parity_byte & 1;
             });
         coroutines.emplace_back(
             [&](yield_t &yield) {
