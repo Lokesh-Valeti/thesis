@@ -71,8 +71,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
 
                     HalfTriple H;
                     for (unsigned int i=0; i<num; ++i) {
-                        res = tio.recv_server(&H, sizeof(H));
-                        if (res < sizeof(H)) break;
+                        H = tio.halftriple();
                         halffile.write((const char *)&H, sizeof(H));
                     }
                     halffile.close();
