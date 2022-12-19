@@ -56,7 +56,45 @@ struct RDPF {
 
 // I/O for RDPFs
 
-MPCSingleIOStream& operator>>(MPCSingleIOStream &is, RDPF &rdpf);
-MPCSingleIOStream& operator<<(MPCSingleIOStream &os, const RDPF &rdpf);
+template <typename T>
+T& operator>>(T &is, RDPF &rdpf)
+{
+    is.read((char *)&rdpf.seed, sizeof(rdpf.seed));
+    uint8_t depth;
+    assert(depth <= VALUE_BITS);
+    is.read((char *)&depth, sizeof(depth));
+    rdpf.cw.clear();
+    for (uint8_t i=0; i<depth; ++i) {
+        DPFnode cw;
+        is.read((char *)&cw, sizeof(cw));
+        rdpf.cw.push_back(cw);
+    }
+    value_t cfbits = 0;
+    is.read((char *)&cfbits, BITBYTES(depth));
+    rdpf.cfbits = cfbits;
+    is.read((char *)&rdpf.unit_sum_inverse, sizeof(rdpf.unit_sum_inverse));
+    is.read((char *)&rdpf.scaled_sum, sizeof(rdpf.scaled_sum));
+    is.read((char *)&rdpf.scaled_xor, sizeof(rdpf.scaled_xor));
+
+    return is;
+}
+
+template <typename T>
+T& operator<<(T &os, const RDPF &rdpf)
+{
+    os.write((const char *)&rdpf.seed, sizeof(rdpf.seed));
+    uint8_t depth = rdpf.cw.size();
+    assert(depth <= VALUE_BITS);
+    os.write((const char *)&depth, sizeof(depth));
+    for (uint8_t i=0; i<depth; ++i) {
+        os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));
+    }
+    os.write((const char *)&rdpf.cfbits, BITBYTES(depth));
+    os.write((const char *)&rdpf.unit_sum_inverse, sizeof(rdpf.unit_sum_inverse));
+    os.write((const char *)&rdpf.scaled_sum, sizeof(rdpf.scaled_sum));
+    os.write((const char *)&rdpf.scaled_xor, sizeof(rdpf.scaled_xor));
+
+    return os;
+}
 
 #endif
