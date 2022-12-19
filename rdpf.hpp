@@ -2,6 +2,7 @@
 #define __RDPF_HPP__
 
 #include <vector>
+#include <iostream>
 
 #include "mpcio.hpp"
 #include "coroutine.hpp"
@@ -25,6 +26,8 @@ struct RDPF {
     // of the leaf values for P0 and P1 XOR to M_xs * e_{target}
     RegXS scaled_xor;
 
+    RDPF() {}
+
     // Construct a DPF with the given (XOR-shared) target location, and
     // of the given depth, to be used for random-access memory reads and
     // writes.  The DPF is constructed collaboratively by P0 and P1,
@@ -39,6 +42,21 @@ struct RDPF {
     // 0 local AES operations for P2
     RDPF(MPCTIO &tio, yield_t &yield,
         RegXS target, nbits_t depth);
+
+    // The number of bytes it will take to store this RDPF
+    size_t size() const;
+
+    // The number of bytes it will take to store a RDPF of the given
+    // depth
+    static size_t size(nbits_t depth);
+
+    // The depth
+    inline nbits_t depth() const { return cw.size(); }
 };
+
+// I/O for RDPFs
+
+MPCSingleIOStream& operator>>(MPCSingleIOStream &is, RDPF &rdpf);
+MPCSingleIOStream& operator<<(MPCSingleIOStream &os, const RDPF &rdpf);
 
 #endif

@@ -279,6 +279,21 @@ MPCServerIO::MPCServerIO(bool preprocessing,
     }
 }
 
+MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num) :
+        thread_num(thread_num), thread_lamport(mpcio.lamport),
+        mpcio(mpcio)
+{
+    if (mpcio.player < 2) {
+        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+        peer_iostream.emplace(mpcpio.peerios[thread_num], thread_lamport);
+        server_iostream.emplace(mpcpio.serverios[thread_num], thread_lamport);
+    } else {
+        MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
+        p0_iostream.emplace(mpcsrvio.p0ios[thread_num], thread_lamport);
+        p1_iostream.emplace(mpcsrvio.p1ios[thread_num], thread_lamport);
+    }
+}
+
 // Sync our per-thread lamport clock with the master one in the
 // mpcio.  You only need to call this explicitly if your MPCTIO
 // outlives your thread (in which case call it after the join), or

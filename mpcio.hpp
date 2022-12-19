@@ -216,17 +216,38 @@ struct MPCServerIO : public MPCIO {
             std::deque<tcp::socket> &p1socks);
 };
 
+class MPCSingleIOStream {
+    MPCSingleIO &sio;
+    lamport_t &lamport;
+
+public:
+    MPCSingleIOStream(MPCSingleIO &sio, lamport_t &lamport) :
+        sio(sio), lamport(lamport) {}
+
+    MPCSingleIOStream& write(const char *data, std::streamsize len) {
+        sio.queue(data, len, lamport);
+        return *this;
+    }
+
+    MPCSingleIOStream& read(char *data, std::streamsize len) {
+        sio.recv(data, len, lamport);
+        return *this;
+    }
+};
+
 // A handle to one thread's sockets and streams in a MPCIO
 
 class MPCTIO {
     int thread_num;
     lamport_t thread_lamport;
     MPCIO &mpcio;
+    std::optional<MPCSingleIOStream> peer_iostream;
+    std::optional<MPCSingleIOStream> server_iostream;
+    std::optional<MPCSingleIOStream> p0_iostream;
+    std::optional<MPCSingleIOStream> p1_iostream;
 
 public:
-    MPCTIO(MPCIO &mpcio, int thread_num):
-        thread_num(thread_num), thread_lamport(mpcio.lamport),
-        mpcio(mpcio) {}
+    MPCTIO(MPCIO &mpcio, int thread_num);
 
     // Sync our per-thread lamport clock with the master one in the
     // mpcio.  You only need to call this explicitly if your MPCTIO
@@ -243,6 +264,8 @@ public:
         sync_lamport();
     }
 
+    // Computational peers use these functions:
+
     // Queue up data to the peer or to the server
 
     void queue_peer(const void *data, size_t len);
@@ -253,6 +276,11 @@ public:
     size_t recv_peer(void *data, size_t len);
     size_t recv_server(void *data, size_t len);
 
+    // Or get these MPCSingleIOStreams
+    MPCSingleIOStream& iostream_peer() { return peer_iostream.value(); }
+    MPCSingleIOStream& iostream_server() { return server_iostream.value(); }
+
+    // The server uses these functions:
 
     // Queue up data to p0 or p1
 
@@ -263,6 +291,12 @@ public:
 
     size_t recv_p0(void *data, size_t len);
     size_t recv_p1(void *data, size_t len);
+
+    // Or get these MPCSingleIOStreams
+    MPCSingleIOStream& iostream_p0() { return p0_iostream.value(); }
+    MPCSingleIOStream& iostream_p1() { return p1_iostream.value(); }
+
+    // Everyone can use the remaining functions.
 
     // Send all queued data for this thread
 
