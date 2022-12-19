@@ -53,23 +53,23 @@ struct RegAS {
         ashare &= mask;
     }
 
-    inline RegAS &operator+=(RegAS &rhs) {
+    inline RegAS &operator+=(const RegAS &rhs) {
         this->ashare += rhs.ashare;
         return *this;
     }
 
-    inline RegAS operator+(RegAS &rhs) const {
+    inline RegAS operator+(const RegAS &rhs) const {
         RegAS res = *this;
         res += rhs;
         return res;
     }
 
-    inline RegAS &operator-=(RegAS &rhs) {
+    inline RegAS &operator-=(const RegAS &rhs) {
         this->ashare -= rhs.ashare;
         return *this;
     }
 
-    inline RegAS operator-(RegAS &rhs) const {
+    inline RegAS operator-(const RegAS &rhs) const {
         RegAS res = *this;
         res -= rhs;
         return res;
@@ -108,6 +108,17 @@ struct RegBS {
         arc4random_buf(&randb, sizeof(randb));
         bshare = randb & 1;
     }
+
+    inline RegBS &operator^=(const RegBS &rhs) {
+        this->bshare ^= rhs.bshare;
+        return *this;
+    }
+
+    inline RegBS operator^(const RegBS &rhs) const {
+        RegBS res = *this;
+        res ^= rhs;
+        return res;
+    }
 };
 
 // The type of a register holding an XOR share of a value
@@ -121,12 +132,12 @@ struct RegXS {
         xshare &= mask;
     }
 
-    inline RegXS &operator^=(RegXS &rhs) {
+    inline RegXS &operator^=(const RegXS &rhs) {
         this->xshare ^= rhs.xshare;
         return *this;
     }
 
-    inline RegXS operator^(RegXS &rhs) const {
+    inline RegXS operator^(const RegXS &rhs) const {
         RegXS res = *this;
         res ^= rhs;
         return res;
