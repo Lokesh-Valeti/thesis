@@ -126,8 +126,9 @@ T& operator<<(T &os, const RDPFTriple &rdpftrip)
 {
     os << rdpftrip.dpf[0] << rdpftrip.dpf[1] << rdpftrip.dpf[2];
     nbits_t depth = rdpftrip.dpf[0].depth();
-    os.write(&rdpftrip.as_target.ashare, BITBYTES(depth));
-    os.write(&rdpftrip.xs_target.xshare, BITBYTES(depth));
+    os.write((const char *)&rdpftrip.as_target.ashare, BITBYTES(depth));
+    os.write((const char *)&rdpftrip.xs_target.xshare, BITBYTES(depth));
+    return os;
 }
 
 template <typename T>
@@ -136,9 +137,10 @@ T& operator>>(T &is, RDPFTriple &rdpftrip)
     is >> rdpftrip.dpf[0] >> rdpftrip.dpf[1] >> rdpftrip.dpf[2];
     nbits_t depth = rdpftrip.dpf[0].depth();
     rdpftrip.as_target.ashare = 0;
-    is.read(&rdpftrip.as_target.ashare, BITBYTES(depth));
+    is.read((char *)&rdpftrip.as_target.ashare, BITBYTES(depth));
     rdpftrip.xs_target.xshare = 0;
-    is.read(&rdpftrip.xs_target.xshare, BITBYTES(depth));
+    is.read((char *)&rdpftrip.xs_target.xshare, BITBYTES(depth));
+    return is;
 }
 
 struct RDPFPair {
@@ -151,12 +153,14 @@ template <typename T>
 T& operator<<(T &os, const RDPFPair &rdpfpair)
 {
     os << rdpfpair.dpf[0] << rdpfpair.dpf[1];
+    return os;
 }
 
 template <typename T>
 T& operator>>(T &is, RDPFPair &rdpfpair)
 {
     is >> rdpfpair.dpf[0] >> rdpfpair.dpf[1];
+    return is;
 }
 
 #endif
