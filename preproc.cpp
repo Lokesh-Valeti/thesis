@@ -80,9 +80,15 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
                             [&](yield_t &yield) {
-                                RegXS ri;
-                                ri.randomize(type);
-                                RDPF rdpf(tio, yield, ri, type);
+                                RDPFTriple rdpftrip(tio, yield, type);
+                                printf("usi0 = %016lx\n", rdpftrip.dpf[0].unit_sum_inverse);
+                                printf("sxr0 = %016lx\n", rdpftrip.dpf[0].scaled_xor.xshare);
+                                printf("usi1 = %016lx\n", rdpftrip.dpf[1].unit_sum_inverse);
+                                printf("sxr1 = %016lx\n", rdpftrip.dpf[1].scaled_xor.xshare);
+                                printf("usi2 = %016lx\n", rdpftrip.dpf[2].unit_sum_inverse);
+                                printf("sxr2 = %016lx\n", rdpftrip.dpf[2].scaled_xor.xshare);
+                                tio.iostream_server() <<
+                                    rdpftrip.dpf[(mpcio.player == 0) ? 1 : 2];
                             });
                     }
                 }
@@ -164,8 +170,14 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
                         for (unsigned int i=0; i<num; ++i) {
                             coroutines.emplace_back(
                                 [&](yield_t &yield) {
-                                    RegXS ri;
-                                    RDPF rdpf(stio, yield, ri, depth);
+                                    RDPFTriple rdpftrip(stio, yield, depth);
+                                    RDPFPair rdpfpair;
+                                    stio.iostream_p0() >> rdpfpair.dpf[0];
+                                    stio.iostream_p1() >> rdpfpair.dpf[1];
+                                printf("usi0 = %016lx\n", rdpfpair.dpf[0].unit_sum_inverse);
+                                printf("sxr0 = %016lx\n", rdpfpair.dpf[0].scaled_xor.xshare);
+                                printf("usi1 = %016lx\n", rdpfpair.dpf[1].unit_sum_inverse);
+                                printf("sxr1 = %016lx\n", rdpfpair.dpf[1].scaled_xor.xshare);
                                 });
                         }
                     }

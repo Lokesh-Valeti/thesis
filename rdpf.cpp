@@ -269,3 +269,29 @@ size_t RDPF::size() const
     uint8_t depth = cw.size();
     return size(depth);
 }
+
+// Construct three RDPFs of the given depth all with the same randomly
+// generated target index.
+RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
+    nbits_t depth)
+{
+    // Pick a random XOR share of the target
+    xs_target.randomize(depth);
+
+    // Now create three RDPFs with that target, and also convert the XOR
+    // shares of the target to additive shares
+    std::vector<coro_t> coroutines;
+    for (int i=0;i<3;++i) {
+        coroutines.emplace_back(
+            [&, i](yield_t &yield) {
+                printf("Starting DPF %d\n", i);
+                dpf[i] = RDPF(tio, yield, xs_target, depth);
+                printf("Ending DPF %d\n", i);
+            });
+    }
+    coroutines.emplace_back(
+        [&](yield_t &yield) {
+            mpc_xs_to_as(tio, yield, as_target, xs_target, depth);
+        });
+    run_coroutines(yield, coroutines);
+}

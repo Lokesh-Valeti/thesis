@@ -61,8 +61,8 @@ T& operator>>(T &is, RDPF &rdpf)
 {
     is.read((char *)&rdpf.seed, sizeof(rdpf.seed));
     uint8_t depth;
-    assert(depth <= VALUE_BITS);
     is.read((char *)&depth, sizeof(depth));
+    assert(depth <= VALUE_BITS);
     rdpf.cw.clear();
     for (uint8_t i=0; i<depth; ++i) {
         DPFnode cw;
@@ -95,6 +95,68 @@ T& operator<<(T &os, const RDPF &rdpf)
     os.write((const char *)&rdpf.scaled_xor, sizeof(rdpf.scaled_xor));
 
     return os;
+}
+
+// Computational peers will generate triples of RDPFs with the _same_
+// random target for use in Duoram.  They will each hold a share of the
+// target (neither knowing the complete target index).  They will each
+// give one of the DPFs (not a matching pair) to the server, but not the
+// shares of the target index.  So computational peers will hold a
+// RDPFTriple (which includes both an additive and an XOR share of the
+// target index), while the server will hold a RDPFPair (which does
+// not).
+
+struct RDPFTriple {
+    RegAS as_target;
+    RegXS xs_target;
+    RDPF dpf[3];
+
+    RDPFTriple() {}
+
+    // Construct three RDPFs of the given depth all with the same
+    // randomly generated target index.
+    RDPFTriple(MPCTIO &tio, yield_t &yield,
+        nbits_t depth);
+};
+
+// I/O for RDPF Triples
+
+template <typename T>
+T& operator<<(T &os, const RDPFTriple &rdpftrip)
+{
+    os << rdpftrip.dpf[0] << rdpftrip.dpf[1] << rdpftrip.dpf[2];
+    nbits_t depth = rdpftrip.dpf[0].depth();
+    os.write(&rdpftrip.as_target.ashare, BITBYTES(depth));
+    os.write(&rdpftrip.xs_target.xshare, BITBYTES(depth));
+}
+
+template <typename T>
+T& operator>>(T &is, RDPFTriple &rdpftrip)
+{
+    is >> rdpftrip.dpf[0] >> rdpftrip.dpf[1] >> rdpftrip.dpf[2];
+    nbits_t depth = rdpftrip.dpf[0].depth();
+    rdpftrip.as_target.ashare = 0;
+    is.read(&rdpftrip.as_target.ashare, BITBYTES(depth));
+    rdpftrip.xs_target.xshare = 0;
+    is.read(&rdpftrip.xs_target.xshare, BITBYTES(depth));
+}
+
+struct RDPFPair {
+    RDPF dpf[2];
+};
+
+// I/O for RDPF Pairs
+
+template <typename T>
+T& operator<<(T &os, const RDPFPair &rdpfpair)
+{
+    os << rdpfpair.dpf[0] << rdpfpair.dpf[1];
+}
+
+template <typename T>
+T& operator>>(T &is, RDPFPair &rdpfpair)
+{
+    is >> rdpfpair.dpf[0] >> rdpfpair.dpf[1];
 }
 
 #endif
