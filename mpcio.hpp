@@ -235,13 +235,19 @@ struct MPCServerIO : public MPCIO {
 class MPCSingleIOStream {
     MPCSingleIO &sio;
     lamport_t &lamport;
+    size_t &msgs_sent;
+    size_t &msg_bytes_sent;
 
 public:
-    MPCSingleIOStream(MPCSingleIO &sio, lamport_t &lamport) :
-        sio(sio), lamport(lamport) {}
+    MPCSingleIOStream(MPCSingleIO &sio, lamport_t &lamport,
+            size_t &msgs_sent, size_t &msg_bytes_sent) :
+        sio(sio), lamport(lamport), msgs_sent(msgs_sent),
+        msg_bytes_sent(msg_bytes_sent) {}
 
     MPCSingleIOStream& write(const char *data, std::streamsize len) {
-        sio.queue(data, len, lamport);
+        size_t newmsg = sio.queue(data, len, lamport);
+        msgs_sent += newmsg;
+        msg_bytes_sent += len;
         return *this;
     }
 

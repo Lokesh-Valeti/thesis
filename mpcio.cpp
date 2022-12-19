@@ -353,12 +353,20 @@ MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num) :
 {
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        peer_iostream.emplace(mpcpio.peerios[thread_num], thread_lamport);
-        server_iostream.emplace(mpcpio.serverios[thread_num], thread_lamport);
+        peer_iostream.emplace(mpcpio.peerios[thread_num],
+            thread_lamport, mpcpio.msgs_sent[thread_num],
+            mpcpio.msg_bytes_sent[thread_num]);
+        server_iostream.emplace(mpcpio.serverios[thread_num],
+            thread_lamport, mpcpio.msgs_sent[thread_num],
+            mpcpio.msg_bytes_sent[thread_num]);
     } else {
         MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
-        p0_iostream.emplace(mpcsrvio.p0ios[thread_num], thread_lamport);
-        p1_iostream.emplace(mpcsrvio.p1ios[thread_num], thread_lamport);
+        p0_iostream.emplace(mpcsrvio.p0ios[thread_num],
+            thread_lamport, mpcsrvio.msgs_sent[thread_num],
+            mpcsrvio.msg_bytes_sent[thread_num]);
+        p1_iostream.emplace(mpcsrvio.p1ios[thread_num],
+            thread_lamport, mpcsrvio.msgs_sent[thread_num],
+            mpcsrvio.msg_bytes_sent[thread_num]);
     }
 }
 
