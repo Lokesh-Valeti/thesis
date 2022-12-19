@@ -19,8 +19,8 @@ PreCompStorage<T>::PreCompStorage(unsigned player, bool preprocessing,
 
 template<typename T>
 void PreCompStorage<T>::get(T& nextval) {
-    storage.read((char *)&nextval, sizeof(T));
-    if (storage.gcount() != sizeof(T)) {
+    storage >> nextval;
+    if (!storage.good()) {
         std::cerr << "Failed to read precomputed value from storage\n";
         exit(1);
     }

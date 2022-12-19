@@ -96,7 +96,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                     MultTriple T;
                     for (unsigned int i=0; i<num; ++i) {
                         T = tio.triple();
-                        tripfile.os().write((const char *)&T, sizeof(T));
+                        tripfile.os() << T;
                     }
                 } else if (type == 0x81) {
                     // Multiplication half triples
@@ -106,7 +106,7 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                     HalfTriple H;
                     for (unsigned int i=0; i<num; ++i) {
                         H = tio.halftriple();
-                        halffile.os().write((const char *)&H, sizeof(H));
+                        halffile.os() << H;
                     }
                 } else if (type >= 0x01 && type <= 0x30) {
                     // RAM DPFs

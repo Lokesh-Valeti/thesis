@@ -17,7 +17,7 @@ $(BIN): $(OBJS)
 
 # Remove the files created by the preprocessing phase
 reset:
-	-rm -f *.p[01].t*
+	-rm -f *.p[012].t*
 
 clean: reset
 	-rm -f $(BIN) $(OBJS) $(ASMS)
