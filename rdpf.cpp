@@ -62,6 +62,7 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
     // Ensure the flag bits (the lsb of each node) are different
     seed = set_lsb(seed, !!player);
     cfbits = 0;
+    whichhalf = (player == 1);
 
     // The root level is just the seed
     nbits_t level = 0;
@@ -268,6 +269,36 @@ size_t RDPF::size() const
 {
     uint8_t depth = cw.size();
     return size(depth);
+}
+
+// Descend from a node at depth parentdepth to one of its children
+// whichchild = 0: left child
+// whichchild = 1: right child
+DPFnode RDPF::descend(const DPFnode parent, nbits_t parentdepth,
+    bit_t whichchild, size_t &op_counter) const
+{
+    DPFnode prgout;
+    bool flag = get_lsb(parent);
+    prg(prgout, parent, whichchild, op_counter);
+    if (flag) {
+        DPFnode CW = cw[parentdepth];
+        bit_t cfbit = !!(cfbits & (value_t(1)<<parentdepth));
+        DPFnode CWR = CW ^ lsb128_mask[cfbit];
+        prgout ^= (whichchild ? CWR : CW);
+    }
+    return prgout;
+}
+
+// Get the leaf node for the given input
+DPFnode RDPF::leaf(address_t input, size_t &op_counter) const
+{
+    nbits_t totdepth = depth();
+    DPFnode node = seed;
+    for (nbits_t d=0;d<totdepth;++d) {
+        bit_t dir = !!(input & (address_t(1)<<(totdepth-d-1)));
+        node = descend(node, d, dir, op_counter);
+    }
+    return node;
 }
 
 // Construct three RDPFs of the given depth all with the same randomly

@@ -163,20 +163,35 @@ static void rdpf_test(MPCIO &mpcio, int num_threads, char **args)
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, depth] {
             MPCTIO tio(mpcio, thread_num);
+            size_t &op_counter = tio.aes_ops();
             if (mpcio.player == 2) {
                 RDPFPair dp = tio.rdpfpair(depth);
-                printf("usi0 = %016lx\n", dp.dpf[0].unit_sum_inverse);
-                printf("ss0  = %016lx\n", dp.dpf[0].scaled_sum.ashare);
-                printf("usi1 = %016lx\n", dp.dpf[1].unit_sum_inverse);
-                printf("ss1  = %016lx\n", dp.dpf[1].scaled_sum.ashare);
+                for (int i=0;i<2;++i) {
+                    const RDPF &dpf = dp.dpf[i];
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        RegBS ub = dpf.unit_bs(leaf);
+                        RegAS ua = dpf.unit_as(leaf);
+                        RegXS sx = dpf.scaled_xs(leaf);
+                        RegAS sa = dpf.scaled_as(leaf);
+                        printf("%04x %x %016lx %016lx %016lx\n", x,
+                            ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                    }
+                }
             } else {
                 RDPFTriple dt = tio.rdpftriple(depth);
-                printf("usi0 = %016lx\n", dt.dpf[0].unit_sum_inverse);
-                printf("ss0  = %016lx\n", dt.dpf[0].scaled_sum.ashare);
-                printf("usi1 = %016lx\n", dt.dpf[1].unit_sum_inverse);
-                printf("ss1  = %016lx\n", dt.dpf[1].scaled_sum.ashare);
-                printf("usi2 = %016lx\n", dt.dpf[2].unit_sum_inverse);
-                printf("ss2  = %016lx\n", dt.dpf[2].scaled_sum.ashare);
+                for (int i=0;i<3;++i) {
+                    const RDPF &dpf = dt.dpf[i];
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        RegBS ub = dpf.unit_bs(leaf);
+                        RegAS ua = dpf.unit_as(leaf);
+                        RegXS sx = dpf.scaled_xs(leaf);
+                        RegAS sa = dpf.scaled_as(leaf);
+                        printf("%04x %x %016lx %016lx %016lx\n", x,
+                            ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                    }
+                }
             }
         });
     }

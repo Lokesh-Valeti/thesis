@@ -7,10 +7,13 @@
 #include "mpcio.hpp"
 #include "coroutine.hpp"
 #include "types.hpp"
+#include "bitutils.hpp"
 
 struct RDPF {
     // The 128-bit seed
     DPFnode seed;
+    // Which half of the DPF are we?
+    bit_t whichhalf;
     // correction words; the depth of the DPF is the length of this
     // vector
     std::vector<DPFnode> cw;
@@ -52,6 +55,59 @@ struct RDPF {
 
     // The depth
     inline nbits_t depth() const { return cw.size(); }
+
+    // Descend from a node at depth parentdepth to one of its children
+    // whichchild = 0: left child
+    // whichchild = 1: right child
+    //
+    // Cost: 1 AES operation
+    DPFnode descend(const DPFnode parent, nbits_t parentdepth,
+        bit_t whichchild, size_t &op_counter) const;
+
+    // Get the leaf node for the given input
+    //
+    // Cost: depth AES operations
+    DPFnode leaf(address_t input, size_t &op_counter) const;
+
+    // Get the bit-shared unit vector entry from the leaf node
+    inline RegBS unit_bs(DPFnode leaf) const {
+        RegBS b;
+        b.bshare = get_lsb(leaf);
+        return b;
+    }
+
+    // Get the additive-shared unit vector entry from the leaf node
+    inline RegAS unit_as(DPFnode leaf) const {
+        RegAS a;
+        value_t lowword = value_t(_mm_cvtsi128_si64x(leaf));
+        if (whichhalf == 1) {
+            lowword = -lowword;
+        }
+        a.ashare = lowword * unit_sum_inverse;
+        return a;
+    }
+
+    // Get the XOR-shared scaled vector entry from the leaf ndoe
+    inline RegXS scaled_xs(DPFnode leaf) const {
+        RegXS x;
+        value_t highword =
+            value_t(_mm_cvtsi128_si64x(_mm_srli_si128(leaf,8)));
+        x.xshare = highword;
+        return x;
+    }
+
+    // Get the additive-shared scaled vector entry from the leaf ndoe
+    inline RegAS scaled_as(DPFnode leaf) const {
+        RegAS a;
+        value_t highword =
+            value_t(_mm_cvtsi128_si64x(_mm_srli_si128(leaf,8)));
+        if (whichhalf == 1) {
+            highword = -highword;
+        }
+        a.ashare = highword;
+        return a;
+    }
+
 };
 
 // I/O for RDPFs
@@ -61,7 +117,10 @@ T& operator>>(T &is, RDPF &rdpf)
 {
     is.read((char *)&rdpf.seed, sizeof(rdpf.seed));
     uint8_t depth;
+    // The whichhalf bit is the high bit of depth
     is.read((char *)&depth, sizeof(depth));
+    rdpf.whichhalf = !!(depth & 0x80);
+    depth &= 0x7f;
     assert(depth <= ADDRESS_MAX_BITS);
     rdpf.cw.clear();
     for (uint8_t i=0; i<depth; ++i) {
@@ -85,7 +144,11 @@ T& operator<<(T &os, const RDPF &rdpf)
     os.write((const char *)&rdpf.seed, sizeof(rdpf.seed));
     uint8_t depth = rdpf.cw.size();
     assert(depth <= ADDRESS_MAX_BITS);
-    os.write((const char *)&depth, sizeof(depth));
+    // The whichhalf bit is the high bit of depth
+    uint8_t whichhalf_and_depth = depth |
+        (uint8_t(rdpf.whichhalf)<<7);
+    os.write((const char *)&whichhalf_and_depth,
+        sizeof(whichhalf_and_depth));
     for (uint8_t i=0; i<depth; ++i) {
         os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));
     }
