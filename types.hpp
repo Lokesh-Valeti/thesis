@@ -180,43 +180,11 @@ using address_t = uint64_t;
 
 using MultTriple = std::tuple<value_t, value_t, value_t>;
 
-// I/O for a MultTriple
-
-template <typename T>
-T& operator>>(T& is, MultTriple &m)
-{
-    is.read((char *)&m, sizeof(m));
-    return is;
-}
-
-template <typename T>
-T& operator<<(T& os, const MultTriple &m)
-{
-    os.write((const char *)&m, sizeof(m));
-    return os;
-}
-
 // A half-triple is (X0,Z0) held by P0 (and correspondingly (Y1,Z1) held
 // by P1), with all values random, but subject to the relation that
 // X0*Y1 = Z0+Z1
 
 using HalfTriple = std::tuple<value_t, value_t>;
-
-// I/O for a HalfTriple
-
-template <typename T>
-T& operator>>(T& is, HalfTriple &h)
-{
-    is.read((char *)&h, sizeof(h));
-    return is;
-}
-
-template <typename T>
-T& operator<<(T& os, const HalfTriple &h)
-{
-    os.write((const char *)&h, sizeof(h));
-    return os;
-}
 
 // The type of nodes in a DPF.  This must be at least as many bits as
 // the security parameter, and at least twice as many bits as value_t.
@@ -239,5 +207,32 @@ struct SelectTriple {
 // header dependencies.
 struct RDPFPair;
 struct RDPFTriple;
+
+// We want the I/O (using << and >>) for many classes
+// to just be a common thing: write out the bytes
+// straight from memory
+
+#define DEFAULT_IO(CLASSNAME)                  \
+    template <typename T>                      \
+    T& operator>>(T& is, CLASSNAME &x)         \
+    {                                          \
+        is.read((char *)&x, sizeof(x));        \
+        return is;                             \
+    }                                          \
+                                               \
+    template <typename T>                      \
+    T& operator<<(T& os, const CLASSNAME &x)   \
+    {                                          \
+        os.write((const char *)&x, sizeof(x)); \
+        return os;                             \
+    }
+
+// Default I/O for various types
+
+DEFAULT_IO(RegBS)
+DEFAULT_IO(RegAS)
+DEFAULT_IO(RegXS)
+DEFAULT_IO(MultTriple)
+DEFAULT_IO(HalfTriple)
 
 #endif
