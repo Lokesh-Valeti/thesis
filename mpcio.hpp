@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <array>
 #include <deque>
 #include <queue>
 #include <string>
@@ -24,8 +25,11 @@ using boost::asio::ip::tcp;
 template<typename T>
 class PreCompStorage {
 public:
+    PreCompStorage() : count(0) {}
     PreCompStorage(unsigned player, bool preprocessing,
         const char *filenameprefix, unsigned thread_num);
+    void init(unsigned player, bool preprocessing,
+        const char *filenameprefix, unsigned thread_num, nbits_t depth = 0);
     void get(T& nextval);
 
     inline size_t get_stats() { return count; }
@@ -192,6 +196,9 @@ struct MPCPeerIO : public MPCIO {
     std::deque<MPCSingleIO> serverios;
     std::vector<PreCompStorage<MultTriple>> triples;
     std::vector<PreCompStorage<HalfTriple>> halftriples;
+    // The outer vector is (like above) one item per thread
+    // The inner array is indexed by DPF depth (depth d is at entry d-1)
+    std::vector<std::array<PreCompStorage<RDPFTriple>,ADDRESS_MAX_BITS>> rdpftriples;
 
     MPCPeerIO(unsigned player, bool preprocessing,
             std::deque<tcp::socket> &peersocks,
@@ -210,10 +217,19 @@ struct MPCPeerIO : public MPCIO {
 struct MPCServerIO : public MPCIO {
     std::deque<MPCSingleIO> p0ios;
     std::deque<MPCSingleIO> p1ios;
+    // The outer vector is (like above) one item per thread
+    // The inner array is indexed by DPF depth (depth d is at entry d-1)
+    std::vector<std::array<PreCompStorage<RDPFPair>,ADDRESS_MAX_BITS>> rdpfpairs;
 
     MPCServerIO(bool preprocessing,
             std::deque<tcp::socket> &p0socks,
             std::deque<tcp::socket> &p1socks);
+
+    void dump_precomp_stats(std::ostream &os);
+
+    void reset_precomp_stats();
+
+    void dump_stats(std::ostream &os);
 };
 
 class MPCSingleIOStream {
@@ -309,6 +325,12 @@ public:
     MultTriple triple();
     HalfTriple halftriple();
     SelectTriple selecttriple();
+
+    // These ones only work during the online phase
+    // Computational peers call:
+    RDPFTriple rdpftriple(nbits_t depth);
+    // The server calls:
+    RDPFPair rdpfpair(nbits_t depth);
 
     // Accessors
 

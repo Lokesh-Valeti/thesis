@@ -284,9 +284,7 @@ RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
     for (int i=0;i<3;++i) {
         coroutines.emplace_back(
             [&, i](yield_t &yield) {
-                printf("Starting DPF %d\n", i);
                 dpf[i] = RDPF(tio, yield, xs_target, depth);
-                printf("Ending DPF %d\n", i);
             });
     }
     coroutines.emplace_back(

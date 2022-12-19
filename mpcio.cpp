@@ -1,16 +1,28 @@
 #include "mpcio.hpp"
+#include "rdpf.hpp"
 #include "bitutils.hpp"
 
 template<typename T>
 PreCompStorage<T>::PreCompStorage(unsigned player, bool preprocessing,
         const char *filenameprefix, unsigned thread_num) {
+    init(player, preprocessing, filenameprefix, thread_num);
+}
+
+template<typename T>
+void PreCompStorage<T>::init(unsigned player, bool preprocessing,
+        const char *filenameprefix, unsigned thread_num, nbits_t depth) {
     if (preprocessing) return;
     std::string filename(filenameprefix);
     char suffix[20];
-    sprintf(suffix, ".p%d.t%u", player%10, thread_num);
+    if (depth) {
+        sprintf(suffix, "%02d.p%d.t%u", depth, player%10, thread_num);
+    } else {
+        sprintf(suffix, ".p%d.t%u", player%10, thread_num);
+    }
     filename.append(suffix);
     storage.open(filename);
-    if (storage.fail()) {
+    // It's OK if files for not every depth exist
+    if (!depth && storage.fail()) {
         std::cerr << "Failed to open " << filename << "\n";
         exit(1);
     }
@@ -231,6 +243,13 @@ MPCPeerIO::MPCPeerIO(unsigned player, bool preprocessing,
     for (unsigned i=0; i<num_threads; ++i) {
         halftriples.emplace_back(player, preprocessing, "halves", i);
     }
+    rdpftriples.resize(num_threads);
+    for (unsigned i=0; i<num_threads; ++i) {
+        for (unsigned depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
+            rdpftriples[i][depth-1].init(player, preprocessing,
+                "rdpf", i, depth);
+        }
+    }
     for (auto &&sock : peersocks) {
         peerios.emplace_back(std::move(sock));
     }
@@ -247,6 +266,12 @@ void MPCPeerIO::dump_precomp_stats(std::ostream &os)
         }
         os << "T" << i << " t:" << triples[i].get_stats() <<
             " h:" << halftriples[i].get_stats();
+        for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
+            size_t cnt = rdpftriples[i][depth-1].get_stats();
+            if (cnt > 0) {
+                os << " r" << int(depth) << ":" << cnt;
+            }
+        }
     }
     os << "\n";
 }
@@ -256,6 +281,9 @@ void MPCPeerIO::reset_precomp_stats()
     for (size_t i=0; i<triples.size(); ++i) {
         triples[i].reset_stats();
         halftriples[i].reset_stats();
+        for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
+            rdpftriples[i][depth-1].reset_stats();
+        }
     }
 }
 
@@ -271,12 +299,52 @@ MPCServerIO::MPCServerIO(bool preprocessing,
         std::deque<tcp::socket> &p1socks) :
     MPCIO(2, preprocessing, p0socks.size())
 {
+    rdpfpairs.resize(num_threads);
+    for (unsigned i=0; i<num_threads; ++i) {
+        for (unsigned depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
+            rdpfpairs[i][depth-1].init(player, preprocessing,
+                "rdpf", i, depth);
+        }
+    }
     for (auto &&sock : p0socks) {
         p0ios.emplace_back(std::move(sock));
     }
     for (auto &&sock : p1socks) {
         p1ios.emplace_back(std::move(sock));
     }
+}
+
+void MPCServerIO::dump_precomp_stats(std::ostream &os)
+{
+    for (size_t i=0; i<rdpfpairs.size(); ++i) {
+        if (i > 0) {
+            os << " ";
+        }
+        os << "T" << i;
+        for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
+            size_t cnt = rdpfpairs[i][depth-1].get_stats();
+            if (cnt > 0) {
+                os << " r" << int(depth) << ":" << cnt;
+            }
+        }
+    }
+    os << "\n";
+}
+
+void MPCServerIO::reset_precomp_stats()
+{
+    for (size_t i=0; i<rdpfpairs.size(); ++i) {
+        for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
+            rdpfpairs[i][depth-1].reset_stats();
+        }
+    }
+}
+
+void MPCServerIO::dump_stats(std::ostream &os)
+{
+    MPCIO::dump_stats(os);
+    os << "Precomputed values used: ";
+    dump_precomp_stats(os);
 }
 
 MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num) :
@@ -518,6 +586,26 @@ SelectTriple MPCTIO::selecttriple()
         queue_p1(&X1, sizeof(X1));
         queue_p1(&Y1, sizeof(Y1));
         queue_p1(&Z1, sizeof(Z1));
+    }
+    return val;
+}
+
+RDPFTriple MPCTIO::rdpftriple(nbits_t depth)
+{
+    RDPFTriple val;
+    if (!mpcio.preprocessing && mpcio.player <= 2) {
+        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+        mpcpio.rdpftriples[thread_num][depth-1].get(val);
+    }
+    return val;
+}
+
+RDPFPair MPCTIO::rdpfpair(nbits_t depth)
+{
+    RDPFPair val;
+    if (!mpcio.preprocessing && mpcio.player == 2) {
+        MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
+        mpcsrvio.rdpfpairs[thread_num][depth-1].get(val);
     }
     return val;
 }

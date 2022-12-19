@@ -62,7 +62,7 @@ T& operator>>(T &is, RDPF &rdpf)
     is.read((char *)&rdpf.seed, sizeof(rdpf.seed));
     uint8_t depth;
     is.read((char *)&depth, sizeof(depth));
-    assert(depth <= VALUE_BITS);
+    assert(depth <= ADDRESS_MAX_BITS);
     rdpf.cw.clear();
     for (uint8_t i=0; i<depth; ++i) {
         DPFnode cw;
@@ -84,7 +84,7 @@ T& operator<<(T &os, const RDPF &rdpf)
 {
     os.write((const char *)&rdpf.seed, sizeof(rdpf.seed));
     uint8_t depth = rdpf.cw.size();
-    assert(depth <= VALUE_BITS);
+    assert(depth <= ADDRESS_MAX_BITS);
     os.write((const char *)&depth, sizeof(depth));
     for (uint8_t i=0; i<depth; ++i) {
         os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));

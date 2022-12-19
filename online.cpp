@@ -2,6 +2,7 @@
 
 #include "online.hpp"
 #include "mpcops.hpp"
+#include "rdpf.hpp"
 
 
 static void online_test(MPCIO &mpcio, int num_threads, char **args)
@@ -149,6 +150,39 @@ static void lamport_test(MPCIO &mpcio, int num_threads, char **args)
     pool.join();
 }
 
+static void rdpf_test(MPCIO &mpcio, int num_threads, char **args)
+{
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+            MPCTIO tio(mpcio, thread_num);
+            if (mpcio.player == 2) {
+                RDPFPair dp = tio.rdpfpair(depth);
+                printf("usi0 = %016lx\n", dp.dpf[0].unit_sum_inverse);
+                printf("ss0  = %016lx\n", dp.dpf[0].scaled_sum.ashare);
+                printf("usi1 = %016lx\n", dp.dpf[1].unit_sum_inverse);
+                printf("ss1  = %016lx\n", dp.dpf[1].scaled_sum.ashare);
+            } else {
+                RDPFTriple dt = tio.rdpftriple(depth);
+                printf("usi0 = %016lx\n", dt.dpf[0].unit_sum_inverse);
+                printf("ss0  = %016lx\n", dt.dpf[0].scaled_sum.ashare);
+                printf("usi1 = %016lx\n", dt.dpf[1].unit_sum_inverse);
+                printf("ss1  = %016lx\n", dt.dpf[1].scaled_sum.ashare);
+                printf("usi2 = %016lx\n", dt.dpf[2].unit_sum_inverse);
+                printf("ss2  = %016lx\n", dt.dpf[2].scaled_sum.ashare);
+            }
+        });
+    }
+    pool.join();
+}
+
 void online_main(MPCIO &mpcio, int num_threads, char **args)
 {
     if (!*args) {
@@ -160,6 +194,9 @@ void online_main(MPCIO &mpcio, int num_threads, char **args)
     } else if (!strcmp(*args, "lamporttest")) {
         ++args;
         lamport_test(mpcio, num_threads, args);
+    } else if (!strcmp(*args, "rdpftest")) {
+        ++args;
+        rdpf_test(mpcio, num_threads, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }

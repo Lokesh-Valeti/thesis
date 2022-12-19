@@ -235,4 +235,9 @@ struct SelectTriple {
     DPFnode Y, Z;
 };
 
+// These are defined in rdpf.hpp, but declared here to avoid cyclic
+// header dependencies.
+struct RDPFPair;
+struct RDPFTriple;
+
 #endif
