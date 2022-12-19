@@ -206,7 +206,8 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
                 // evaluation time for the additive-shared unit vector,
                 // we will output this global inverse times the low word
                 // of each leaf, which will make the sum of all of those
-                // values 1.
+                // values 1.  (This technique replaces the protocol in
+                // Appendix D of the Duoram paper.)
                 //
                 // For the scaled vector, we just have to compute shares
                 // of what the scaled vector is a sharing _of_, but
