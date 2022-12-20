@@ -286,7 +286,7 @@ size_t RDPF::size() const
 // Descend from a node at depth parentdepth to one of its children
 // whichchild = 0: left child
 // whichchild = 1: right child
-DPFnode RDPF::descend(const DPFnode parent, nbits_t parentdepth,
+DPFnode RDPF::descend(const DPFnode &parent, nbits_t parentdepth,
     bit_t whichchild, size_t &op_counter) const
 {
     DPFnode prgout;
@@ -363,96 +363,6 @@ void RDPF::expand(size_t &op_counter)
     delete[] path;
 }
 
-// Create an Eval object that will start its output at index start.
-// It will wrap around to 0 when it hits 2^depth.  If use_expansion
-// is true, then if the DPF has been expanded, just output values
-// from that.  If use_expansion=false or if the DPF has not been
-// expanded, compute the values on the fly.
-RDPF::Eval RDPF::eval(address_t start, size_t &op_counter,
-    bool use_expansion) const
-{
-    RDPF::Eval eval(*this, op_counter, start, use_expansion);
-
-    return eval;
-}
-
-RDPF::Eval::Eval(const RDPF &rdpf, size_t &op_counter, address_t start,
-    bool use_expansion) : rdpf(rdpf), op_counter(op_counter),
-    use_expansion(use_expansion)
-{
-    depth = rdpf.depth();
-    // Prevent overflow of 1<<depth
-    if (depth < ADDRESS_MAX_BITS) {
-        indexmask = (address_t(1)<<depth)-1;
-    } else {
-        indexmask = ~0;
-    }
-    // Record that we haven't actually output the leaf for index start
-    // itself yet
-    nextindex = start;
-    if (use_expansion && rdpf.expansion.size()) {
-        // We just need to keep the counter, not compute anything
-        return;
-    }
-    path.resize(depth);
-    pathindex = start;
-    path[0] = rdpf.seed;
-    for (nbits_t i=1;i<depth;++i) {
-        bool dir = !!(pathindex & (address_t(1)<<(depth-i)));
-        path[i] = rdpf.descend(path[i-1], i-1, dir, op_counter);
-    }
-}
-
-DPFnode RDPF::Eval::next()
-{
-    if (use_expansion && rdpf.expansion.size()) {
-        // Just use the precomputed values
-        DPFnode leaf = rdpf.expansion[nextindex];
-        nextindex = (nextindex + 1) & indexmask;
-        return leaf;
-    }
-    // Invariant: in the first call to next(), nextindex = pathindex.
-    // Otherwise, nextindex = pathindex+1.
-    // Get the XOR of nextindex and pathindex, and strip the low bit.
-    // If nextindex and pathindex are equal, or pathindex is even
-    // and nextindex is the consecutive odd number, index_xor will be 0,
-    // indicating that we don't have to update the path, but just
-    // compute the appropriate leaf given by the low bit of nextindex.
-    //
-    // Otherwise, say for example pathindex is 010010111 and nextindex
-    // is 010011000.  Then their XOR is 000001111, and stripping the low
-    // bit yields 000001110, so how_many_1_bits will be 3.
-    // That indicates (typically) that path[depth-3] was a left child,
-    // and now we need to change it to a right child by descending right
-    // from path[depth-4], and then filling the path after that with
-    // left children.
-    //
-    // When we wrap around, however, index_xor will be 111111110 (after
-    // we strip the low bit), and how_many_1_bits will be depth-1, but
-    // the new top child (of the root seed) we have to compute will be a
-    // left, not a right, child.
-    uint64_t index_xor = (nextindex ^ pathindex) & ~1;
-    nbits_t how_many_1_bits = __builtin_popcount(index_xor);
-    if (how_many_1_bits > 0) {
-        // This will almost always be 1, unless we've just wrapped
-        // around from the right subtree back to the left, in which case
-        // it will be 0.
-        bool top_changed_bit =
-            nextindex & (address_t(1) << how_many_1_bits);
-        path[depth-how_many_1_bits] =
-            rdpf.descend(path[depth-how_many_1_bits-1],
-                depth-how_many_1_bits-1, top_changed_bit, op_counter);
-        for (nbits_t i = depth-how_many_1_bits; i < depth-1; ++i) {
-            path[i+1] = rdpf.descend(path[i], i, 0, op_counter);
-        }
-    }
-    DPFnode leaf = rdpf.descend(path[depth-1], depth-1, nextindex & 1,
-        op_counter);
-    pathindex = nextindex;
-    nextindex = (nextindex + 1) & indexmask;
-    return leaf;
-}
-
 // Construct three RDPFs of the given depth all with the same randomly
 // generated target index.
 RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
@@ -476,4 +386,27 @@ RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
             mpc_xs_to_as(tio, yield, as_target, xs_target, depth);
         });
     run_coroutines(yield, coroutines);
+}
+
+RDPFTriple::node RDPFTriple::descend(const RDPFTriple::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &op_counter) const
+{
+    auto [P0, P1, P2] = parent;
+    DPFnode C0, C1, C2;
+    C0 = dpf[0].descend(P0, parentdepth, whichchild, op_counter);
+    C1 = dpf[1].descend(P1, parentdepth, whichchild, op_counter);
+    C2 = dpf[2].descend(P2, parentdepth, whichchild, op_counter);
+    return std::make_tuple(C0,C1,C2);
+}
+
+RDPFPair::node RDPFPair::descend(const RDPFPair::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &op_counter) const
+{
+    auto [P0, P1] = parent;
+    DPFnode C0, C1;
+    C0 = dpf[0].descend(P0, parentdepth, whichchild, op_counter);
+    C1 = dpf[1].descend(P1, parentdepth, whichchild, op_counter);
+    return std::make_tuple(C0,C1);
 }

@@ -312,7 +312,7 @@ static void rdpfeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     RDPF &dpf = dp.dpf[i];
                     RegXS scaled_xor;
                     scaled_xor.xshare = 0;
-                    RDPF::Eval ev = dpf.eval(start, op_counter, false);
+                    auto ev = StreamEval(dpf, start, op_counter, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -328,7 +328,7 @@ static void rdpfeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     RDPF &dpf = dt.dpf[i];
                     RegXS scaled_xor;
                     scaled_xor.xshare = 0;
-                    RDPF::Eval ev = dpf.eval(start, op_counter, false);
+                    auto ev = StreamEval(dpf, start, op_counter, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -338,6 +338,77 @@ static void rdpfeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
                         dpf.scaled_xor.xshare);
                     printf("\n");
                 }
+            }
+            tio.send();
+        });
+    }
+    pool.join();
+}
+
+static void tupleeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+    address_t start=0;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        start = atoi(*args);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
+            MPCTIO tio(mpcio, thread_num);
+            size_t &op_counter = tio.aes_ops();
+            if (mpcio.player == 2) {
+                RDPFPair dp = tio.rdpfpair(depth);
+                RegXS scaled_xor0, scaled_xor1;
+                scaled_xor0.xshare = 0;
+                scaled_xor1.xshare = 0;
+                auto ev = StreamEval(dp, start, op_counter, false);
+                for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                    auto [L0, L1] = ev.next();
+                    RegXS sx0 = dp.dpf[0].scaled_xs(L0);
+                    RegXS sx1 = dp.dpf[1].scaled_xs(L1);
+                    scaled_xor0 ^= sx0;
+                    scaled_xor1 ^= sx1;
+                }
+                printf("%016lx\n%016lx\n", scaled_xor0.xshare,
+                    dp.dpf[0].scaled_xor.xshare);
+                printf("\n");
+                printf("%016lx\n%016lx\n", scaled_xor1.xshare,
+                    dp.dpf[1].scaled_xor.xshare);
+                printf("\n");
+            } else {
+                RDPFTriple dt = tio.rdpftriple(depth);
+                RegXS scaled_xor0, scaled_xor1, scaled_xor2;
+                scaled_xor0.xshare = 0;
+                scaled_xor1.xshare = 0;
+                scaled_xor2.xshare = 0;
+                auto ev = StreamEval(dt, start, op_counter, false);
+                for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                    auto [L0, L1, L2] = ev.next();
+                    RegXS sx0 = dt.dpf[0].scaled_xs(L0);
+                    RegXS sx1 = dt.dpf[1].scaled_xs(L1);
+                    RegXS sx2 = dt.dpf[2].scaled_xs(L2);
+                    scaled_xor0 ^= sx0;
+                    scaled_xor1 ^= sx1;
+                    scaled_xor2 ^= sx2;
+                }
+                printf("%016lx\n%016lx\n", scaled_xor0.xshare,
+                    dt.dpf[0].scaled_xor.xshare);
+                printf("\n");
+                printf("%016lx\n%016lx\n", scaled_xor1.xshare,
+                    dt.dpf[1].scaled_xor.xshare);
+                printf("\n");
+                printf("%016lx\n%016lx\n", scaled_xor2.xshare,
+                    dt.dpf[2].scaled_xor.xshare);
+                printf("\n");
             }
             tio.send();
         });
@@ -365,6 +436,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "evaltime")) {
         ++args;
         rdpfeval_timing(mpcio, opts, args);
+    } else if (!strcmp(*args, "tupletime")) {
+        ++args;
+        tupleeval_timing(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
