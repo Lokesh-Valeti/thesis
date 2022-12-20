@@ -2,7 +2,8 @@
 #define __ONLINE_HPP__
 
 #include "mpcio.hpp"
+#include "options.hpp"
 
-void online_main(MPCIO &mpcio, int num_threads, char **args);
+void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args);
 
 #endif

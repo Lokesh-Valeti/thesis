@@ -25,11 +25,9 @@ void PreCompStorage<T,N>::init(unsigned player, bool preprocessing,
     }
     filename.append(suffix);
     storage.open(filename);
-    // It's OK if files for not every depth exist
-    if (!depth && storage.fail()) {
-        std::cerr << "Failed to open " << filename << "\n";
-        exit(1);
-    }
+    // It's OK if not every file exists; so don't worry about checking
+    // for errors here.  We'll report an error in get() if we actually
+    // try to use a value for which we don't have a precomputed file.
     count = 0;
 }
 

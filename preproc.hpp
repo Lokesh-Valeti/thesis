@@ -2,8 +2,9 @@
 #define __PREPROC_HPP__
 
 #include "mpcio.hpp"
+#include "options.hpp"
 
-void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args);
-void preprocessing_server(MPCServerIO &mpcio, int num_threads, char **args);
+void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args);
+void preprocessing_server(MPCServerIO &mpcio, const PRACOptions &opts, char **args);
 
 #endif

@@ -5,7 +5,7 @@
 #include "rdpf.hpp"
 
 
-static void online_test(MPCIO &mpcio, int num_threads, char **args)
+static void online_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     nbits_t nbits = VALUE_BITS;
 
@@ -106,7 +106,7 @@ static void online_test(MPCIO &mpcio, int num_threads, char **args)
     delete[] A;
 }
 
-static void lamport_test(MPCIO &mpcio, int num_threads, char **args)
+static void lamport_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     // Create a bunch of threads and send a bunch of data to the other
     // peer, and receive their data.  If an arg is specified, repeat
@@ -129,6 +129,7 @@ static void lamport_test(MPCIO &mpcio, int num_threads, char **args)
         ++args;
     }
 
+    int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, niters, chunksize, numchunks] {
@@ -150,7 +151,7 @@ static void lamport_test(MPCIO &mpcio, int num_threads, char **args)
     pool.join();
 }
 
-static void rdpf_test(MPCIO &mpcio, int num_threads, char **args)
+static void rdpf_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
 
@@ -159,6 +160,7 @@ static void rdpf_test(MPCIO &mpcio, int num_threads, char **args)
         ++args;
     }
 
+    int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, depth] {
@@ -230,20 +232,77 @@ static void rdpf_test(MPCIO &mpcio, int num_threads, char **args)
     pool.join();
 }
 
-void online_main(MPCIO &mpcio, int num_threads, char **args)
+static void rdpf_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+            MPCTIO tio(mpcio, thread_num);
+            size_t &op_counter = tio.aes_ops();
+            if (mpcio.player == 2) {
+                RDPFPair dp = tio.rdpfpair(depth);
+                for (int i=0;i<2;++i) {
+                    RDPF &dpf = dp.dpf[i];
+                    dpf.expand(op_counter);
+                    RegXS scaled_xor;
+                    scaled_xor.xshare = 0;
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        RegXS sx = dpf.scaled_xs(leaf);
+                        scaled_xor ^= sx;
+                    }
+                    printf("%016lx\n%016lx\n", scaled_xor.xshare,
+                        dpf.scaled_xor.xshare);
+                    printf("\n");
+                }
+            } else {
+                RDPFTriple dt = tio.rdpftriple(depth);
+                for (int i=0;i<3;++i) {
+                    RDPF &dpf = dt.dpf[i];
+                    dpf.expand(op_counter);
+                    RegXS scaled_xor;
+                    scaled_xor.xshare = 0;
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        RegXS sx = dpf.scaled_xs(leaf);
+                        scaled_xor ^= sx;
+                    }
+                    printf("%016lx\n%016lx\n", scaled_xor.xshare,
+                        dpf.scaled_xor.xshare);
+                    printf("\n");
+                }
+            }
+            tio.send();
+        });
+    }
+    pool.join();
+}
+
+void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     if (!*args) {
         std::cerr << "Mode is required as the first argument when not preprocessing.\n";
         return;
     } else if (!strcmp(*args, "test")) {
         ++args;
-        online_test(mpcio, num_threads, args);
+        online_test(mpcio, opts, args);
     } else if (!strcmp(*args, "lamporttest")) {
         ++args;
-        lamport_test(mpcio, num_threads, args);
+        lamport_test(mpcio, opts, args);
     } else if (!strcmp(*args, "rdpftest")) {
         ++args;
-        rdpf_test(mpcio, num_threads, args);
+        rdpf_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "rdpftime")) {
+        ++args;
+        rdpf_timing(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }

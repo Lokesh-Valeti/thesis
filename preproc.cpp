@@ -74,11 +74,12 @@ void Openfiles::closeall()
 //
 // Repeat the whole thing until type == 0x00 is received
 
-void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
+void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
+    int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num] {
+        boost::asio::post(pool, [&mpcio, &opts, thread_num] {
             MPCTIO tio(mpcio, thread_num);
             Openfiles ofiles;
             std::vector<coro_t> coroutines;
@@ -115,7 +116,8 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
                             [&, tripfile, type](yield_t &yield) {
-                                RDPFTriple rdpftrip(tio, yield, type);
+                                RDPFTriple rdpftrip(tio, yield, type,
+                                    opts.expand_rdpfs);
                                 printf("usi0 = %016lx\n", rdpftrip.dpf[0].unit_sum_inverse);
                                 printf("sxr0 = %016lx\n", rdpftrip.dpf[0].scaled_xor.xshare);
                                 printf("usi1 = %016lx\n", rdpftrip.dpf[1].unit_sum_inverse);
@@ -136,11 +138,12 @@ void preprocessing_comp(MPCIO &mpcio, int num_threads, char **args)
     pool.join();
 }
 
-void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
+void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char **args)
 {
+    int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcsrvio, thread_num, args] {
+        boost::asio::post(pool, [&mpcsrvio, &opts, thread_num, args] {
             char **threadargs = args;
             MPCTIO stio(mpcsrvio, thread_num);
             Openfiles ofiles;
@@ -220,6 +223,12 @@ void preprocessing_server(MPCServerIO &mpcsrvio, int num_threads, char **args)
                                 printf("usi1 = %016lx\n", rdpfpair.dpf[1].unit_sum_inverse);
                                 printf("sxr1 = %016lx\n", rdpfpair.dpf[1].scaled_xor.xshare);
                                 printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
+                                    if (opts.expand_rdpfs) {
+                                        printf("Expanding\n");
+                                        rdpfpair.dpf[0].expand(stio.aes_ops());
+                                        rdpfpair.dpf[1].expand(stio.aes_ops());
+                                        printf("Expanded\n");
+                                    }
                                     pairfile.os() << rdpfpair;
                                 });
                         }
