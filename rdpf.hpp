@@ -74,6 +74,32 @@ struct RDPF {
     // Expand the DPF if it's not already expanded
     void expand(size_t &op_counter);
 
+    // Streaming evaluation, to avoid taking up enough memory to store
+    // an entire evaluation
+    class Eval {
+        friend class RDPF; // So eval() can call the Eval constructor
+        const RDPF &rdpf;
+        size_t &op_counter;
+        bool use_expansion;
+        nbits_t depth;
+        address_t indexmask;
+        address_t pathindex;
+        address_t nextindex;
+        std::vector<DPFnode> path;
+        Eval(const RDPF &rdpf, size_t &op_counter, address_t start,
+            bool use_expansion);
+    public:
+        DPFnode next();
+    };
+
+    // Create an Eval object that will start its output at index start.
+    // It will wrap around to 0 when it hits 2^depth.  If use_expansion
+    // is true, then if the DPF has been expanded, just output values
+    // from that.  If use_expansion=false or if the DPF has not been
+    // expanded, compute the values on the fly.
+    Eval eval(address_t start, size_t &op_counter,
+        bool use_expansion=true) const;
+
     // Get the bit-shared unit vector entry from the leaf node
     inline RegBS unit_bs(DPFnode leaf) const {
         RegBS b;
