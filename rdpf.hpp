@@ -28,6 +28,8 @@ struct RDPF {
     // XOR share of the scaling value M_xs such that the high words
     // of the leaf values for P0 and P1 XOR to M_xs * e_{target}
     RegXS scaled_xor;
+    // If we're saving the expansion, put it here
+    std::vector<DPFnode> expansion;
 
     RDPF() {}
 
@@ -44,7 +46,7 @@ struct RDPF {
     // 2^{depth+1}-2 local AES operations for P0,P1
     // 0 local AES operations for P2
     RDPF(MPCTIO &tio, yield_t &yield,
-        RegXS target, nbits_t depth);
+        RegXS target, nbits_t depth, bool save_expansion = false);
 
     // The number of bytes it will take to store this RDPF
     size_t size() const;
@@ -68,6 +70,9 @@ struct RDPF {
     //
     // Cost: depth AES operations
     DPFnode leaf(address_t input, size_t &op_counter) const;
+
+    // Expand the DPF if it's not already expanded
+    void expand(size_t &op_counter);
 
     // Get the bit-shared unit vector entry from the leaf node
     inline RegBS unit_bs(DPFnode leaf) const {
@@ -121,12 +126,22 @@ T& operator>>(T &is, RDPF &rdpf)
     is.read((char *)&depth, sizeof(depth));
     rdpf.whichhalf = !!(depth & 0x80);
     depth &= 0x7f;
+    bool read_expanded = false;
+    if (depth > 64) {
+        read_expanded = true;
+        depth -= 64;
+    }
     assert(depth <= ADDRESS_MAX_BITS);
     rdpf.cw.clear();
     for (uint8_t i=0; i<depth; ++i) {
         DPFnode cw;
         is.read((char *)&cw, sizeof(cw));
         rdpf.cw.push_back(cw);
+    }
+    if (read_expanded) {
+        rdpf.expansion.resize(1<<depth);
+        is.read((char *)rdpf.expansion.data(),
+            sizeof(rdpf.expansion[0])<<depth);
     }
     value_t cfbits = 0;
     is.read((char *)&cfbits, BITBYTES(depth));
@@ -138,19 +153,33 @@ T& operator>>(T &is, RDPF &rdpf)
     return is;
 }
 
+// Write the DPF to the output stream.  If expanded=true, then include
+// the expansion _if_ the DPF is itself already expanded.  You can use
+// this to write DPFs to files.
 template <typename T>
-T& operator<<(T &os, const RDPF &rdpf)
+T& write_maybe_expanded(T &os, const RDPF &rdpf,
+    bool expanded = true)
 {
     os.write((const char *)&rdpf.seed, sizeof(rdpf.seed));
     uint8_t depth = rdpf.cw.size();
     assert(depth <= ADDRESS_MAX_BITS);
     // The whichhalf bit is the high bit of depth
+    // If we're writing an expansion, add 64 to depth as well
     uint8_t whichhalf_and_depth = depth |
         (uint8_t(rdpf.whichhalf)<<7);
+    bool write_expansion = false;
+    if (expanded && rdpf.expansion.size() == (size_t(1)<<depth)) {
+        write_expansion = true;
+        whichhalf_and_depth += 64;
+    }
     os.write((const char *)&whichhalf_and_depth,
         sizeof(whichhalf_and_depth));
     for (uint8_t i=0; i<depth; ++i) {
         os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));
+    }
+    if (write_expansion) {
+        os.write((const char *)rdpf.expansion.data(),
+            sizeof(rdpf.expansion[0])<<depth);
     }
     os.write((const char *)&rdpf.cfbits, BITBYTES(depth));
     os.write((const char *)&rdpf.unit_sum_inverse, sizeof(rdpf.unit_sum_inverse));
@@ -158,6 +187,14 @@ T& operator<<(T &os, const RDPF &rdpf)
     os.write((const char *)&rdpf.scaled_xor, sizeof(rdpf.scaled_xor));
 
     return os;
+}
+
+// The ordinary << version never writes the expansion, since this is
+// what we use to send DPFs over the network.
+template <typename T>
+T& operator<<(T &os, const RDPF &rdpf)
+{
+    return write_maybe_expanded(os, rdpf, false);
 }
 
 // Computational peers will generate triples of RDPFs with the _same_
@@ -179,15 +216,19 @@ struct RDPFTriple {
     // Construct three RDPFs of the given depth all with the same
     // randomly generated target index.
     RDPFTriple(MPCTIO &tio, yield_t &yield,
-        nbits_t depth);
+        nbits_t depth, bool save_expansion = false);
 };
 
 // I/O for RDPF Triples
 
+// We never write RDPFTriples over the network, so always write
+// the DPF expansions if they're available.
 template <typename T>
 T& operator<<(T &os, const RDPFTriple &rdpftrip)
 {
-    os << rdpftrip.dpf[0] << rdpftrip.dpf[1] << rdpftrip.dpf[2];
+    write_maybe_expanded(os, rdpftrip.dpf[0], true);
+    write_maybe_expanded(os, rdpftrip.dpf[1], true);
+    write_maybe_expanded(os, rdpftrip.dpf[2], true);
     nbits_t depth = rdpftrip.dpf[0].depth();
     os.write((const char *)&rdpftrip.as_target.ashare, BITBYTES(depth));
     os.write((const char *)&rdpftrip.xs_target.xshare, BITBYTES(depth));
@@ -212,10 +253,13 @@ struct RDPFPair {
 
 // I/O for RDPF Pairs
 
+// We never write RDPFPairs over the network, so always write
+// the DPF expansions if they're available.
 template <typename T>
 T& operator<<(T &os, const RDPFPair &rdpfpair)
 {
-    os << rdpfpair.dpf[0] << rdpfpair.dpf[1];
+    write_maybe_expanded(os, rdpfpair.dpf[0], true);
+    write_maybe_expanded(os, rdpfpair.dpf[1], true);
     return os;
 }
 

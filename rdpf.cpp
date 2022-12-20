@@ -52,7 +52,7 @@ static value_t inverse_value_t(value_t x)
 // This algorithm is based on Appendix C from the Duoram paper, with a
 // small optimization noted below.
 RDPF::RDPF(MPCTIO &tio, yield_t &yield,
-    RegXS target, nbits_t depth)
+    RegXS target, nbits_t depth, bool save_expansion)
 {
     int player = tio.player();
     size_t &aesops = tio.aes_ops();
@@ -74,7 +74,12 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
     while(level < depth) {
         delete[] curlevel;
         curlevel = nextlevel;
-        nextlevel = new DPFnode[1<<(level+1)];
+        if (save_expansion && level == depth-1) {
+            expansion.resize(1<<depth);
+            nextlevel = expansion.data();
+        } else {
+            nextlevel = new DPFnode[1<<(level+1)];
+        }
         // Invariant: curlevel has 2^level elements; nextlevel has
         // 2^{level+1} elements
 
@@ -221,6 +226,10 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
                     bool flag = get_lsb(curlevel[i]);
                     DPFnode leftchild = xor_if(nextlevel[2*i], CW, flag);
                     DPFnode rightchild = xor_if(nextlevel[2*i+1], CWR, flag);
+                    if (save_expansion) {
+                        nextlevel[2*i] = leftchild;
+                        nextlevel[2*i+1] = rightchild;
+                    }
                     value_t leftlow = value_t(_mm_cvtsi128_si64x(leftchild));
                     value_t rightlow = value_t(_mm_cvtsi128_si64x(rightchild));
                     value_t lefthigh =
@@ -254,7 +263,9 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
     }
 
     delete[] curlevel;
-    delete[] nextlevel;
+    if (!save_expansion) {
+        delete[] nextlevel;
+    }
 }
 
 // The number of bytes it will take to store a RDPF of the given depth
@@ -293,6 +304,11 @@ DPFnode RDPF::descend(const DPFnode parent, nbits_t parentdepth,
 // Get the leaf node for the given input
 DPFnode RDPF::leaf(address_t input, size_t &op_counter) const
 {
+    // If we have a precomputed expansion, just use it
+    if (expansion.size()) {
+        return expansion[input];
+    }
+
     nbits_t totdepth = depth();
     DPFnode node = seed;
     for (nbits_t d=0;d<totdepth;++d) {
@@ -302,10 +318,52 @@ DPFnode RDPF::leaf(address_t input, size_t &op_counter) const
     return node;
 }
 
+// Expand the DPF if it's not already expanded
+void RDPF::expand(size_t &op_counter)
+{
+    nbits_t depth = this->depth();
+    size_t num_leaves = size_t(1)<<depth;
+    if (expansion.size() == num_leaves) return;
+    expansion.resize(num_leaves);
+    address_t index = 0;
+    address_t lastindex = 0;
+    DPFnode *path = new DPFnode[depth];
+    path[0] = seed;
+    for (nbits_t i=1;i<depth;++i) {
+        path[i] = descend(path[i-1], i-1, 0, op_counter);
+    }
+    expansion[index++] = descend(path[depth-1], depth-1, 0, op_counter);
+    expansion[index++] = descend(path[depth-1], depth-1, 1, op_counter);
+    while(index < num_leaves) {
+        // Invariant: lastindex and index will both be even, and
+        // index=lastindex+2
+        uint64_t index_xor = index ^ lastindex;
+        nbits_t how_many_1_bits = __builtin_popcount(index_xor);
+        // If lastindex -> index goes for example from (in binary)
+        // 010010110 -> 010011000, then index_xor will be
+        // 000001110 and how_many_1_bits will be 3.
+        // That indicates that path[depth-3] was a left child, and now
+        // we need to change it to a right child by descending right
+        // from path[depth-4], and then filling the path after that with
+        // left children.
+        path[depth-how_many_1_bits] =
+            descend(path[depth-how_many_1_bits-1],
+                depth-how_many_1_bits-1, 1, op_counter);
+        for (nbits_t i = depth-how_many_1_bits; i < depth-1; ++i) {
+            path[i+1] = descend(path[i], i, 0, op_counter);
+        }
+        lastindex = index;
+        expansion[index++] = descend(path[depth-1], depth-1, 0, op_counter);
+        expansion[index++] = descend(path[depth-1], depth-1, 1, op_counter);
+    }
+
+    delete[] path;
+}
+
 // Construct three RDPFs of the given depth all with the same randomly
 // generated target index.
 RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
-    nbits_t depth)
+    nbits_t depth, bool save_expansion)
 {
     // Pick a random XOR share of the target
     xs_target.randomize(depth);
@@ -316,7 +374,8 @@ RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
     for (int i=0;i<3;++i) {
         coroutines.emplace_back(
             [&, i](yield_t &yield) {
-                dpf[i] = RDPF(tio, yield, xs_target, depth);
+                dpf[i] = RDPF(tio, yield, xs_target, depth,
+                save_expansion);
             });
     }
     coroutines.emplace_back(
