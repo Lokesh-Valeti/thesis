@@ -22,10 +22,10 @@ using boost::asio::ip::tcp;
 
 // Classes to represent stored precomputed data (e.g., multiplication triples)
 
-template<typename T>
+template<typename T, typename N>
 class PreCompStorage {
 public:
-    PreCompStorage() : count(0) {}
+    PreCompStorage() : name(N::name), depth(0), count(0) {}
     PreCompStorage(unsigned player, bool preprocessing,
         const char *filenameprefix, unsigned thread_num);
     void init(unsigned player, bool preprocessing,
@@ -36,6 +36,8 @@ public:
     inline void reset_stats() { count = 0; }
 private:
     std::ifstream storage;
+    std::string name;
+    nbits_t depth;
     size_t count;
 };
 
@@ -194,11 +196,11 @@ struct MPCPeerIO : public MPCIO {
     // culprit), but you can have a deque of those for some reason.
     std::deque<MPCSingleIO> peerios;
     std::deque<MPCSingleIO> serverios;
-    std::vector<PreCompStorage<MultTriple>> triples;
-    std::vector<PreCompStorage<HalfTriple>> halftriples;
+    std::vector<PreCompStorage<MultTriple, MultTripleName>> triples;
+    std::vector<PreCompStorage<HalfTriple, HalfTripleName>> halftriples;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
-    std::vector<std::array<PreCompStorage<RDPFTriple>,ADDRESS_MAX_BITS>> rdpftriples;
+    std::vector<std::array<PreCompStorage<RDPFTriple, RDPFTripleName>,ADDRESS_MAX_BITS>> rdpftriples;
 
     MPCPeerIO(unsigned player, bool preprocessing,
             std::deque<tcp::socket> &peersocks,
@@ -219,7 +221,7 @@ struct MPCServerIO : public MPCIO {
     std::deque<MPCSingleIO> p1ios;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
-    std::vector<std::array<PreCompStorage<RDPFPair>,ADDRESS_MAX_BITS>> rdpfpairs;
+    std::vector<std::array<PreCompStorage<RDPFPair, RDPFPairName>,ADDRESS_MAX_BITS>> rdpfpairs;
 
     MPCServerIO(bool preprocessing,
             std::deque<tcp::socket> &p0socks,

@@ -2,19 +2,23 @@
 #include "rdpf.hpp"
 #include "bitutils.hpp"
 
-template<typename T>
-PreCompStorage<T>::PreCompStorage(unsigned player, bool preprocessing,
-        const char *filenameprefix, unsigned thread_num) {
+template<typename T, typename N>
+PreCompStorage<T,N>::PreCompStorage(unsigned player, bool preprocessing,
+        const char *filenameprefix, unsigned thread_num) :
+        name(N::name), depth(0)
+{
     init(player, preprocessing, filenameprefix, thread_num);
 }
 
-template<typename T>
-void PreCompStorage<T>::init(unsigned player, bool preprocessing,
-        const char *filenameprefix, unsigned thread_num, nbits_t depth) {
+template<typename T, typename N>
+void PreCompStorage<T,N>::init(unsigned player, bool preprocessing,
+        const char *filenameprefix, unsigned thread_num, nbits_t depth)
+{
     if (preprocessing) return;
     std::string filename(filenameprefix);
     char suffix[20];
     if (depth) {
+        this->depth = depth;
         sprintf(suffix, "%02d.p%d.t%u", depth, player%10, thread_num);
     } else {
         sprintf(suffix, ".p%d.t%u", player%10, thread_num);
@@ -29,11 +33,16 @@ void PreCompStorage<T>::init(unsigned player, bool preprocessing,
     count = 0;
 }
 
-template<typename T>
-void PreCompStorage<T>::get(T& nextval) {
+template<typename T, typename N>
+void PreCompStorage<T,N>::get(T& nextval)
+{
     storage >> nextval;
     if (!storage.good()) {
-        std::cerr << "Failed to read precomputed value from storage\n";
+        std::cerr << "Failed to read precomputed value from " << name;
+        if (depth) {
+            std::cerr << (int)depth;
+        }
+        std::cerr << " storage\n";
         exit(1);
     }
     ++count;

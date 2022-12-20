@@ -190,12 +190,17 @@ using address_t = uint64_t;
 // but subject to the relation that X0*Y1 + Y0*X1 = Z0+Z1
 
 using MultTriple = std::tuple<value_t, value_t, value_t>;
+// The *Name structs are a way to get strings representing the names of
+// the types as would be given to preprocessing to create them in
+// advance.
+struct MultTripleName { static constexpr const char *name = "t"; };
 
 // A half-triple is (X0,Z0) held by P0 (and correspondingly (Y1,Z1) held
 // by P1), with all values random, but subject to the relation that
 // X0*Y1 = Z0+Z1
 
 using HalfTriple = std::tuple<value_t, value_t>;
+struct HalfTripleName { static constexpr const char *name = "h"; };
 
 // The type of nodes in a DPF.  This must be at least as many bits as
 // the security parameter, and at least twice as many bits as value_t.
@@ -217,7 +222,9 @@ struct SelectTriple {
 // These are defined in rdpf.hpp, but declared here to avoid cyclic
 // header dependencies.
 struct RDPFPair;
+struct RDPFPairName { static constexpr const char *name = "r"; };
 struct RDPFTriple;
+struct RDPFTripleName { static constexpr const char *name = "r"; };
 
 // We want the I/O (using << and >>) for many classes
 // to just be a common thing: write out the bytes
