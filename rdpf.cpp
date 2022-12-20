@@ -319,6 +319,9 @@ DPFnode RDPF::leaf(address_t input, size_t &op_counter) const
 }
 
 // Expand the DPF if it's not already expanded
+//
+// This routine is slightly more efficient than repeatedly calling
+// Eval::next(), but it uses a lot more memory.
 void RDPF::expand(size_t &op_counter)
 {
     nbits_t depth = this->depth();
