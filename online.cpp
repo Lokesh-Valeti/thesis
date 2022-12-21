@@ -6,7 +6,8 @@
 #include "duoram.hpp"
 
 
-static void online_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
+static void online_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
 {
     nbits_t nbits = VALUE_BITS;
 
@@ -61,7 +62,7 @@ static void online_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
         [&](yield_t &yield) {
             mpc_xs_to_as(tio, yield, A[8], X, nbits);
         });
-    run_coroutines(tio, coroutines);
+    run_coroutines(yield, coroutines);
     if (!is_server) {
         printf("\n");
         printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i].ashare);
@@ -107,7 +108,8 @@ static void online_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
     delete[] A;
 }
 
-static void lamport_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
+static void lamport_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
 {
     // Create a bunch of threads and send a bunch of data to the other
     // peer, and receive their data.  If an arg is specified, repeat
@@ -152,7 +154,8 @@ static void lamport_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
     pool.join();
 }
 
-static void rdpf_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
+static void rdpf_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
 
@@ -233,7 +236,8 @@ static void rdpf_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
     pool.join();
 }
 
-static void rdpf_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
+static void rdpf_timing(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
 
@@ -285,7 +289,8 @@ static void rdpf_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
     pool.join();
 }
 
-static void rdpfeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
+static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
     address_t start=0;
@@ -342,7 +347,8 @@ static void rdpfeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
     pool.join();
 }
 
-static void tupleeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
+static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
     address_t start=0;
@@ -408,7 +414,8 @@ static void tupleeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
     pool.join();
 }
 
-static void duoram_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
+static void duoram_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
 
@@ -420,11 +427,13 @@ static void duoram_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
             MPCTIO tio(mpcio, thread_num);
             // size_t &op_counter = tio.aes_ops();
             Duoram<RegAS> oram(mpcio.player, size_t(1)<<depth);
             printf("%ld\n", oram.size());
+            auto A = oram.flat(tio, yield);
+            printf("%ld\n", A.size());
             tio.send();
         });
     }
@@ -433,31 +442,39 @@ static void duoram_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
 
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
-    if (!*args) {
-        std::cerr << "Mode is required as the first argument when not preprocessing.\n";
-        return;
-    } else if (!strcmp(*args, "test")) {
-        ++args;
-        online_test(mpcio, opts, args);
-    } else if (!strcmp(*args, "lamporttest")) {
-        ++args;
-        lamport_test(mpcio, opts, args);
-    } else if (!strcmp(*args, "rdpftest")) {
-        ++args;
-        rdpf_test(mpcio, opts, args);
-    } else if (!strcmp(*args, "rdpftime")) {
-        ++args;
-        rdpf_timing(mpcio, opts, args);
-    } else if (!strcmp(*args, "evaltime")) {
-        ++args;
-        rdpfeval_timing(mpcio, opts, args);
-    } else if (!strcmp(*args, "tupletime")) {
-        ++args;
-        tupleeval_timing(mpcio, opts, args);
-    } else if (!strcmp(*args, "duotest")) {
-        ++args;
-        duoram_test(mpcio, opts, args);
-    } else {
-        std::cerr << "Unknown mode " << *args << "\n";
-    }
+    // Run everything inside a coroutine so that simple tests don't have
+    // to start one themselves
+    MPCTIO tio(mpcio, 0);
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back(
+        [&](yield_t &yield) {
+            if (!*args) {
+                std::cerr << "Mode is required as the first argument when not preprocessing.\n";
+                return;
+            } else if (!strcmp(*args, "test")) {
+                ++args;
+                online_test(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "lamporttest")) {
+                ++args;
+                lamport_test(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "rdpftest")) {
+                ++args;
+                rdpf_test(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "rdpftime")) {
+                ++args;
+                rdpf_timing(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "evaltime")) {
+                ++args;
+                rdpfeval_timing(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "tupletime")) {
+                ++args;
+                tupleeval_timing(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "duotest")) {
+                ++args;
+                duoram_test(mpcio, yield, opts, args);
+            } else {
+                std::cerr << "Unknown mode " << *args << "\n";
+            }
+        });
+    run_coroutines(tio, coroutines);
 }

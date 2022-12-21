@@ -50,11 +50,92 @@ public:
     // The type of this Duoram
     using type = T;
 
+    // The different Shapes are subclasses of this inner class
+    class Shape;
+    // These are the different Shapes that exist
+    class Flat;
+
     // Pass the player number and desired size
     Duoram(int player, size_t size);
 
     // Get the size
     inline size_t size() { return oram_size; }
+
+    // Get the basic Flat shape for this Duoram
+    Flat flat(MPCTIO &tio, yield_t &yield, size_t start = 0,
+            size_t len = 0) {
+        return Flat(*this, tio, yield, start, len);
+    }
+};
+
+// The parent class of all Shapes.  This is an abstract class that
+// cannot itself be instantiated.
+
+template <typename T>
+class Duoram<T>::Shape {
+protected:
+    // A reference to the parent shape.  As with ".." in the root
+    // directory of a filesystem, the topmost shape is indicated by
+    // having parent = *this.
+    const Shape &parent;
+
+    // A reference to the backing physical storage
+    Duoram &duoram;
+
+    // The size of this shape
+    size_t shape_size;
+
+    // The Shape's context (MPCTIO and yield_t)
+    MPCTIO &tio;
+    yield_t &yield;
+
+    // We need a constructor because we hold non-static references; this
+    // constructor is called by the subclass constructors
+    Shape(const Shape &parent, Duoram &duoram, MPCTIO &tio,
+        yield_t &yield) : parent(parent), duoram(duoram), shape_size(0),
+        tio(tio), yield(yield) {}
+
+public:
+    // The index-mapping function. Input the index relative to this
+    // shape, and output the corresponding physical address.  The
+    // strategy is to map the index relative to this shape to the index
+    // relative to the parent shape, call the parent's indexmap function
+    // on that (unless this is the topmost shape), and return what it
+    // returns.  If this is the topmost shape, just return what you
+    // would have passed to the parent's indexmap.
+    //
+    // This is a pure virtual function; all subclasses of Shape must
+    // implement it, and of course Shape itself therefore cannot be
+    // instantiated.
+    virtual size_t indexmap(size_t idx) const = 0;
+
+    // Get the size
+    inline size_t size() { return shape_size; }
+};
+
+// The most basic shape is Flat.  It is almost always the topmost shape,
+// and serves to provide MPCTIO and yield_t context to a Duoram without
+// changing the indices or size (but can specify a subrange if desired).
+
+template <typename T>
+class Duoram<T>::Flat : public Duoram<T>::Shape {
+    // If this is a subrange, start may be non-0, but it's usually 0
+    size_t start;
+
+    inline size_t indexmap(size_t idx) const {
+        size_t paridx = idx + start;
+        if (&(this->parent) == this) {
+            return paridx;
+        } else {
+            return this->parent.indexmap(paridx);
+        }
+    }
+
+public:
+    // Constructor.  len=0 means the maximum size (the parent's size
+    // minus start).
+    Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield, size_t start = 0,
+        size_t len = 0);
 };
 
 #include "duoram.tcc"
