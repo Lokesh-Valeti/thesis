@@ -27,12 +27,12 @@ depend:
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
-prac.o: mpcio.hpp types.hpp preproc.hpp online.hpp
-mpcio.o: mpcio.hpp types.hpp rdpf.hpp coroutine.hpp bitutils.hpp
-preproc.o: types.hpp coroutine.hpp mpcio.hpp preproc.hpp rdpf.hpp
-preproc.o: bitutils.hpp
-online.o: online.hpp mpcio.hpp types.hpp mpcops.hpp coroutine.hpp rdpf.hpp
-online.o: bitutils.hpp
+prac.o: mpcio.hpp types.hpp preproc.hpp options.hpp online.hpp
+mpcio.o: mpcio.hpp types.hpp rdpf.hpp coroutine.hpp bitutils.hpp rdpf.tcc
+preproc.o: types.hpp coroutine.hpp mpcio.hpp preproc.hpp options.hpp rdpf.hpp
+preproc.o: bitutils.hpp rdpf.tcc
+online.o: online.hpp mpcio.hpp types.hpp options.hpp mpcops.hpp coroutine.hpp
+online.o: rdpf.hpp bitutils.hpp rdpf.tcc
 mpcops.o: mpcops.hpp types.hpp mpcio.hpp coroutine.hpp bitutils.hpp
-rdpf.o: rdpf.hpp mpcio.hpp types.hpp coroutine.hpp bitutils.hpp mpcops.hpp
-rdpf.o: aes.hpp prg.hpp
+rdpf.o: rdpf.hpp mpcio.hpp types.hpp coroutine.hpp bitutils.hpp rdpf.tcc
+rdpf.o: mpcops.hpp aes.hpp prg.hpp
