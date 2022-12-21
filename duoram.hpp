@@ -57,19 +57,6 @@ public:
     // These are the different Shapes that exist
     class Flat;
 
-    // When you index into a shape (A[x]), you get one of these types,
-    // depending on the type of x (the index), _not_ on the type T (the
-    // underlying type of the Duoram).  That is, you can have an
-    // additive-shared index (x) into an XOR-shared database (T), for
-    // example.
-
-    // When x is unshared explicit value
-    class MemRefExpl;
-    // When x is additively shared
-    class MemRefAS;
-    // When x is XOR shared
-    class MemRefXS;
-
     // Pass the player number and desired size
     Duoram(int player, size_t size);
 
@@ -91,6 +78,19 @@ class Duoram<T>::Shape {
     // Subclasses should be able to access _other_ Shapes' indexmap
     friend class Flat;
 
+    // When you index into a shape (A[x]), you get one of these types,
+    // depending on the type of x (the index), _not_ on the type T (the
+    // underlying type of the Duoram).  That is, you can have an
+    // additive-shared index (x) into an XOR-shared database (T), for
+    // example.
+
+    // When x is unshared explicit value
+    class MemRefExpl;
+    // When x is additively shared
+    class MemRefAS;
+    // When x is XOR shared
+    class MemRefXS;
+
 protected:
     // A reference to the parent shape.  As with ".." in the root
     // directory of a filesystem, the topmost shape is indicated by
@@ -103,9 +103,20 @@ protected:
     // The size of this shape
     size_t shape_size;
 
+    // The number of bits needed to address this shape (the number of
+    // bits in shape_size-1)
+    nbits_t addr_size;
+
+    // And a mask with the low addr_size bits set
+    address_t addr_mask;
+
     // The Shape's context (MPCTIO and yield_t)
     MPCTIO &tio;
     yield_t &yield;
+
+    // A function to set the shape_size and compute addr_size and
+    // addr_mask
+    void set_shape_size(size_t sz);
 
     // We need a constructor because we hold non-static references; this
     // constructor is called by the subclass constructors
@@ -170,7 +181,7 @@ public:
 // perform operations on this object, which do the Duoram operations.
 
 template <typename T>
-class Duoram<T>::MemRefAS {
+class Duoram<T>::Shape::MemRefAS {
     const Shape &shape;
     RegAS idx;
 
@@ -178,8 +189,11 @@ public:
     MemRefAS(const Shape &shape, const RegAS &idx) :
         shape(shape), idx(idx) {}
 
-    // Oblivious read from an additively shared index into Duoram memory
+    // Oblivious read from an additively shared index of Duoram memory
     operator T();
+
+    // Oblivious update to an additively shared index of Duoram memory
+    MemRefAS &operator+=(const T& M);
 };
 
 // An XOR shared memory reference.  You get one of these from a Shape A
@@ -187,7 +201,7 @@ public:
 // operations on this object, which do the Duoram operations.
 
 template <typename T>
-class Duoram<T>::MemRefXS {
+class Duoram<T>::Shape::MemRefXS {
     const Shape &shape;
     RegXS idx;
 
@@ -202,7 +216,7 @@ public:
 // operations.
 
 template <typename T>
-class Duoram<T>::MemRefExpl {
+class Duoram<T>::Shape::MemRefExpl {
     const Shape &shape;
     address_t idx;
 

@@ -37,6 +37,25 @@ std::vector<T> Duoram<T>::Shape::reconstruct() const
     return res;
 }
 
+// Function to set the shape_size of a shape and compute the number of
+// bits you need to address a shape of that size (which is the number of
+// bits in sz-1).  This is typically called by subclass constructors.
+template <typename T>
+void Duoram<T>::Shape::set_shape_size(size_t sz)
+{
+    shape_size = sz;
+    // Compute the number of bits in (sz-1)
+    // But use 0 if sz=0 for some reason (though that should never
+    // happen)
+    if (sz > 1) {
+        addr_size = 64-__builtin_clzll(sz-1);
+        addr_mask = address_t((size_t(1)<<addr_size)-1);
+    } else {
+        addr_size = 0;
+        addr_mask = 0;
+    }
+}
+
 // Constructor for the Flat shape.  len=0 means the maximum size (the
 // parent's size minus start).
 template <typename T>
@@ -52,12 +71,68 @@ Duoram<T>::Flat::Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield,
     if (len > maxshapesize || len == 0) {
         len = maxshapesize;
     }
-    this->shape_size = len;
+    this->set_shape_size(len);
 }
 
+// Oblivious read from an additively shared index of Duoram memory
 template <typename T>
-Duoram<T>::MemRefAS::operator T()
+Duoram<T>::Shape::MemRefAS::operator T()
 {
     T res;
     return res;
+}
+
+// Oblivious update to an additively shared index of Duoram memory
+template <typename T>
+typename Duoram<T>::Shape::MemRefAS
+    &Duoram<T>::Shape::MemRefAS::operator+=(const T& M)
+{
+    int player = shape.tio.player();
+    if (player < 2) {
+        // Computational players do this
+        RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+        RegAS indoffset = idx;
+        indoffset -= dt.as_target;
+        RegAS Moffset[3];
+        Moffset[0] = Moffset[1] = Moffset[2] = M;
+        Moffset[0] -= dt.dpf[0].scaled_sum;
+        Moffset[1] -= dt.dpf[1].scaled_sum;
+        Moffset[2] -= dt.dpf[2].scaled_sum;
+        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_peer() << Moffset[0] << Moffset[1] <<
+            Moffset[2];
+        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_server() << Moffset[1] << Moffset[2];
+        shape.yield();
+        RegAS peerindoffset;
+        RegAS peerMoffset[3];
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_peer() >> peerMoffset[0] >> peerMoffset[1] >>
+            peerMoffset[2];
+        indoffset += peerindoffset;
+        indoffset &= shape.addr_mask;
+        Moffset[0] += peerMoffset[0];
+        Moffset[1] += peerMoffset[1];
+        Moffset[2] += peerMoffset[2];
+        StreamEval<RDPFTriple> ev(dt, indoffset.ashare,
+            shape.tio.aes_ops());
+        for (size_t i=0; i<shape.shape_size; ++i) {
+            auto [L0, L1, L2] = ev.next();
+
+        }
+    } else {
+        // The server does this
+        RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
+        RegAS p0indoffset, p1indoffset;
+        RegAS p0Moffset[2];
+        RegAS p1Moffset[2];
+        shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_p0() >> p0Moffset[0] >> p0Moffset[1];
+        shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_p1() >> p1Moffset[0] >> p1Moffset[1];
+        p0indoffset += p1indoffset;
+        p0Moffset[0] += p1Moffset[0];
+        p0Moffset[1] += p1Moffset[1];
+    }
+    return *this;
 }
