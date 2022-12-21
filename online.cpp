@@ -3,6 +3,7 @@
 #include "online.hpp"
 #include "mpcops.hpp"
 #include "rdpf.hpp"
+#include "duoram.hpp"
 
 
 static void online_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
@@ -407,6 +408,29 @@ static void tupleeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
     pool.join();
 }
 
+static void duoram_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+            MPCTIO tio(mpcio, thread_num);
+            // size_t &op_counter = tio.aes_ops();
+            Duoram<RegAS> oram(mpcio.player, size_t(1)<<depth);
+            printf("%ld\n", oram.size());
+            tio.send();
+        });
+    }
+    pool.join();
+}
+
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     if (!*args) {
@@ -430,6 +454,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "tupletime")) {
         ++args;
         tupleeval_timing(mpcio, opts, args);
+    } else if (!strcmp(*args, "duotest")) {
+        ++args;
+        duoram_test(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
