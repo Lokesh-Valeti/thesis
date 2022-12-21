@@ -31,3 +31,10 @@ Duoram<T>::Flat::Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield,
     }
     this->shape_size = len;
 }
+
+template <typename T>
+Duoram<T>::MemRefAS::operator T()
+{
+    T res;
+    return res;
+}

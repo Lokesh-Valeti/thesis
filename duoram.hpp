@@ -1,6 +1,8 @@
 #ifndef __DUORAM_HPP__
 #define __DUORAM_HPP__
 
+#include "types.hpp"
+
 // Implementation of the 3-party protocols described in:
 // Adithya Vadapalli, Ryan Henry, Ian Goldberg, "Duoram: A
 // Bandwidth-Efficient Distributed ORAM for 2- and 3-Party Computation".
@@ -55,6 +57,19 @@ public:
     // These are the different Shapes that exist
     class Flat;
 
+    // When you index into a shape (A[x]), you get one of these types,
+    // depending on the type of x (the index), _not_ on the type T (the
+    // underlying type of the Duoram).  That is, you can have an
+    // additive-shared index (x) into an XOR-shared database (T), for
+    // example.
+
+    // When x is unshared explicit value
+    class MemRefExpl;
+    // When x is additively shared
+    class MemRefAS;
+    // When x is XOR shared
+    class MemRefXS;
+
     // Pass the player number and desired size
     Duoram(int player, size_t size);
 
@@ -73,6 +88,9 @@ public:
 
 template <typename T>
 class Duoram<T>::Shape {
+    // Subclasses should be able to access _other_ Shapes' indexmap
+    friend class Flat;
+
 protected:
     // A reference to the parent shape.  As with ".." in the root
     // directory of a filesystem, the topmost shape is indicated by
@@ -95,7 +113,6 @@ protected:
         yield_t &yield) : parent(parent), duoram(duoram), shape_size(0),
         tio(tio), yield(yield) {}
 
-public:
     // The index-mapping function. Input the index relative to this
     // shape, and output the corresponding physical address.  The
     // strategy is to map the index relative to this shape to the index
@@ -109,8 +126,14 @@ public:
     // instantiated.
     virtual size_t indexmap(size_t idx) const = 0;
 
+public:
     // Get the size
     inline size_t size() { return shape_size; }
+
+    // Index into this Shape in various ways
+    MemRefAS operator[](const RegAS &idx) { return MemRefAS(*this, idx); }
+    MemRefXS operator[](const RegXS &idx) { return MemRefXS(*this, idx); }
+    MemRefExpl operator[](address_t idx) { return MemRefExpl(*this, idx); }
 };
 
 // The most basic shape is Flat.  It is almost always the topmost shape,
@@ -136,6 +159,52 @@ public:
     // minus start).
     Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield, size_t start = 0,
         size_t len = 0);
+};
+
+// An additively shared memory reference.  You get one of these from a
+// Shape A and an additively shared RegAS index x with A[x].  Then you
+// perform operations on this object, which do the Duoram operations.
+
+template <typename T>
+class Duoram<T>::MemRefAS {
+    const Shape &shape;
+    RegAS idx;
+
+public:
+    MemRefAS(const Shape &shape, const RegAS &idx) :
+        shape(shape), idx(idx) {}
+
+    // Oblivious read from an additively shared index into Duoram memory
+    operator T();
+};
+
+// An XOR shared memory reference.  You get one of these from a Shape A
+// and an XOR shared RegXS index x with A[x].  Then you perform
+// operations on this object, which do the Duoram operations.
+
+template <typename T>
+class Duoram<T>::MemRefXS {
+    const Shape &shape;
+    RegXS idx;
+
+public:
+    MemRefXS(const Shape &shape, const RegXS &idx) :
+        shape(shape), idx(idx) {}
+};
+
+// An explicit memory reference.  You get one of these from a Shape A
+// and an address_t index x with A[x].  Then you perform operations on
+// this object, which update the Duoram state without performing Duoram
+// operations.
+
+template <typename T>
+class Duoram<T>::MemRefExpl {
+    const Shape &shape;
+    address_t idx;
+
+public:
+    MemRefExpl(const Shape &shape, address_t idx) :
+        shape(shape), idx(idx) {}
 };
 
 #include "duoram.tcc"

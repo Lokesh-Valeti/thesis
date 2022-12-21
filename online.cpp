@@ -433,7 +433,16 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
             Duoram<RegAS> oram(mpcio.player, size_t(1)<<depth);
             printf("%ld\n", oram.size());
             auto A = oram.flat(tio, yield);
-            printf("%ld\n", A.size());
+            RegAS aidx;
+            aidx.randomize(depth);
+            RegXS xidx;
+            xidx.randomize(depth);
+            size_t eidx = arc4random();
+            eidx &= (size_t(1)<<depth)-1;
+            RegAS Aa = A[aidx];
+            auto Ax = A[xidx];
+            auto Ae = A[eidx];
+            printf("%ld %ld\n", A.size(), Aa.ashare);
             tio.send();
         });
     }
