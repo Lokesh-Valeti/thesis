@@ -2,6 +2,10 @@
 #include "rdpf.hpp"
 #include "bitutils.hpp"
 
+// T is the type being stored
+// N is a type whose "name" static member is a string naming the type
+//   so that we can report something useful to the user if they try
+//   to read a type that we don't have any more values for
 template<typename T, typename N>
 PreCompStorage<T,N>::PreCompStorage(unsigned player, bool preprocessing,
         const char *filenameprefix, unsigned thread_num) :
