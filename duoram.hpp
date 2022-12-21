@@ -134,6 +134,10 @@ public:
     MemRefAS operator[](const RegAS &idx) { return MemRefAS(*this, idx); }
     MemRefXS operator[](const RegXS &idx) { return MemRefXS(*this, idx); }
     MemRefExpl operator[](address_t idx) { return MemRefExpl(*this, idx); }
+
+    // For debugging or checking your answers (using this in general is
+    // of course insecure)
+    std::vector<T> reconstruct() const;
 };
 
 // The most basic shape is Flat.  It is almost always the topmost shape,

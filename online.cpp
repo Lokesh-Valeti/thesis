@@ -428,9 +428,10 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
+            size_t size = size_t(1)<<depth;
             MPCTIO tio(mpcio, thread_num);
             // size_t &op_counter = tio.aes_ops();
-            Duoram<RegAS> oram(mpcio.player, size_t(1)<<depth);
+            Duoram<RegAS> oram(mpcio.player, size);
             printf("%ld\n", oram.size());
             auto A = oram.flat(tio, yield);
             RegAS aidx;
@@ -438,11 +439,18 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
             RegXS xidx;
             xidx.randomize(depth);
             size_t eidx = arc4random();
-            eidx &= (size_t(1)<<depth)-1;
+            eidx &= (size-1);
             RegAS Aa = A[aidx];
             auto Ax = A[xidx];
             auto Ae = A[eidx];
             printf("%ld %ld\n", A.size(), Aa.ashare);
+
+            auto check = A.reconstruct();
+            if (tio.player() == 0) {
+                for (address_t i=0;i<size;++i) {
+                    printf("%04x %016lx\n", i, check[i].ashare);
+                }
+            }
             tio.send();
         });
     }
