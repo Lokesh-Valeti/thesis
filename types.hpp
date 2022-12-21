@@ -46,6 +46,8 @@ using nbits_t = uint8_t;
 struct RegAS {
     value_t ashare;
 
+    RegAS() : ashare(0) {}
+
     // Set each side's share to a random value nbits bits long
     inline void randomize(size_t nbits = VALUE_BITS) {
         value_t mask = MASKBITS(nbits);
@@ -102,6 +104,8 @@ struct RegAS {
 struct RegBS {
     bit_t bshare;
 
+    RegBS() : bshare(0) {}
+
     // Set each side's share to a random bit
     inline void randomize() {
         unsigned char randb;
@@ -124,6 +128,8 @@ struct RegBS {
 // The type of a register holding an XOR share of a value
 struct RegXS {
     value_t xshare;
+
+    RegXS() : xshare(0) {}
 
     // Set each side's share to a random value nbits bits long
     inline void randomize(size_t nbits = VALUE_BITS) {

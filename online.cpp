@@ -253,7 +253,6 @@ static void rdpf_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     RDPF &dpf = dp.dpf[i];
                     dpf.expand(op_counter);
                     RegXS scaled_xor;
-                    scaled_xor.xshare = 0;
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = dpf.leaf(x, op_counter);
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -269,7 +268,6 @@ static void rdpf_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     RDPF &dpf = dt.dpf[i];
                     dpf.expand(op_counter);
                     RegXS scaled_xor;
-                    scaled_xor.xshare = 0;
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = dpf.leaf(x, op_counter);
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -311,7 +309,6 @@ static void rdpfeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
                 for (int i=0;i<2;++i) {
                     RDPF &dpf = dp.dpf[i];
                     RegXS scaled_xor;
-                    scaled_xor.xshare = 0;
                     auto ev = StreamEval(dpf, start, op_counter, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
@@ -327,7 +324,6 @@ static void rdpfeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
                 for (int i=0;i<3;++i) {
                     RDPF &dpf = dt.dpf[i];
                     RegXS scaled_xor;
-                    scaled_xor.xshare = 0;
                     auto ev = StreamEval(dpf, start, op_counter, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
@@ -368,8 +364,6 @@ static void tupleeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
             if (mpcio.player == 2) {
                 RDPFPair dp = tio.rdpfpair(depth);
                 RegXS scaled_xor0, scaled_xor1;
-                scaled_xor0.xshare = 0;
-                scaled_xor1.xshare = 0;
                 auto ev = StreamEval(dp, start, op_counter, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
                     auto [L0, L1] = ev.next();
@@ -387,9 +381,6 @@ static void tupleeval_timing(MPCIO &mpcio, const PRACOptions &opts, char **args)
             } else {
                 RDPFTriple dt = tio.rdpftriple(depth);
                 RegXS scaled_xor0, scaled_xor1, scaled_xor2;
-                scaled_xor0.xshare = 0;
-                scaled_xor1.xshare = 0;
-                scaled_xor2.xshare = 0;
                 auto ev = StreamEval(dt, start, op_counter, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
                     auto [L0, L1, L2] = ev.next();
