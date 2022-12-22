@@ -48,6 +48,8 @@ struct RegAS {
 
     RegAS() : ashare(0) {}
 
+    inline value_t share() const { return ashare; }
+
     // Set each side's share to a random value nbits bits long
     inline void randomize(size_t nbits = VALUE_BITS) {
         value_t mask = MASKBITS(nbits);
@@ -100,11 +102,22 @@ struct RegAS {
     }
 };
 
+inline value_t combine(const RegAS &A, const RegAS &B,
+        nbits_t nbits = VALUE_BITS) {
+    value_t mask = ~0;
+    if (nbits < VALUE_BITS) {
+        mask = (value_t(1)<<nbits)-1;
+    }
+    return (A.ashare + B.ashare) & mask;
+}
+
 // The type of a register holding a bit share
 struct RegBS {
     bit_t bshare;
 
     RegBS() : bshare(0) {}
+
+    inline bit_t share() const { return bshare; }
 
     // Set each side's share to a random bit
     inline void randomize() {
@@ -130,6 +143,8 @@ struct RegXS {
     value_t xshare;
 
     RegXS() : xshare(0) {}
+
+    inline value_t share() const { return xshare; }
 
     // Set each side's share to a random value nbits bits long
     inline void randomize(size_t nbits = VALUE_BITS) {
@@ -167,6 +182,205 @@ struct RegXS {
         return bs;
     }
 };
+
+inline value_t combine(const RegXS &A, const RegXS &B,
+        nbits_t nbits = VALUE_BITS) {
+    value_t mask = ~0;
+    if (nbits < VALUE_BITS) {
+        mask = (value_t(1)<<nbits)-1;
+    }
+    return (A.xshare ^ B.xshare) & mask;
+}
+
+// Some useful operations on tuples of the above types
+
+template <typename T>
+std::tuple<T,T> operator+=(std::tuple<T,T> &A,
+    const std::tuple<T,T> &B)
+{
+    std::get<0>(A) += std::get<0>(B);
+    std::get<1>(A) += std::get<1>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T> operator+=(const std::tuple<T&,T&> &A,
+    const std::tuple<T,T> &B)
+{
+    std::get<0>(A) += std::get<0>(B);
+    std::get<1>(A) += std::get<1>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T> operator+(const std::tuple<T,T> &A,
+    const std::tuple<T,T> &B)
+{
+    auto res = A;
+    res += B;
+    return res;
+}
+
+template <typename T>
+std::tuple<T,T> operator-=(const std::tuple<T&,T&> &A,
+    const std::tuple<T,T> &B)
+{
+    std::get<0>(A) -= std::get<0>(B);
+    std::get<1>(A) -= std::get<1>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T> operator-=(std::tuple<T,T> &A,
+    const std::tuple<T,T> &B)
+{
+    std::get<0>(A) -= std::get<0>(B);
+    std::get<1>(A) -= std::get<1>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T> operator-(const std::tuple<T,T> &A,
+    const std::tuple<T,T> &B)
+{
+    auto res = A;
+    res -= B;
+    return res;
+}
+
+template <typename T>
+std::tuple<T,T> operator*=(const std::tuple<T&,T&> &A,
+    const std::tuple<value_t,value_t> &B)
+{
+    std::get<0>(A) *= std::get<0>(B);
+    std::get<1>(A) *= std::get<1>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T> operator*=(std::tuple<T,T> &A,
+    const std::tuple<value_t,value_t> &B)
+{
+    std::get<0>(A) *= std::get<0>(B);
+    std::get<1>(A) *= std::get<1>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T> operator*(const std::tuple<T,T> &A,
+    const std::tuple<value_t,value_t> &B)
+{
+    auto res = A;
+    res *= B;
+    return res;
+}
+
+template <typename T>
+inline std::tuple<value_t,value_t> combine(
+        const std::tuple<T,T> &A, const std::tuple<T,T> &B,
+        nbits_t nbits = VALUE_BITS) {
+    return std::make_tuple(
+        combine(std::get<0>(A), std::get<0>(B), nbits),
+        combine(std::get<1>(A), std::get<1>(B), nbits));
+}
+
+template <typename T>
+std::tuple<T,T,T> operator+=(const std::tuple<T&,T&,T&> &A,
+    const std::tuple<T,T,T> &B)
+{
+    std::get<0>(A) += std::get<0>(B);
+    std::get<1>(A) += std::get<1>(B);
+    std::get<2>(A) += std::get<2>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator+=(std::tuple<T,T,T> &A,
+    const std::tuple<T,T,T> &B)
+{
+    std::get<0>(A) += std::get<0>(B);
+    std::get<1>(A) += std::get<1>(B);
+    std::get<2>(A) += std::get<2>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator+(const std::tuple<T,T,T> &A,
+    const std::tuple<T,T,T> &B)
+{
+    auto res = A;
+    res += B;
+    return res;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator-=(const std::tuple<T&,T&,T&> &A,
+    const std::tuple<T,T,T> &B)
+{
+    std::get<0>(A) -= std::get<0>(B);
+    std::get<1>(A) -= std::get<1>(B);
+    std::get<2>(A) -= std::get<2>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator-=(std::tuple<T,T,T> &A,
+    const std::tuple<T,T,T> &B)
+{
+    std::get<0>(A) -= std::get<0>(B);
+    std::get<1>(A) -= std::get<1>(B);
+    std::get<2>(A) -= std::get<2>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator-(const std::tuple<T,T,T> &A,
+    const std::tuple<T,T,T> &B)
+{
+    auto res = A;
+    res -= B;
+    return res;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator*=(const std::tuple<T&,T&,T&> &A,
+    const std::tuple<value_t,value_t,value_t> &B)
+{
+    std::get<0>(A) *= std::get<0>(B);
+    std::get<1>(A) *= std::get<1>(B);
+    std::get<2>(A) *= std::get<2>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator*=(std::tuple<T,T,T> &A,
+    const std::tuple<value_t,value_t,value_t> &B)
+{
+    std::get<0>(A) *= std::get<0>(B);
+    std::get<1>(A) *= std::get<1>(B);
+    std::get<2>(A) *= std::get<2>(B);
+    return A;
+}
+
+template <typename T>
+std::tuple<T,T,T> operator*(const std::tuple<T,T,T> &A,
+    const std::tuple<value_t,value_t,value_t> &B)
+{
+    auto res = A;
+    res *= B;
+    return res;
+}
+
+template <typename T>
+inline std::tuple<value_t,value_t,value_t> combine(
+        const std::tuple<T,T,T> &A, const std::tuple<T,T,T> &B,
+        nbits_t nbits = VALUE_BITS) {
+    return std::make_tuple(
+        combine(std::get<0>(A), std::get<0>(B), nbits),
+        combine(std::get<1>(A), std::get<1>(B), nbits),
+        combine(std::get<2>(A), std::get<2>(B), nbits));
+}
+
 
 // The _maximum_ number of bits in an MPC address; the actual size of
 // the memory will typically be set at runtime, but it cannot exceed
@@ -253,9 +467,15 @@ struct RDPFTripleName { static constexpr const char *name = "r"; };
 
 // Default I/O for various types
 
+// Otherwise the comma is treated as an argument separator
+#define COMMA ,
 DEFAULT_IO(RegBS)
 DEFAULT_IO(RegAS)
+DEFAULT_IO(std::tuple<RegAS COMMA RegAS>)
+DEFAULT_IO(std::tuple<RegAS COMMA RegAS COMMA RegAS>)
 DEFAULT_IO(RegXS)
+DEFAULT_IO(std::tuple<RegXS COMMA RegXS>)
+DEFAULT_IO(std::tuple<RegXS COMMA RegXS COMMA RegXS>)
 DEFAULT_IO(MultTriple)
 DEFAULT_IO(HalfTriple)
 

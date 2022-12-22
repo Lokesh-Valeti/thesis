@@ -68,6 +68,9 @@ public:
             size_t len = 0) {
         return Flat(*this, tio, yield, start, len);
     }
+
+    // For debugging; print the contents of the Duoram to stdout
+    void dump() const;
 };
 
 // The parent class of all Shapes.  This is an abstract class that
@@ -136,6 +139,27 @@ protected:
     // implement it, and of course Shape itself therefore cannot be
     // instantiated.
     virtual size_t indexmap(size_t idx) const = 0;
+
+    // Get a pair (for the server) of references to the underlying
+    // Duoram entries at share virtual index idx.  (That is, it gets
+    // duoram.p0_blind[indexmap(idx)], etc.)
+    inline std::tuple<T&,T&> get_server(size_t idx) const {
+        size_t physaddr = indexmap(idx);
+        return std::make_tuple(
+            duoram.p0_blind[physaddr],
+            duoram.p1_blind[physaddr]);
+    }
+
+    // Get a triple (for the computational players) of references to the
+    // underlying Duoram entries at share virtual index idx.  (That is,
+    // it gets duoram.database[indexmap(idx)], etc.)
+    inline std::tuple<T&,T&,T&> get_comp(size_t idx) const {
+        size_t physaddr = indexmap(idx);
+        return std::tie(
+            duoram.database[physaddr],
+            duoram.blind[physaddr],
+            duoram.peer_blinded_db[physaddr]);
+    }
 
 public:
     // Get the size

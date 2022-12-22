@@ -1,5 +1,7 @@
 // Templated method implementations for duoram.hpp
 
+#include <stdio.h>
+
 // Pass the player number and desired size
 template <typename T>
 Duoram<T>::Duoram(int player, size_t size) : player(player),
@@ -12,6 +14,23 @@ Duoram<T>::Duoram(int player, size_t size) : player(player),
         p0_blind.resize(size);
         p1_blind.resize(size);
     }
+}
+
+// For debugging; print the contents of the Duoram to stdout
+template <typename T>
+void Duoram<T>::dump() const
+{
+    for (size_t i=0; i<oram_size; ++i) {
+        if (player < 2) {
+            printf("%04lx %016lx %016lx %016lx\n",
+                i, database[i].share(), blind[i].share(),
+                peer_blinded_db[i].share());
+        } else {
+            printf("%04lx %016lx %016lx\n",
+                i, p0_blind[i].share(), p1_blind[i].share());
+        }
+    }
+    printf("\n");
 }
 
 // For debugging or checking your answers (using this in general is
@@ -90,35 +109,40 @@ typename Duoram<T>::Shape::MemRefAS
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this
+
         RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+
+        // Compute the index and message offsets
         RegAS indoffset = idx;
         indoffset -= dt.as_target;
-        RegAS Moffset[3];
-        Moffset[0] = Moffset[1] = Moffset[2] = M;
-        Moffset[0] -= dt.dpf[0].scaled_sum;
-        Moffset[1] -= dt.dpf[1].scaled_sum;
-        Moffset[2] -= dt.dpf[2].scaled_sum;
-        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
-        shape.tio.iostream_peer() << Moffset[0] << Moffset[1] <<
-            Moffset[2];
-        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
-        shape.tio.iostream_server() << Moffset[1] << Moffset[2];
-        shape.yield();
-        RegAS peerindoffset;
-        RegAS peerMoffset[3];
-        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
-        shape.tio.iostream_peer() >> peerMoffset[0] >> peerMoffset[1] >>
-            peerMoffset[2];
-        indoffset += peerindoffset;
-        indoffset &= shape.addr_mask;
-        Moffset[0] += peerMoffset[0];
-        Moffset[1] += peerMoffset[1];
-        Moffset[2] += peerMoffset[2];
-        StreamEval<RDPFTriple> ev(dt, indoffset.ashare,
-            shape.tio.aes_ops());
-        for (size_t i=0; i<shape.shape_size; ++i) {
-            auto [L0, L1, L2] = ev.next();
+        auto Moffset = std::make_tuple(M, M, M);
+        Moffset -= dt.scaled_sum();
 
+        // Send them to the peer, and everything except the first offset
+        // to the server
+        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_peer() << Moffset;
+        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_server() << std::get<1>(Moffset) <<
+            std::get<2>(Moffset);
+
+        shape.yield();
+
+        // Receive the above from the peer
+        RegAS peerindoffset;
+        std::tuple<RegAS,RegAS,RegAS> peerMoffset;
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_peer() >> peerMoffset;
+
+        // Reconstruct the total offsets
+        auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
+        auto Mshift = combine(Moffset, peerMoffset);
+
+        // Evaluate the DPFs and add them to the database
+        StreamEval ev(dt, indshift, shape.tio.aes_ops());
+        for (size_t i=0; i<shape.shape_size; ++i) {
+            auto L = ev.next();
+            shape.get_comp(i) += dt.scaled_as(L) + dt.unit_as(L) * Mshift;
         }
     } else {
         // The server does this

@@ -450,8 +450,7 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
             RegAS Aa = A[aidx];
             auto Ax = A[xidx];
             auto Ae = A[eidx];
-            printf("%ld %ld\n", A.size(), Aa.ashare);
-
+            oram.dump();
             auto check = A.reconstruct();
             if (tio.player() == 0) {
                 for (address_t i=0;i<size;++i) {

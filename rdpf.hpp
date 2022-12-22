@@ -200,6 +200,52 @@ struct RDPFTriple {
     // Descend the three RDPFs in lock step
     node descend(const node &parent, nbits_t parentdepth,
         bit_t whichchild, size_t &op_counter) const;
+
+    // Additive share of the scaling value M_as such that the high words
+    // of the leaf values for P0 and P1 add to M_as * e_{target}
+    inline std::tuple<RegAS,RegAS,RegAS> scaled_sum() const {
+        return std::make_tuple(dpf[0].scaled_sum, dpf[1].scaled_sum,
+            dpf[2].scaled_sum);
+    }
+
+    // XOR share of the scaling value M_xs such that the high words
+    // of the leaf values for P0 and P1 XOR to M_xs * e_{target}
+    inline std::tuple<RegXS,RegXS,RegXS> scaled_xor() const {
+        return std::make_tuple(dpf[0].scaled_xor, dpf[1].scaled_xor,
+            dpf[2].scaled_xor);
+    }
+
+    // Get the bit-shared unit vector entry from the leaf node
+    inline std::tuple<RegBS,RegBS,RegBS> unit_bs(node leaf) const {
+        return std::make_tuple(
+            dpf[0].unit_bs(std::get<0>(leaf)),
+            dpf[1].unit_bs(std::get<1>(leaf)),
+            dpf[2].unit_bs(std::get<2>(leaf)));
+    }
+
+    // Get the additive-shared unit vector entry from the leaf node
+    inline std::tuple<RegAS,RegAS,RegAS> unit_as(node leaf) const {
+        return std::make_tuple(
+            dpf[0].unit_as(std::get<0>(leaf)),
+            dpf[1].unit_as(std::get<1>(leaf)),
+            dpf[2].unit_as(std::get<2>(leaf)));
+    }
+
+    // Get the XOR-shared scaled vector entry from the leaf ndoe
+    inline std::tuple<RegXS,RegXS,RegXS> scaled_xs(node leaf) const {
+        return std::make_tuple(
+            dpf[0].scaled_xs(std::get<0>(leaf)),
+            dpf[1].scaled_xs(std::get<1>(leaf)),
+            dpf[2].scaled_xs(std::get<2>(leaf)));
+    }
+
+    // Get the additive-shared scaled vector entry from the leaf node
+    inline std::tuple<RegAS,RegAS,RegAS> scaled_as(node leaf) const {
+        return std::make_tuple(
+            dpf[0].scaled_as(std::get<0>(leaf)),
+            dpf[1].scaled_as(std::get<1>(leaf)),
+            dpf[2].scaled_as(std::get<2>(leaf)));
+    }
 };
 
 struct RDPFPair {
@@ -230,6 +276,46 @@ struct RDPFPair {
     // Descend the two RDPFs in lock step
     node descend(const node &parent, nbits_t parentdepth,
         bit_t whichchild, size_t &op_counter) const;
+
+    // Additive share of the scaling value M_as such that the high words
+    // of the leaf values for P0 and P1 add to M_as * e_{target}
+    inline std::tuple<RegAS,RegAS> scaled_sum() const {
+        return std::make_tuple(dpf[0].scaled_sum, dpf[1].scaled_sum);
+    }
+
+    // XOR share of the scaling value M_xs such that the high words
+    // of the leaf values for P0 and P1 XOR to M_xs * e_{target}
+    inline std::tuple<RegXS,RegXS> scaled_xor() const {
+        return std::make_tuple(dpf[0].scaled_xor, dpf[1].scaled_xor);
+    }
+
+    // Get the bit-shared unit vector entry from the leaf node
+    inline std::tuple<RegBS,RegBS> unit_bs(node leaf) const {
+        return std::make_tuple(
+            dpf[0].unit_bs(std::get<0>(leaf)),
+            dpf[1].unit_bs(std::get<1>(leaf)));
+    }
+
+    // Get the additive-shared unit vector entry from the leaf node
+    inline std::tuple<RegAS,RegAS> unit_as(node leaf) const {
+        return std::make_tuple(
+            dpf[0].unit_as(std::get<0>(leaf)),
+            dpf[1].unit_as(std::get<1>(leaf)));
+    }
+
+    // Get the XOR-shared scaled vector entry from the leaf ndoe
+    inline std::tuple<RegXS,RegXS> scaled_xs(node leaf) const {
+        return std::make_tuple(
+            dpf[0].scaled_xs(std::get<0>(leaf)),
+            dpf[1].scaled_xs(std::get<1>(leaf)));
+    }
+
+    // Get the additive-shared scaled vector entry from the leaf node
+    inline std::tuple<RegAS,RegAS> scaled_as(node leaf) const {
+        return std::make_tuple(
+            dpf[0].scaled_as(std::get<0>(leaf)),
+            dpf[1].scaled_as(std::get<1>(leaf)));
+    }
 };
 
 #include "rdpf.tcc"
