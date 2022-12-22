@@ -126,8 +126,8 @@ Duoram<T>::Shape::MemRefAS::operator T()
         RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
 
         // Compute the index offset
-        RegAS indoffset = idx;
-        indoffset -= dt.as_target;
+        RegAS indoffset = dt.as_target;
+        indoffset -= idx;
 
         // We only need two of the DPFs for reading
         RDPFPair dp(std::move(dt), 0, player == 0 ? 2 : 1);
@@ -146,7 +146,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
         auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
 
         // Evaluate the DPFs and compute the dotproducts
-        StreamEval ev(dp, -indshift, shape.tio.aes_ops());
+        StreamEval ev(dp, indshift, shape.tio.aes_ops());
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
             // The values from the two DPFs
@@ -175,7 +175,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
 
         // Evaluate the DPFs to compute the cancellation terms
         T gamma0, gamma1;
-        StreamEval ev(dp, -indshift, shape.tio.aes_ops());
+        StreamEval ev(dp, indshift, shape.tio.aes_ops());
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
 
