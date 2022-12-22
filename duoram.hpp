@@ -172,7 +172,12 @@ public:
 
     // For debugging or checking your answers (using this in general is
     // of course insecure)
+
+    // This one reconstructs the whole database
     std::vector<T> reconstruct() const;
+
+    // This one reconstructs a single database value
+    T reconstruct(const T& share) const;
 };
 
 // The most basic shape is Flat.  It is almost always the topmost shape,

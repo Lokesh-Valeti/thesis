@@ -448,19 +448,26 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
                 M.ashare = 0x0000a66e;
             }
             RegXS xidx;
-            xidx.randomize(depth);
-            size_t eidx = arc4random();
-            eidx &= (size-1);
+            xidx.xshare = share;
+            size_t eidx = share;
+            printf("Updating\n");
             A[aidx] += M;
+            printf("Reading\n");
             RegAS Aa = A[aidx];
             auto Ax = A[xidx];
             auto Ae = A[eidx];
-            oram.dump();
-            auto check = A.reconstruct();
-            if (tio.player() == 0) {
-                for (address_t i=0;i<size;++i) {
-                    printf("%04x %016lx\n", i, check[i].ashare);
+            if (depth <= 10) {
+                oram.dump();
+                auto check = A.reconstruct();
+                if (tio.player() == 0) {
+                    for (address_t i=0;i<size;++i) {
+                        printf("%04x %016lx\n", i, check[i].ashare);
+                    }
                 }
+            }
+            auto checkread = A.reconstruct(Aa);
+            if (tio.player() == 0) {
+                printf("Read value = %016lx\n", checkread.share());
             }
             tio.send();
         });

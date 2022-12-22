@@ -254,6 +254,17 @@ struct RDPFPair {
 
     RDPF dpf[2];
 
+    RDPFPair() {}
+
+    // Create an RDPFPair from an RDPFTriple, keeping two of the RDPFs
+    // and dropping one.  This _moves_ the dpfs from the triple to the
+    // pair, so the triple will no longer be valid after using this.
+    // which0 and which1 indicate which of the dpfs to keep.
+    RDPFPair(RDPFTriple &&trip, int which0, int which1) {
+        dpf[0] = std::move(trip.dpf[which0]);
+        dpf[1] = std::move(trip.dpf[which1]);
+    }
+
     // The depth
     inline nbits_t depth() const { return dpf[0].depth(); }
 
