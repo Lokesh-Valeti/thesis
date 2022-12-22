@@ -418,24 +418,29 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
+    address_t share=arc4random();
 
     if (*args) {
         depth = atoi(*args);
         ++args;
     }
+    if (*args) {
+        share = atoi(*args);
+        ++args;
+    }
+    share &= ((address_t(1)<<depth)-1);
 
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, share] {
             size_t size = size_t(1)<<depth;
             MPCTIO tio(mpcio, thread_num);
             // size_t &op_counter = tio.aes_ops();
             Duoram<RegAS> oram(mpcio.player, size);
-            printf("%ld\n", oram.size());
             auto A = oram.flat(tio, yield);
             RegAS aidx;
-            aidx.randomize(depth);
+            aidx.ashare = share;
             RegAS M;
             if (tio.player() == 0) {
                 M.ashare = 0xbabb0000;

@@ -139,24 +139,50 @@ typename Duoram<T>::Shape::MemRefAS
         auto Mshift = combine(Moffset, peerMoffset);
 
         // Evaluate the DPFs and add them to the database
-        StreamEval ev(dt, indshift, shape.tio.aes_ops());
+        StreamEval ev(dt, -indshift, shape.tio.aes_ops());
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
-            shape.get_comp(i) += dt.scaled_as(L) + dt.unit_as(L) * Mshift;
+            // The values from the three DPFs
+            auto [V0, V1, V2] = dt.scaled_as(L) + dt.unit_as(L) * Mshift;
+            // References to the appropriate cells in our database, our
+            // blind, and our copy of the peer's blinded database
+            auto [DB, BL, PBD] = shape.get_comp(i);
+            DB += V0;
+            if (player == 0) {
+                BL -= V1;
+                PBD += V2-V0;
+            } else {
+                BL -= V2;
+                PBD += V1-V0;
+            }
         }
     } else {
         // The server does this
+
         RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
         RegAS p0indoffset, p1indoffset;
-        RegAS p0Moffset[2];
-        RegAS p1Moffset[2];
+        std::tuple<RegAS,RegAS> p0Moffset, p1Moffset;
+
+        // Receive the index and message offsets from the computational
+        // players and combine them
         shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
-        shape.tio.iostream_p0() >> p0Moffset[0] >> p0Moffset[1];
+        shape.tio.iostream_p0() >> p0Moffset;
         shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
-        shape.tio.iostream_p1() >> p1Moffset[0] >> p1Moffset[1];
-        p0indoffset += p1indoffset;
-        p0Moffset[0] += p1Moffset[0];
-        p0Moffset[1] += p1Moffset[1];
+        shape.tio.iostream_p1() >> p1Moffset;
+        auto indshift = combine(p0indoffset, p1indoffset);
+        auto Mshift = combine(p0Moffset, p1Moffset);
+
+        // Evaluate the DPFs and subtract them from the blinds
+        StreamEval ev(dp, -indshift, shape.tio.aes_ops());
+        for (size_t i=0; i<shape.shape_size; ++i) {
+            auto L = ev.next();
+            // The values from the two DPFs
+            auto V = dp.scaled_as(L) + dp.unit_as(L) * Mshift;
+            // shape.get_server(i) returns a pair of references to the
+            // appropriate cells in the two blinded databases, so we can
+            // subtract the pair directly.
+            shape.get_server(i) -= V;
+        }
     }
     return *this;
 }

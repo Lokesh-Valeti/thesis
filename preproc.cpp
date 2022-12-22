@@ -224,10 +224,8 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                                 printf("sxr1 = %016lx\n", rdpfpair.dpf[1].scaled_xor.xshare);
                                 printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
                                     if (opts.expand_rdpfs) {
-                                        printf("Expanding\n");
                                         rdpfpair.dpf[0].expand(stio.aes_ops());
                                         rdpfpair.dpf[1].expand(stio.aes_ops());
-                                        printf("Expanded\n");
                                     }
                                     pairfile.os() << rdpfpair;
                                 });

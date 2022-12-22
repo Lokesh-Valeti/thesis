@@ -17,6 +17,7 @@ StreamEval<T>::StreamEval(const T &rdpf, address_t start,
     } else {
         indexmask = ~0;
     }
+    start &= indexmask;
     // Record that we haven't actually output the leaf for index start
     // itself yet
     nextindex = start;

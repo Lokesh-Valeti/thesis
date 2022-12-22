@@ -378,7 +378,7 @@ RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
         coroutines.emplace_back(
             [&, i](yield_t &yield) {
                 dpf[i] = RDPF(tio, yield, xs_target, depth,
-                save_expansion);
+                    save_expansion);
             });
     }
     coroutines.emplace_back(

@@ -467,16 +467,44 @@ struct RDPFTripleName { static constexpr const char *name = "r"; };
 
 // Default I/O for various types
 
-// Otherwise the comma is treated as an argument separator
-#define COMMA ,
 DEFAULT_IO(RegBS)
 DEFAULT_IO(RegAS)
-DEFAULT_IO(std::tuple<RegAS COMMA RegAS>)
-DEFAULT_IO(std::tuple<RegAS COMMA RegAS COMMA RegAS>)
 DEFAULT_IO(RegXS)
-DEFAULT_IO(std::tuple<RegXS COMMA RegXS>)
-DEFAULT_IO(std::tuple<RegXS COMMA RegXS COMMA RegXS>)
 DEFAULT_IO(MultTriple)
 DEFAULT_IO(HalfTriple)
+
+// And for pairs and triples
+
+#define DEFAULT_TUPLE_IO(CLASSNAME)                                  \
+    template <typename T>                                            \
+    T& operator>>(T& is, std::tuple<CLASSNAME, CLASSNAME> &x)        \
+    {                                                                \
+        is >> std::get<0>(x) >> std::get<1>(x);                      \
+        return is;                                                   \
+    }                                                                \
+                                                                     \
+    template <typename T>                                            \
+    T& operator<<(T& os, const std::tuple<CLASSNAME, CLASSNAME> &x)  \
+    {                                                                \
+        os << std::get<0>(x) << std::get<1>(x);                      \
+        return os;                                                   \
+    }                                                                \
+                                                                     \
+    template <typename T>                                            \
+    T& operator>>(T& is, std::tuple<CLASSNAME, CLASSNAME, CLASSNAME> &x) \
+    {                                                                \
+        is >> std::get<0>(x) >> std::get<1>(x) >> std::get<2>(x);    \
+        return is;                                                   \
+    }                                                                \
+                                                                     \
+    template <typename T>                                            \
+    T& operator<<(T& os, const std::tuple<CLASSNAME, CLASSNAME, CLASSNAME> &x) \
+    {                                                                \
+        os << std::get<0>(x) << std::get<1>(x) << std::get<2>(x);    \
+        return os;                                                   \
+    }
+
+DEFAULT_TUPLE_IO(RegAS)
+DEFAULT_TUPLE_IO(RegXS)
 
 #endif

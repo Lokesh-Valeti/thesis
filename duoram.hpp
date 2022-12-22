@@ -145,7 +145,7 @@ protected:
     // duoram.p0_blind[indexmap(idx)], etc.)
     inline std::tuple<T&,T&> get_server(size_t idx) const {
         size_t physaddr = indexmap(idx);
-        return std::make_tuple(
+        return std::tie(
             duoram.p0_blind[physaddr],
             duoram.p1_blind[physaddr]);
     }
