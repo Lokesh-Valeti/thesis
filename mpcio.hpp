@@ -184,6 +184,8 @@ struct MPCIO {
 
     void reset_stats();
 
+    static void dump_memusage(std::ostream &os);
+
     void dump_stats(std::ostream &os);
 };
 

@@ -1,3 +1,5 @@
+#include <sys/time.h>      // getrusage
+#include <sys/resource.h>  // getrusage
 #include "mpcio.hpp"
 #include "rdpf.hpp"
 #include "bitutils.hpp"
@@ -213,6 +215,15 @@ void MPCIO::reset_stats()
     cpu_start = boost::chrono::process_cpu_clock::now();
 }
 
+// Report the memory usage
+
+void MPCIO::dump_memusage(std::ostream &os)
+{
+    struct rusage ru;
+    getrusage(RUSAGE_SELF, &ru);
+    os << "Mem: " << ru.ru_maxrss << " KiB\n";
+}
+
 void MPCIO::dump_stats(std::ostream &os)
 {
     size_t tot_msgs_sent = 0;
@@ -234,12 +245,13 @@ void MPCIO::dump_stats(std::ostream &os)
 
     os << tot_msgs_sent << " messages sent\n";
     os << tot_msg_bytes_sent << " message bytes sent\n";
-    os << tot_aes_ops << " local AES operations\n";
     os << lamport << " Lamport clock (latencies)\n";
+    os << tot_aes_ops << " local AES operations\n";
     os << boost::chrono::duration_cast
         <boost::chrono::milliseconds>(steady_elapsed) <<
         " wall clock time\n";
     os << cpu_elapsed << " {real;user;system}\n";
+    dump_memusage(os);
 }
 
 MPCPeerIO::MPCPeerIO(unsigned player, bool preprocessing,
