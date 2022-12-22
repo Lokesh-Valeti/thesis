@@ -261,6 +261,12 @@ class Duoram<T>::Shape::MemRefExpl {
 public:
     MemRefExpl(const Shape &shape, address_t idx) :
         shape(shape), idx(idx) {}
+
+    // Explicit read from a given index of Duoram memory
+    operator T();
+
+    // Explicit update to a given index of Duoram memory
+    MemRefExpl &operator+=(const T& M);
 };
 
 #include "duoram.tcc"

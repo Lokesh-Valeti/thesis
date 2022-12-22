@@ -199,6 +199,8 @@ Duoram<T>::Shape::MemRefAS::operator T()
         // Send the cancellation terms to the computational players
         shape.tio.iostream_p0() << gamma0;
         shape.tio.iostream_p1() << gamma1;
+
+        shape.yield();
     }
     return res;  // The server will always get 0
 }
@@ -285,6 +287,63 @@ typename Duoram<T>::Shape::MemRefAS
             // subtract the pair directly.
             shape.get_server(i) -= V;
         }
+    }
+    return *this;
+}
+
+// Explicit read from a given index of Duoram memory
+template <typename T>
+Duoram<T>::Shape::MemRefExpl::operator T()
+{
+    T res;
+    int player = shape.tio.player();
+    if (player < 2) {
+        res = std::get<0>(shape.get_comp(idx));
+    }
+    return res;  // The server will always get 0
+}
+
+// Explicit update to a given index of Duoram memory
+template <typename T>
+typename Duoram<T>::Shape::MemRefExpl
+    &Duoram<T>::Shape::MemRefExpl::operator+=(const T& M)
+{
+    int player = shape.tio.player();
+    if (player < 2) {
+        // Computational players do this
+
+        // Pick a blinding factor
+        T blind;
+        blind.randomize();
+
+        // Send the blind to the server, and the blinded value to the
+        // peer
+        shape.tio.iostream_server() << blind;
+        shape.tio.iostream_peer() << (M + blind);
+
+        shape.yield();
+
+        // Receive the peer's blinded value
+        T peerblinded;
+        shape.tio.iostream_peer() >> peerblinded;
+
+        // Our database, our blind, the peer's blinded database
+        auto [ DB, BL, PBD ] = shape.get_comp(idx);
+        DB += M;
+        BL += blind;
+        PBD += peerblinded;
+    } else if (player == 2) {
+        // The server does this
+
+        // Receive the updates to the blinds
+        T p0blind, p1blind;
+        shape.tio.iostream_p0() >> p0blind;
+        shape.tio.iostream_p1() >> p1blind;
+
+        // The two computational parties' blinds
+        auto [ BL0, BL1 ] = shape.get_server(idx);
+        BL0 += p0blind;
+        BL1 += p1blind;
     }
     return *this;
 }

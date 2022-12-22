@@ -452,12 +452,18 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
             RegXS xidx;
             xidx.xshare = share;
             size_t eidx = share;
+            // Writing and reading with additively shared indices
             printf("Updating\n");
             A[aidx] += M;
             printf("Reading\n");
             T Aa = A[aidx];
+            T Ae;
+            // Writing and reading with explicit indices
+            if (depth > 2) {
+                A[5] += Aa;
+                Ae = A[6];
+            }
             auto Ax = A[xidx];
-            auto Ae = A[eidx];
             if (depth <= 10) {
                 oram.dump();
                 auto check = A.reconstruct();
@@ -468,8 +474,10 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
                 }
             }
             auto checkread = A.reconstruct(Aa);
+            auto checkreade = A.reconstruct(Ae);
             if (tio.player() == 0) {
-                printf("Read value = %016lx\n", checkread.share());
+                printf("Read AS value = %016lx\n", checkread.share());
+                printf("Read Ex value = %016lx\n", checkreade.share());
             }
             tio.send();
         });
