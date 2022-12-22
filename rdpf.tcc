@@ -4,11 +4,17 @@
 // It will wrap around to 0 when it hits 2^depth.  If use_expansion
 // is true, then if the DPF has been expanded, just output values
 // from that.  If use_expansion=false or if the DPF has not been
-// expanded, compute the values on the fly.
+// expanded, compute the values on the fly.  If xor_offset is non-zero,
+// then the outputs are actually
+// DPF(start XOR xor_offset)
+// DPF((start+1) XOR xor_offset)
+// DPF((start+2) XOR xor_offset)
+// etc.
 template <typename T>
 StreamEval<T>::StreamEval(const T &rdpf, address_t start,
-    size_t &op_counter, bool use_expansion) : rdpf(rdpf),
-    op_counter(op_counter), use_expansion(use_expansion)
+    address_t xor_offset, size_t &op_counter,
+    bool use_expansion) : rdpf(rdpf), op_counter(op_counter),
+    use_expansion(use_expansion), counter_xor_offset(xor_offset)
 {
     depth = rdpf.depth();
     // Prevent overflow of 1<<depth
@@ -18,6 +24,7 @@ StreamEval<T>::StreamEval(const T &rdpf, address_t start,
         indexmask = ~0;
     }
     start &= indexmask;
+    counter_xor_offset &= indexmask;
     // Record that we haven't actually output the leaf for index start
     // itself yet
     nextindex = start;
@@ -30,7 +37,10 @@ StreamEval<T>::StreamEval(const T &rdpf, address_t start,
     path[0] = rdpf.get_seed();
     for (nbits_t i=1;i<depth;++i) {
         bool dir = !!(pathindex & (address_t(1)<<(depth-i)));
-        path[i] = rdpf.descend(path[i-1], i-1, dir, op_counter);
+        bool xor_offset_bit =
+            !!(counter_xor_offset & (address_t(1)<<(depth-i)));
+        path[i] = rdpf.descend(path[i-1], i-1,
+            dir ^ xor_offset_bit, op_counter);
     }
 }
 
@@ -39,7 +49,8 @@ typename T::node StreamEval<T>::next()
 {
     if (use_expansion && rdpf.has_expansion()) {
         // Just use the precomputed values
-        typename T::node leaf = rdpf.get_expansion(nextindex);
+        typename T::node leaf =
+            rdpf.get_expansion(nextindex ^ counter_xor_offset);
         nextindex = (nextindex + 1) & indexmask;
         return leaf;
     }
@@ -70,16 +81,22 @@ typename T::node StreamEval<T>::next()
         // around from the right subtree back to the left, in which case
         // it will be 0.
         bool top_changed_bit =
-            nextindex & (address_t(1) << how_many_1_bits);
+            !!(nextindex & (address_t(1) << how_many_1_bits));
+        bool xor_offset_bit =
+            !!(counter_xor_offset & (address_t(1) << how_many_1_bits));
         path[depth-how_many_1_bits] =
             rdpf.descend(path[depth-how_many_1_bits-1],
-                depth-how_many_1_bits-1, top_changed_bit, op_counter);
+                depth-how_many_1_bits-1,
+                top_changed_bit ^ xor_offset_bit, op_counter);
         for (nbits_t i = depth-how_many_1_bits; i < depth-1; ++i) {
-            path[i+1] = rdpf.descend(path[i], i, 0, op_counter);
+            bool xor_offset_bit =
+                !!(counter_xor_offset & (address_t(1) << (depth-i-1)));
+            path[i+1] = rdpf.descend(path[i], i, xor_offset_bit, op_counter);
         }
     }
+    bool xor_offset_bit = counter_xor_offset & 1;
     typename T::node leaf = rdpf.descend(path[depth-1], depth-1,
-        nextindex & 1, op_counter);
+        (nextindex & 1) ^ xor_offset_bit, op_counter);
     pathindex = nextindex;
     nextindex = (nextindex + 1) & indexmask;
     return leaf;

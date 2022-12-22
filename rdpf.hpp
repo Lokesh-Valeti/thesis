@@ -17,6 +17,7 @@ class StreamEval {
     size_t &op_counter;
     bool use_expansion;
     nbits_t depth;
+    address_t counter_xor_offset;
     address_t indexmask;
     address_t pathindex;
     address_t nextindex;
@@ -26,9 +27,16 @@ public:
     // It will wrap around to 0 when it hits 2^depth.  If use_expansion
     // is true, then if the DPF has been expanded, just output values
     // from that.  If use_expansion=false or if the DPF has not been
-    // expanded, compute the values on the fly.
-    StreamEval(const T &rdpf, address_t start, size_t &op_counter,
+    // expanded, compute the values on the fly.  If xor_offset is
+    // non-zero, then the outputs are actually
+    // DPF(start XOR xor_offset)
+    // DPF((start+1) XOR xor_offset)
+    // DPF((start+2) XOR xor_offset)
+    // etc.
+    StreamEval(const T &rdpf, address_t start,
+        address_t xor_offset, size_t &op_counter,
         bool use_expansion = true);
+
     // Get the next value (or tuple of values) from the evaluator
     typename T::node next();
 };

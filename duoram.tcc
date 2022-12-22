@@ -146,7 +146,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
         auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
 
         // Evaluate the DPFs and compute the dotproducts
-        StreamEval ev(dp, indshift, shape.tio.aes_ops());
+        StreamEval ev(dp, indshift, 0, shape.tio.aes_ops());
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
             // The values from the two DPFs
@@ -175,7 +175,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
 
         // Evaluate the DPFs to compute the cancellation terms
         T gamma0, gamma1;
-        StreamEval ev(dp, indshift, shape.tio.aes_ops());
+        StreamEval ev(dp, indshift, 0, shape.tio.aes_ops());
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
 
@@ -217,8 +217,8 @@ typename Duoram<T>::Shape::MemRefAS
         RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
 
         // Compute the index and message offsets
-        RegAS indoffset = idx;
-        indoffset -= dt.as_target;
+        RegAS indoffset = dt.as_target;
+        indoffset -= idx;
         auto Moffset = std::make_tuple(M, M, M);
         Moffset -= dt.scaled_value<T>();
 
@@ -243,7 +243,7 @@ typename Duoram<T>::Shape::MemRefAS
         auto Mshift = combine(Moffset, peerMoffset);
 
         // Evaluate the DPFs and add them to the database
-        StreamEval ev(dt, -indshift, shape.tio.aes_ops());
+        StreamEval ev(dt, indshift, 0, shape.tio.aes_ops());
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
             // The values from the three DPFs
@@ -277,7 +277,7 @@ typename Duoram<T>::Shape::MemRefAS
         auto Mshift = combine(p0Moffset, p1Moffset);
 
         // Evaluate the DPFs and subtract them from the blinds
-        StreamEval ev(dp, -indshift, shape.tio.aes_ops());
+        StreamEval ev(dp, indshift, 0, shape.tio.aes_ops());
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
             // The values from the two DPFs

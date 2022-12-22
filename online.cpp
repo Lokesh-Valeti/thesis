@@ -315,7 +315,7 @@ static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
                 for (int i=0;i<2;++i) {
                     RDPF &dpf = dp.dpf[i];
                     RegXS scaled_xor;
-                    auto ev = StreamEval(dpf, start, op_counter, false);
+                    auto ev = StreamEval(dpf, start, 0, op_counter, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -330,7 +330,7 @@ static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
                 for (int i=0;i<3;++i) {
                     RDPF &dpf = dt.dpf[i];
                     RegXS scaled_xor;
-                    auto ev = StreamEval(dpf, start, op_counter, false);
+                    auto ev = StreamEval(dpf, start, 0, op_counter, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -371,7 +371,7 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
             if (mpcio.player == 2) {
                 RDPFPair dp = tio.rdpfpair(depth);
                 RegXS scaled_xor0, scaled_xor1;
-                auto ev = StreamEval(dp, start, op_counter, false);
+                auto ev = StreamEval(dp, start, 0, op_counter, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
                     auto [L0, L1] = ev.next();
                     RegXS sx0 = dp.dpf[0].scaled_xs(L0);
@@ -388,7 +388,7 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
             } else {
                 RDPFTriple dt = tio.rdpftriple(depth);
                 RegXS scaled_xor0, scaled_xor1, scaled_xor2;
-                auto ev = StreamEval(dt, start, op_counter, false);
+                auto ev = StreamEval(dt, start, 0, op_counter, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
                     auto [L0, L1, L2] = ev.next();
                     RegXS sx0 = dt.dpf[0].scaled_xs(L0);
