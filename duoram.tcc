@@ -291,6 +291,187 @@ typename Duoram<T>::Shape::MemRefAS
     return *this;
 }
 
+// The MemRefXS routines are almost identical to the MemRefAS routines,
+// but I couldn't figure out how to get them to be two instances of a
+// template.  Sorry for the code duplication.
+
+// Oblivious read from an XOR shared index of Duoram memory
+template <typename T>
+Duoram<T>::Shape::MemRefXS::operator T()
+{
+    T res;
+    int player = shape.tio.player();
+    if (player < 2) {
+        // Computational players do this
+
+        RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+
+        // Compute the index offset
+        RegXS indoffset = dt.xs_target;
+        indoffset -= idx;
+
+        // We only need two of the DPFs for reading
+        RDPFPair dp(std::move(dt), 0, player == 0 ? 2 : 1);
+
+        // Send it to the peer and the server
+        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+
+        shape.yield();
+
+        // Receive the above from the peer
+        RegXS peerindoffset;
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+
+        // Reconstruct the total offset
+        auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
+
+        // Evaluate the DPFs and compute the dotproducts
+        StreamEval ev(dp, 0, indshift, shape.tio.aes_ops());
+        for (size_t i=0; i<shape.shape_size; ++i) {
+            auto L = ev.next();
+            // The values from the two DPFs
+            auto [V0, V1] = dp.unit<T>(L);
+            // References to the appropriate cells in our database, our
+            // blind, and our copy of the peer's blinded database
+            auto [DB, BL, PBD] = shape.get_comp(i);
+            res += (DB + PBD) * V0.share() - BL * (V1-V0).share();
+        }
+
+        // Receive the cancellation term from the server
+        T gamma;
+        shape.tio.iostream_server() >> gamma;
+        res += gamma;
+    } else {
+        // The server does this
+
+        RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
+        RegXS p0indoffset, p1indoffset;
+
+        // Receive the index offset from the computational players and
+        // combine them
+        shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
+        auto indshift = combine(p0indoffset, p1indoffset, shape.addr_size);
+
+        // Evaluate the DPFs to compute the cancellation terms
+        T gamma0, gamma1;
+        StreamEval ev(dp, 0, indshift, shape.tio.aes_ops());
+        for (size_t i=0; i<shape.shape_size; ++i) {
+            auto L = ev.next();
+
+            // The values from the two DPFs
+            auto [V0, V1] = dp.unit<T>(L);
+
+            // shape.get_server(i) returns a pair of references to the
+            // appropriate cells in the two blinded databases
+            auto [BL0, BL1] = shape.get_server(i);
+            gamma0 -= BL0 * V1.share();
+            gamma1 -= BL1 * V0.share();
+        }
+
+        // Choose a random blinding factor
+        T rho;
+        rho.randomize();
+
+        gamma0 += rho;
+        gamma1 -= rho;
+
+        // Send the cancellation terms to the computational players
+        shape.tio.iostream_p0() << gamma0;
+        shape.tio.iostream_p1() << gamma1;
+
+        shape.yield();
+    }
+    return res;  // The server will always get 0
+}
+
+// Oblivious update to an XOR shared index of Duoram memory
+template <typename T>
+typename Duoram<T>::Shape::MemRefXS
+    &Duoram<T>::Shape::MemRefXS::operator+=(const T& M)
+{
+    int player = shape.tio.player();
+    if (player < 2) {
+        // Computational players do this
+
+        RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+
+        // Compute the index and message offsets
+        RegXS indoffset = dt.xs_target;
+        indoffset -= idx;
+        auto Moffset = std::make_tuple(M, M, M);
+        Moffset -= dt.scaled_value<T>();
+
+        // Send them to the peer, and everything except the first offset
+        // to the server
+        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_peer() << Moffset;
+        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_server() << std::get<1>(Moffset) <<
+            std::get<2>(Moffset);
+
+        shape.yield();
+
+        // Receive the above from the peer
+        RegXS peerindoffset;
+        std::tuple<T,T,T> peerMoffset;
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_peer() >> peerMoffset;
+
+        // Reconstruct the total offsets
+        auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
+        auto Mshift = combine(Moffset, peerMoffset);
+
+        // Evaluate the DPFs and add them to the database
+        StreamEval ev(dt, 0, indshift, shape.tio.aes_ops());
+        for (size_t i=0; i<shape.shape_size; ++i) {
+            auto L = ev.next();
+            // The values from the three DPFs
+            auto [V0, V1, V2] = dt.scaled<T>(L) + dt.unit<T>(L) * Mshift;
+            // References to the appropriate cells in our database, our
+            // blind, and our copy of the peer's blinded database
+            auto [DB, BL, PBD] = shape.get_comp(i);
+            DB += V0;
+            if (player == 0) {
+                BL -= V1;
+                PBD += V2-V0;
+            } else {
+                BL -= V2;
+                PBD += V1-V0;
+            }
+        }
+    } else {
+        // The server does this
+
+        RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
+        RegXS p0indoffset, p1indoffset;
+        std::tuple<T,T> p0Moffset, p1Moffset;
+
+        // Receive the index and message offsets from the computational
+        // players and combine them
+        shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_p0() >> p0Moffset;
+        shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
+        shape.tio.iostream_p1() >> p1Moffset;
+        auto indshift = combine(p0indoffset, p1indoffset, shape.addr_size);
+        auto Mshift = combine(p0Moffset, p1Moffset);
+
+        // Evaluate the DPFs and subtract them from the blinds
+        StreamEval ev(dp, 0, indshift, shape.tio.aes_ops());
+        for (size_t i=0; i<shape.shape_size; ++i) {
+            auto L = ev.next();
+            // The values from the two DPFs
+            auto V = dp.scaled<T>(L) + dp.unit<T>(L) * Mshift;
+            // shape.get_server(i) returns a pair of references to the
+            // appropriate cells in the two blinded databases, so we can
+            // subtract the pair directly.
+            shape.get_server(i) -= V;
+        }
+    }
+    return *this;
+}
+
 // Explicit read from a given index of Duoram memory
 template <typename T>
 Duoram<T>::Shape::MemRefExpl::operator T()

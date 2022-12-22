@@ -246,6 +246,12 @@ class Duoram<T>::Shape::MemRefXS {
 public:
     MemRefXS(const Shape &shape, const RegXS &idx) :
         shape(shape), idx(idx) {}
+
+    // Oblivious read from an XOR shared index of Duoram memory
+    operator T();
+
+    // Oblivious update to an XOR shared index of Duoram memory
+    MemRefXS &operator+=(const T& M);
 };
 
 // An explicit memory reference.  You get one of these from a Shape A
