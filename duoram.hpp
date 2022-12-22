@@ -16,8 +16,8 @@
 // shape is bound to a context, which is a thread-specific MPCTIO and a
 // coroutine-specific yield_t.  If you launch new threads and/or
 // coroutines, you'll need to make a copy of the current Shape for your
-// new context, and call set_context() on it.  Be sure not to call
-// set_content() on a Shape shared with other threads or coroutines.
+// new context, and call context() on it.  Be sure not to call context()
+// on a Shape shared with other threads or coroutines.
 
 // This is templated, because you can have a Duoram of additively shared
 // (RegAS) or XOR shared (RegXS) elements, or std::arrays of those to
@@ -164,6 +164,15 @@ protected:
 public:
     // Get the size
     inline size_t size() { return shape_size; }
+
+    // Update the context (MPCTIO and yield if you've started a new
+    // thread, or just yield if you've started a new coroutine in the
+    // same thread)
+    void context(MPCTIO &new_tio, yield_t &new_yield) {
+        tio = new_tio;
+        yield = new_yield;
+    }
+    void context(yield_t &new_yield) { yield = new_yield; }
 
     // Index into this Shape in various ways
     MemRefAS operator[](const RegAS &idx) { return MemRefAS(*this, idx); }
