@@ -49,6 +49,7 @@ struct RegAS {
     RegAS() : ashare(0) {}
 
     inline value_t share() const { return ashare; }
+    inline void set(value_t s) { ashare = s; }
 
     // Set each side's share to a random value nbits bits long
     inline void randomize(size_t nbits = VALUE_BITS) {
@@ -118,6 +119,7 @@ struct RegBS {
     RegBS() : bshare(0) {}
 
     inline bit_t share() const { return bshare; }
+    inline void set(bit_t s) { bshare = s; }
 
     // Set each side's share to a random bit
     inline void randomize() {
@@ -143,14 +145,54 @@ struct RegXS {
     value_t xshare;
 
     RegXS() : xshare(0) {}
+    RegXS(const RegBS &b) { xshare = b.bshare ? ~0 : 0; }
 
     inline value_t share() const { return xshare; }
+    inline void set(value_t s) { xshare = s; }
 
     // Set each side's share to a random value nbits bits long
     inline void randomize(size_t nbits = VALUE_BITS) {
         value_t mask = MASKBITS(nbits);
         arc4random_buf(&xshare, sizeof(xshare));
         xshare &= mask;
+    }
+
+    // For RegXS, + and * should be interpreted bitwise; that is, + is
+    // really XOR and * is really AND.  - is also XOR (the same as +).
+
+    // We also include actual XOR operators for convenience
+
+    inline RegXS &operator+=(const RegXS &rhs) {
+        this->xshare ^= rhs.xshare;
+        return *this;
+    }
+
+    inline RegXS operator+(const RegXS &rhs) const {
+        RegXS res = *this;
+        res += rhs;
+        return res;
+    }
+
+    inline RegXS &operator-=(const RegXS &rhs) {
+        this->xshare ^= rhs.xshare;
+        return *this;
+    }
+
+    inline RegXS operator-(const RegXS &rhs) const {
+        RegXS res = *this;
+        res -= rhs;
+        return res;
+    }
+
+    inline RegXS &operator*=(value_t rhs) {
+        this->xshare &= rhs;
+        return *this;
+    }
+
+    inline RegXS operator*(value_t rhs) const {
+        RegXS res = *this;
+        res *= rhs;
+        return res;
     }
 
     inline RegXS &operator^=(const RegXS &rhs) {

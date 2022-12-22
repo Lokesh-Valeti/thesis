@@ -12,6 +12,7 @@ static void usage(const char *progname)
     std::cerr << "-p: preprocessing mode\n";
     std::cerr << "-t num: use num threads\n";
     std::cerr << "-c: store DPFs compressed (default is expanded)\n";
+    std::cerr << "-x: use XOR-shared database (default is additive)\n";
     std::cerr << "player_num = 0 or 1 for the computational players\n";
     std::cerr << "player_num = 2 for the server player\n";
     std::cerr << "player_addrs is omitted for player 0\n";
@@ -96,6 +97,9 @@ int main(int argc, char **argv)
             }
         } else if (!strcmp("-c", *args)) {
             opts.expand_rdpfs = false;
+            ++args;
+        } else if (!strcmp("-x", *args)) {
+            opts.use_xor_db = true;
             ++args;
         }
     }

@@ -85,6 +85,104 @@ typename T::node StreamEval<T>::next()
     return leaf;
 }
 
+// Additive share of the scaling value M_as such that the high words
+// of the leaf values for P0 and P1 add to M_as * e_{target}
+template <>
+inline std::tuple<RegAS,RegAS,RegAS> RDPFTriple::scaled_value<RegAS>() const {
+    return std::make_tuple(dpf[0].scaled_sum, dpf[1].scaled_sum,
+        dpf[2].scaled_sum);
+}
+
+// XOR share of the scaling value M_xs such that the high words
+// of the leaf values for P0 and P1 XOR to M_xs * e_{target}
+template <>
+inline std::tuple<RegXS,RegXS,RegXS> RDPFTriple::scaled_value<RegXS>() const {
+    return std::make_tuple(dpf[0].scaled_xor, dpf[1].scaled_xor,
+        dpf[2].scaled_xor);
+}
+
+// Get the bit-shared unit vector entry from the leaf node
+template <>
+inline std::tuple<RegXS,RegXS,RegXS> RDPFTriple::unit<RegXS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].unit_bs(std::get<0>(leaf)),
+        dpf[1].unit_bs(std::get<1>(leaf)),
+        dpf[2].unit_bs(std::get<2>(leaf)));
+}
+
+// Get the additive-shared unit vector entry from the leaf node
+template <>
+inline std::tuple<RegAS,RegAS,RegAS> RDPFTriple::unit<RegAS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].unit_as(std::get<0>(leaf)),
+        dpf[1].unit_as(std::get<1>(leaf)),
+        dpf[2].unit_as(std::get<2>(leaf)));
+}
+
+// Get the XOR-shared scaled vector entry from the leaf ndoe
+template <>
+inline std::tuple<RegXS,RegXS,RegXS> RDPFTriple::scaled<RegXS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].scaled_xs(std::get<0>(leaf)),
+        dpf[1].scaled_xs(std::get<1>(leaf)),
+        dpf[2].scaled_xs(std::get<2>(leaf)));
+}
+
+// Get the additive-shared scaled vector entry from the leaf node
+template <>
+inline std::tuple<RegAS,RegAS,RegAS> RDPFTriple::scaled<RegAS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].scaled_as(std::get<0>(leaf)),
+        dpf[1].scaled_as(std::get<1>(leaf)),
+        dpf[2].scaled_as(std::get<2>(leaf)));
+}
+
+// Additive share of the scaling value M_as such that the high words
+// of the leaf values for P0 and P1 add to M_as * e_{target}
+template <>
+inline std::tuple<RegAS,RegAS> RDPFPair::scaled_value<RegAS>() const {
+    return std::make_tuple(dpf[0].scaled_sum, dpf[1].scaled_sum);
+}
+
+// XOR share of the scaling value M_xs such that the high words
+// of the leaf values for P0 and P1 XOR to M_xs * e_{target}
+template <>
+inline std::tuple<RegXS,RegXS> RDPFPair::scaled_value<RegXS>() const {
+    return std::make_tuple(dpf[0].scaled_xor, dpf[1].scaled_xor);
+}
+
+// Get the bit-shared unit vector entry from the leaf node
+template <>
+inline std::tuple<RegXS,RegXS> RDPFPair::unit<RegXS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].unit_bs(std::get<0>(leaf)),
+        dpf[1].unit_bs(std::get<1>(leaf)));
+}
+
+// Get the additive-shared unit vector entry from the leaf node
+template <>
+inline std::tuple<RegAS,RegAS> RDPFPair::unit<RegAS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].unit_as(std::get<0>(leaf)),
+        dpf[1].unit_as(std::get<1>(leaf)));
+}
+
+// Get the XOR-shared scaled vector entry from the leaf ndoe
+template <>
+inline std::tuple<RegXS,RegXS> RDPFPair::scaled<RegXS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].scaled_xs(std::get<0>(leaf)),
+        dpf[1].scaled_xs(std::get<1>(leaf)));
+}
+
+// Get the additive-shared scaled vector entry from the leaf node
+template <>
+inline std::tuple<RegAS,RegAS> RDPFPair::scaled<RegAS>(node leaf) const {
+    return std::make_tuple(
+        dpf[0].scaled_as(std::get<0>(leaf)),
+        dpf[1].scaled_as(std::get<1>(leaf)));
+}
+
 // I/O for RDPFs
 
 template <typename T>

@@ -150,7 +150,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
             // The values from the two DPFs
-            auto [V0, V1] = dp.unit_as(L);
+            auto [V0, V1] = dp.unit<T>(L);
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i);
@@ -180,7 +180,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
             auto L = ev.next();
 
             // The values from the two DPFs
-            auto [V0, V1] = dp.unit_as(L);
+            auto [V0, V1] = dp.unit<T>(L);
 
             // shape.get_server(i) returns a pair of references to the
             // appropriate cells in the two blinded databases
@@ -218,7 +218,7 @@ typename Duoram<T>::Shape::MemRefAS
         RegAS indoffset = idx;
         indoffset -= dt.as_target;
         auto Moffset = std::make_tuple(M, M, M);
-        Moffset -= dt.scaled_sum();
+        Moffset -= dt.scaled_value<T>();
 
         // Send them to the peer, and everything except the first offset
         // to the server
@@ -232,7 +232,7 @@ typename Duoram<T>::Shape::MemRefAS
 
         // Receive the above from the peer
         RegAS peerindoffset;
-        std::tuple<RegAS,RegAS,RegAS> peerMoffset;
+        std::tuple<T,T,T> peerMoffset;
         shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
         shape.tio.iostream_peer() >> peerMoffset;
 
@@ -245,7 +245,7 @@ typename Duoram<T>::Shape::MemRefAS
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
             // The values from the three DPFs
-            auto [V0, V1, V2] = dt.scaled_as(L) + dt.unit_as(L) * Mshift;
+            auto [V0, V1, V2] = dt.scaled<T>(L) + dt.unit<T>(L) * Mshift;
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i);
@@ -263,7 +263,7 @@ typename Duoram<T>::Shape::MemRefAS
 
         RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
         RegAS p0indoffset, p1indoffset;
-        std::tuple<RegAS,RegAS> p0Moffset, p1Moffset;
+        std::tuple<T,T> p0Moffset, p1Moffset;
 
         // Receive the index and message offsets from the computational
         // players and combine them
@@ -279,7 +279,7 @@ typename Duoram<T>::Shape::MemRefAS
         for (size_t i=0; i<shape.shape_size; ++i) {
             auto L = ev.next();
             // The values from the two DPFs
-            auto V = dp.scaled_as(L) + dp.unit_as(L) * Mshift;
+            auto V = dp.scaled<T>(L) + dp.unit<T>(L) * Mshift;
             // shape.get_server(i) returns a pair of references to the
             // appropriate cells in the two blinded databases, so we can
             // subtract the pair directly.

@@ -414,6 +414,8 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
     pool.join();
 }
 
+// T is RegAS or RegXS for additive or XOR shared database respectively
+template <typename T>
 static void duoram_test(MPCIO &mpcio, yield_t &yield,
     const PRACOptions &opts, char **args)
 {
@@ -437,15 +439,15 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
             size_t size = size_t(1)<<depth;
             MPCTIO tio(mpcio, thread_num);
             // size_t &op_counter = tio.aes_ops();
-            Duoram<RegAS> oram(mpcio.player, size);
+            Duoram<T> oram(mpcio.player, size);
             auto A = oram.flat(tio, yield);
             RegAS aidx;
             aidx.ashare = share;
-            RegAS M;
+            T M;
             if (tio.player() == 0) {
-                M.ashare = 0xbabb0000;
+                M.set(0xbabb0000);
             } else {
-                M.ashare = 0x0000a66e;
+                M.set(0x0000a66e);
             }
             RegXS xidx;
             xidx.xshare = share;
@@ -453,7 +455,7 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
             printf("Updating\n");
             A[aidx] += M;
             printf("Reading\n");
-            RegAS Aa = A[aidx];
+            T Aa = A[aidx];
             auto Ax = A[xidx];
             auto Ae = A[eidx];
             if (depth <= 10) {
@@ -461,7 +463,7 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
                 auto check = A.reconstruct();
                 if (tio.player() == 0) {
                     for (address_t i=0;i<size;++i) {
-                        printf("%04x %016lx\n", i, check[i].ashare);
+                        printf("%04x %016lx\n", i, check[i].share());
                     }
                 }
             }
@@ -506,7 +508,11 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
                 tupleeval_timing(mpcio, yield, opts, args);
             } else if (!strcmp(*args, "duotest")) {
                 ++args;
-                duoram_test(mpcio, yield, opts, args);
+                if (opts.use_xor_db) {
+                    duoram_test<RegXS>(mpcio, yield, opts, args);
+                } else {
+                    duoram_test<RegAS>(mpcio, yield, opts, args);
+                }
             } else {
                 std::cerr << "Unknown mode " << *args << "\n";
             }
