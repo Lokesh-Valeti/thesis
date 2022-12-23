@@ -38,7 +38,7 @@ std::tuple<CDPF,CDPF> CDPF::generate(value_t target, size_t &aes_ops)
         prgboth(left1, right1, cur1, aes_ops);
 
         // Which way lies the target?
-        bool targetdir = !!(target & (value_t(1)<<(depth-curlevel-1)));
+        bool targetdir = !!(target & (value_t(1)<<((depth+7)-curlevel-1)));
         DPFnode CW;
         bool cfbit = !get_lsb(left0 ^ left1 ^ right0 ^ right1);
         bool flag0 = get_lsb(cur0);
@@ -134,4 +134,21 @@ std::tuple<CDPF,CDPF> CDPF::generate(size_t &aes_ops)
     value_t target;
     arc4random_buf(&target, sizeof(target));
     return generate(target, aes_ops);
+}
+
+// Get the leaf node for the given input.  We don't actually use
+// this in the protocol, but it's useful for testing.
+DPFnode CDPF::leaf(value_t input, size_t &aes_ops) const
+{
+    nbits_t depth = cw.size();
+    DPFnode node = seed;
+    input >>= 7;
+    for (nbits_t d=0;d<depth-1;++d) {
+        bit_t dir = !!(input & (value_t(1)<<(depth-d-1)));
+        node = descend(node, d, dir, aes_ops);
+    }
+    // The last layer is special
+    bit_t dir = input & 1;
+    node = descend_to_leaf(node, dir, aes_ops);
+    return node;
 }

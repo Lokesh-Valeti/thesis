@@ -274,6 +274,9 @@ MPCPeerIO::MPCPeerIO(unsigned player, bool preprocessing,
                 "rdpf", i, depth);
         }
     }
+    for (unsigned i=0; i<num_threads; ++i) {
+        cdpfs.emplace_back(player, preprocessing, "cdpf", i);
+    }
     for (auto &&sock : peersocks) {
         peerios.emplace_back(std::move(sock));
     }

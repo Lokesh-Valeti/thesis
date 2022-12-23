@@ -4,6 +4,7 @@
 #include "mpcops.hpp"
 #include "rdpf.hpp"
 #include "duoram.hpp"
+#include "cdpf.hpp"
 
 
 static void online_test(MPCIO &mpcio, yield_t &yield,
@@ -496,6 +497,56 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
     pool.join();
 }
 
+static void cdpf_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
+{
+    value_t query, target;
+    arc4random_buf(&query, sizeof(query));
+    arc4random_buf(&target, sizeof(target));
+
+    if (*args) {
+        query = strtoull(*args, NULL, 16);
+        ++args;
+    }
+    if (*args) {
+        target = strtoull(*args, NULL, 16);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num, &query, &target] {
+            MPCTIO tio(mpcio, thread_num);
+            size_t &aes_ops = tio.aes_ops();
+            if (mpcio.player == 2) {
+                auto [ dpf0, dpf1 ] = CDPF::generate(target, aes_ops);
+                DPFnode leaf0 = dpf0.leaf(query, aes_ops);
+                DPFnode leaf1 = dpf1.leaf(query, aes_ops);
+                printf("DPFXOR_{%016lx}(%016lx} = ", target, query);
+                dump_node(leaf0 ^ leaf1);
+            } else {
+                CDPF dpf = tio.cdpf();
+                printf("ashare = %016lX\nxshare = %016lX\n",
+                    dpf.as_target.ashare, dpf.xs_target.xshare);
+                DPFnode leaf = dpf.leaf(query, aes_ops);
+                printf("DPF(%016lx) = ", query);
+                dump_node(leaf);
+                if (mpcio.player == 1) {
+                    tio.iostream_peer() << leaf;
+                } else {
+                    DPFnode peerleaf;
+                    tio.iostream_peer() >> peerleaf;
+                    printf("XOR = ");
+                    dump_node(leaf ^ peerleaf);
+                }
+            }
+            tio.send();
+        });
+    }
+    pool.join();
+}
+
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     // Run everything inside a coroutine so that simple tests don't have
@@ -532,6 +583,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
                 } else {
                     duoram_test<RegAS>(mpcio, yield, opts, args);
                 }
+            } else if (!strcmp(*args, "cdpftest")) {
+                ++args;
+                cdpf_test(mpcio, yield, opts, args);
             } else {
                 std::cerr << "Unknown mode " << *args << "\n";
             }

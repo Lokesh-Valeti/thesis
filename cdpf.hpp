@@ -100,6 +100,10 @@ struct CDPF : public DPF {
     // Descend from the parent of a leaf node to the leaf node
     inline DPFnode descend_to_leaf(const DPFnode &parent,
         bit_t whichchild, size_t &aes_ops) const;
+
+    // Get the leaf node for the given input.  We don't actually use
+    // this in the protocol, but it's useful for testing.
+    DPFnode leaf(value_t input, size_t &aes_ops) const;
 };
 
 // Descend from the parent of a leaf node to the leaf node

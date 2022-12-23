@@ -511,6 +511,7 @@ struct CDPFName { static constexpr const char *name = "c"; };
 
 // Default I/O for various types
 
+DEFAULT_IO(DPFnode)
 DEFAULT_IO(RegBS)
 DEFAULT_IO(RegAS)
 DEFAULT_IO(RegXS)
