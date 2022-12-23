@@ -131,6 +131,8 @@ Duoram<T>::Shape::MemRefAS::operator T()
 
         // We only need two of the DPFs for reading
         RDPFPair dp(std::move(dt), 0, player == 0 ? 2 : 1);
+        // The RDPFTriple dt is now broken, since we've moved things out
+        // of it.
 
         // Send it to the peer and the server
         shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
