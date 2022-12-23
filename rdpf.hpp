@@ -10,37 +10,8 @@
 #include "bitutils.hpp"
 #include "dpf.hpp"
 
-// Streaming evaluation, to avoid taking up enough memory to store
-// an entire evaluation.  T can be RDPF, RDPFPair, or RDPFTriple.
-template <typename T>
-class StreamEval {
-    const T &rdpf;
-    size_t &op_counter;
-    bool use_expansion;
-    nbits_t depth;
-    address_t counter_xor_offset;
-    address_t indexmask;
-    address_t pathindex;
-    address_t nextindex;
-    std::vector<typename T::node> path;
-public:
-    // Create an Eval object that will start its output at index start.
-    // It will wrap around to 0 when it hits 2^depth.  If use_expansion
-    // is true, then if the DPF has been expanded, just output values
-    // from that.  If use_expansion=false or if the DPF has not been
-    // expanded, compute the values on the fly.  If xor_offset is
-    // non-zero, then the outputs are actually
-    // DPF(start XOR xor_offset)
-    // DPF((start+1) XOR xor_offset)
-    // DPF((start+2) XOR xor_offset)
-    // etc.
-    StreamEval(const T &rdpf, address_t start,
-        address_t xor_offset, size_t &op_counter,
-        bool use_expansion = true);
-
-    // Get the next value (or tuple of values) from the evaluator
-    typename T::node next();
-};
+// DPFs for oblivious random accesses to memory.  See dpf.hpp for the
+// differences between the different kinds of DPFs.
 
 struct RDPF : public DPF {
     // The amount we have to scale the low words of the leaf values by
@@ -257,6 +228,38 @@ struct RDPFPair {
     template <typename T>
     inline std::tuple<T,T> scaled(node leaf) const;
 
+};
+
+// Streaming evaluation, to avoid taking up enough memory to store
+// an entire evaluation.  T can be RDPF, RDPFPair, or RDPFTriple.
+template <typename T>
+class StreamEval {
+    const T &rdpf;
+    size_t &op_counter;
+    bool use_expansion;
+    nbits_t depth;
+    address_t counter_xor_offset;
+    address_t indexmask;
+    address_t pathindex;
+    address_t nextindex;
+    std::vector<typename T::node> path;
+public:
+    // Create a StreamEval object that will start its output at index
+    // start.  It will wrap around to 0 when it hits 2^depth.  If
+    // use_expansion is true, then if the DPF has been expanded, just
+    // output values from that.  If use_expansion=false or if the DPF
+    // has not been expanded, compute the values on the fly.  If
+    // xor_offset is non-zero, then the outputs are actually
+    // DPF(start XOR xor_offset)
+    // DPF((start+1) XOR xor_offset)
+    // DPF((start+2) XOR xor_offset)
+    // etc.
+    StreamEval(const T &rdpf, address_t start,
+        address_t xor_offset, size_t &op_counter,
+        bool use_expansion = true);
+
+    // Get the next value (or tuple of values) from the evaluator
+    typename T::node next();
 };
 
 #include "rdpf.tcc"
