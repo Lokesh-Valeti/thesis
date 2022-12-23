@@ -5,7 +5,8 @@ LDFLAGS=-ggdb
 LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthread
 
 BIN=prac
-SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp rdpf.cpp
+SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp rdpf.cpp \
+    cdpf.cpp
 OBJS=$(SRCS:.cpp=.o)
 ASMS=$(SRCS:.cpp=.s)
 
@@ -38,3 +39,4 @@ online.o: duoram.tcc
 mpcops.o: mpcops.hpp types.hpp mpcio.hpp coroutine.hpp bitutils.hpp
 rdpf.o: rdpf.hpp mpcio.hpp types.hpp coroutine.hpp bitutils.hpp dpf.hpp
 rdpf.o: prg.hpp aes.hpp rdpf.tcc mpcops.hpp
+cdpf.o: cdpf.hpp types.hpp dpf.hpp prg.hpp bitutils.hpp aes.hpp

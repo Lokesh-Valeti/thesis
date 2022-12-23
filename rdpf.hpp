@@ -50,12 +50,6 @@ struct RDPF : public DPF {
     // depth
     static size_t size(nbits_t depth);
 
-    // The depth
-    inline nbits_t depth() const { return cw.size(); }
-
-    // The seed
-    inline node get_seed() const { return seed; }
-
     // Do we have a precomputed expansion?
     inline bool has_expansion() const { return expansion.size() > 0; }
 

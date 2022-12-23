@@ -1,6 +1,7 @@
 #ifndef __DPF_HPP__
 #define __DPF_HPP__
 
+#include <vector>
 #include "prg.hpp"
 
 // We have two major kinds of distributed point functions (DPFs): ones
@@ -46,6 +47,12 @@ struct DPF {
     std::vector<DPFnode> cw;
     // correction flag bits: the one for level i is bit i of this word
     value_t cfbits;
+
+    // The depth
+    inline nbits_t depth() const { return cw.size(); }
+
+    // The seed
+    inline node get_seed() const { return seed; }
 
     // Descend from a node at depth parentdepth to one of its children
     // whichchild = 0: left child
