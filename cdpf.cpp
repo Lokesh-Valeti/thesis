@@ -152,3 +152,53 @@ DPFnode CDPF::leaf(value_t input, size_t &aes_ops) const
     node = descend_to_leaf(node, dir, aes_ops);
     return node;
 }
+
+// Compare the given additively shared element to 0.  The output is
+// a triple of bit shares; the first is a share of 1 iff the
+// reconstruction of the element is negative; the second iff it is
+// 0; the third iff it is positive.  (All as two's-complement
+// VALUE_BIT-bit integers.)  Note in particular that exactly one of
+// the outputs will be a share of 1, so you can do "greater than or
+// equal to" just by adding the greater and equal outputs together.
+// Note also that you can compare two RegAS values A and B by
+// passing A-B here.
+std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
+    RegAS x)
+{
+    // Reconstruct S = target-x
+    RegBS gt, eq;
+    // The server does nothing in this protocol
+    if (tio.player() < 2) {
+        RegAS S_share = as_target - x;
+        tio.iostream_peer() << x;
+        yield();
+        RegAS peer_S_share;
+        tio.iostream_peer() >> peer_S_share;
+        value_t S = S_share.ashare + peer_S_share.ashare;
+
+        // Now we're going to simultaneously descend the DPF tree for
+        // the values S and T = S + 2^63.  Note that the 1 values of V
+        // (see the explanation of the algorithm in cdpf.hpp) are those
+        // values _strictly_ larger than S and smaller than T (noting
+        // they can "wrap around" 2^64).  In level 1 of the tree, the
+        // paths to S and T will necessarily be at the two different
+        // children of the root seed, but they could be in either order.
+        // From then on, they will proceed in lockstep, either both
+        // going left, or both going right.  If they both go left, we
+        // also compute the right sibling on the S path, and add it to
+        // the gt flag.  If they both go right, we also compute the left
+        // sibling on the T path, and add it to the gt flag.  When we
+        // hit the leaves, the gt flag will account for all of the
+        // complete leaf nodes strictly greater than S and strictly less
+        // than T.  Then we just have to pull out the parity of the
+        // appropriate bits in the two leaf nodes containing S and T
+        // respectively to complete the computation of gt, and also to
+        // get the single bit eq.
+    }
+    // Once we have gt and eq (which cannot both be 1), lt is just 1
+    // exactly if they're both 0.
+    RegBS lt;
+    lt.bshare = 1 ^ eq.bshare ^ gt.bshare;
+
+    return std::make_tuple(lt, eq, gt);
+}

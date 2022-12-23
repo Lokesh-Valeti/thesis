@@ -2,6 +2,9 @@
 #define __CDPF_HPP__
 
 #include <tuple>
+
+#include "mpcio.hpp"
+#include "coroutine.hpp"
 #include "types.hpp"
 #include "dpf.hpp"
 
@@ -104,6 +107,18 @@ struct CDPF : public DPF {
     // Get the leaf node for the given input.  We don't actually use
     // this in the protocol, but it's useful for testing.
     DPFnode leaf(value_t input, size_t &aes_ops) const;
+
+    // Compare the given additively shared element to 0.  The output is
+    // a triple of bit shares; the first is a share of 1 iff the
+    // reconstruction of the element is negative; the second iff it is
+    // 0; the third iff it is positive.  (All as two's-complement
+    // VALUE_BIT-bit integers.)  Note in particular that exactly one of
+    // the outputs will be a share of 1, so you can do "greater than or
+    // equal to" just by adding the greater and equal outputs together.
+    // Note also that you can compare two RegAS values A and B by
+    // passing A-B here.
+    std::tuple<RegBS,RegBS,RegBS> compare(MPCTIO &tio, yield_t &yield,
+        RegAS x);
 };
 
 // Descend from the parent of a leaf node to the leaf node
