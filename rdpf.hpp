@@ -8,6 +8,7 @@
 #include "coroutine.hpp"
 #include "types.hpp"
 #include "bitutils.hpp"
+#include "dpf.hpp"
 
 // Streaming evaluation, to avoid taking up enough memory to store
 // an entire evaluation.  T can be RDPF, RDPFPair, or RDPFTriple.
@@ -41,19 +42,7 @@ public:
     typename T::node next();
 };
 
-struct RDPF {
-    // The type of nodes
-    using node = DPFnode;
-
-    // The 128-bit seed
-    DPFnode seed;
-    // Which half of the DPF are we?
-    bit_t whichhalf;
-    // correction words; the depth of the DPF is the length of this
-    // vector
-    std::vector<DPFnode> cw;
-    // correction flag bits: the one for level i is bit i of this word
-    value_t cfbits;
+struct RDPF : public DPF {
     // The amount we have to scale the low words of the leaf values by
     // to get additive shares of a unit vector
     value_t unit_sum_inverse;
@@ -103,14 +92,6 @@ struct RDPF {
     inline node get_expansion(address_t index) const {
         return expansion[index];
     }
-
-    // Descend from a node at depth parentdepth to one of its children
-    // whichchild = 0: left child
-    // whichchild = 1: right child
-    //
-    // Cost: 1 AES operation
-    DPFnode descend(const DPFnode &parent, nbits_t parentdepth,
-        bit_t whichchild, size_t &op_counter) const;
 
     // Get the leaf node for the given input
     //

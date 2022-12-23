@@ -3,29 +3,6 @@
 #include "rdpf.hpp"
 #include "bitutils.hpp"
 #include "mpcops.hpp"
-#include "aes.hpp"
-#include "prg.hpp"
-
-// Don't warn if we never actually use these functions
-static void dump_node(DPFnode node, const char *label = NULL)
-__attribute__ ((unused));
-static void dump_level(DPFnode *nodes, size_t num, const char *label = NULL)
-__attribute__ ((unused));
-
-static void dump_node(DPFnode node, const char *label)
-{
-    if (label) printf("%s: ", label);
-    for(int i=0;i<16;++i) { printf("%02x", ((unsigned char *)&node)[15-i]); } printf("\n");
-}
-
-static void dump_level(DPFnode *nodes, size_t num, const char *label)
-{
-    if (label) printf("%s:\n", label);
-    for (size_t i=0;i<num;++i) {
-        dump_node(nodes[i]);
-    }
-    printf("\n");
-}
 
 // Compute the multiplicative inverse of x mod 2^{VALUE_BITS}
 // This is the same as computing x to the power of
@@ -281,24 +258,6 @@ size_t RDPF::size() const
 {
     uint8_t depth = cw.size();
     return size(depth);
-}
-
-// Descend from a node at depth parentdepth to one of its children
-// whichchild = 0: left child
-// whichchild = 1: right child
-DPFnode RDPF::descend(const DPFnode &parent, nbits_t parentdepth,
-    bit_t whichchild, size_t &op_counter) const
-{
-    DPFnode prgout;
-    bool flag = get_lsb(parent);
-    prg(prgout, parent, whichchild, op_counter);
-    if (flag) {
-        DPFnode CW = cw[parentdepth];
-        bit_t cfbit = !!(cfbits & (value_t(1)<<parentdepth));
-        DPFnode CWR = CW ^ lsb128_mask[cfbit];
-        prgout ^= (whichchild ? CWR : CW);
-    }
-    return prgout;
 }
 
 // Get the leaf node for the given input
