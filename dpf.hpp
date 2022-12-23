@@ -60,18 +60,18 @@ struct DPF {
     //
     // Cost: 1 AES operation
     inline DPFnode descend(const DPFnode &parent, nbits_t parentdepth,
-        bit_t whichchild, size_t &op_counter) const;
+        bit_t whichchild, size_t &aes_ops) const;
 };
 
 // Descend from a node at depth parentdepth to one of its children
 // whichchild = 0: left child
 // whichchild = 1: right child
 inline DPFnode DPF::descend(const DPFnode &parent, nbits_t parentdepth,
-    bit_t whichchild, size_t &op_counter) const
+    bit_t whichchild, size_t &aes_ops) const
 {
     DPFnode prgout;
     bool flag = get_lsb(parent);
-    prg(prgout, parent, whichchild, op_counter);
+    prg(prgout, parent, whichchild, aes_ops);
     if (flag) {
         DPFnode CW = cw[parentdepth];
         bit_t cfbit = !!(cfbits & (value_t(1)<<parentdepth));

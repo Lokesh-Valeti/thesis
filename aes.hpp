@@ -62,7 +62,7 @@ static inline void AES_128_Key_Expansion (AESkey &key, __m128i rawkey)
 }
 
 static inline void AES_ECB_encrypt(__m128i &ciphertext, __m128i plaintext,
-    const AESkey &key, size_t &op_counter)
+    const AESkey &key, size_t &aes_ops)
 {
     __m128i tmp;
     int j;
@@ -73,7 +73,7 @@ static inline void AES_ECB_encrypt(__m128i &ciphertext, __m128i plaintext,
     }
     tmp = _mm_aesenclast_si128 (tmp,key[j]);
     ciphertext=tmp;
-    ++op_counter;
+    ++aes_ops;
 }
 
 #endif

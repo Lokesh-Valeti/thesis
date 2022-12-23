@@ -12,8 +12,8 @@
 // etc.
 template <typename T>
 StreamEval<T>::StreamEval(const T &rdpf, address_t start,
-    address_t xor_offset, size_t &op_counter,
-    bool use_expansion) : rdpf(rdpf), op_counter(op_counter),
+    address_t xor_offset, size_t &aes_ops,
+    bool use_expansion) : rdpf(rdpf), aes_ops(aes_ops),
     use_expansion(use_expansion), counter_xor_offset(xor_offset)
 {
     depth = rdpf.depth();
@@ -40,7 +40,7 @@ StreamEval<T>::StreamEval(const T &rdpf, address_t start,
         bool xor_offset_bit =
             !!(counter_xor_offset & (address_t(1)<<(depth-i)));
         path[i] = rdpf.descend(path[i-1], i-1,
-            dir ^ xor_offset_bit, op_counter);
+            dir ^ xor_offset_bit, aes_ops);
     }
 }
 
@@ -87,16 +87,16 @@ typename T::node StreamEval<T>::next()
         path[depth-how_many_1_bits] =
             rdpf.descend(path[depth-how_many_1_bits-1],
                 depth-how_many_1_bits-1,
-                top_changed_bit ^ xor_offset_bit, op_counter);
+                top_changed_bit ^ xor_offset_bit, aes_ops);
         for (nbits_t i = depth-how_many_1_bits; i < depth-1; ++i) {
             bool xor_offset_bit =
                 !!(counter_xor_offset & (address_t(1) << (depth-i-1)));
-            path[i+1] = rdpf.descend(path[i], i, xor_offset_bit, op_counter);
+            path[i+1] = rdpf.descend(path[i], i, xor_offset_bit, aes_ops);
         }
     }
     bool xor_offset_bit = counter_xor_offset & 1;
     typename T::node leaf = rdpf.descend(path[depth-1], depth-1,
-        (nextindex & 1) ^ xor_offset_bit, op_counter);
+        (nextindex & 1) ^ xor_offset_bit, aes_ops);
     pathindex = nextindex;
     nextindex = (nextindex + 1) & indexmask;
     return leaf;

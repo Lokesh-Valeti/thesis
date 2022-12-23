@@ -169,13 +169,13 @@ static void rdpf_test(MPCIO &mpcio, yield_t &yield,
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, depth] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &op_counter = tio.aes_ops();
+            size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
                 RDPFPair dp = tio.rdpfpair(depth);
                 for (int i=0;i<2;++i) {
                     const RDPF &dpf = dp.dpf[i];
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        DPFnode leaf = dpf.leaf(x, aes_ops);
                         RegBS ub = dpf.unit_bs(leaf);
                         RegAS ua = dpf.unit_as(leaf);
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -199,7 +199,7 @@ static void rdpf_test(MPCIO &mpcio, yield_t &yield,
                         peer_scaled_xor ^= dpf.scaled_xor;
                     }
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        DPFnode leaf = dpf.leaf(x, aes_ops);
                         RegBS ub = dpf.unit_bs(leaf);
                         RegAS ua = dpf.unit_as(leaf);
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -251,15 +251,15 @@ static void rdpf_timing(MPCIO &mpcio, yield_t &yield,
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, depth] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &op_counter = tio.aes_ops();
+            size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
                 RDPFPair dp = tio.rdpfpair(depth);
                 for (int i=0;i<2;++i) {
                     RDPF &dpf = dp.dpf[i];
-                    dpf.expand(op_counter);
+                    dpf.expand(aes_ops);
                     RegXS scaled_xor;
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        DPFnode leaf = dpf.leaf(x, aes_ops);
                         RegXS sx = dpf.scaled_xs(leaf);
                         scaled_xor ^= sx;
                     }
@@ -271,10 +271,10 @@ static void rdpf_timing(MPCIO &mpcio, yield_t &yield,
                 RDPFTriple dt = tio.rdpftriple(depth);
                 for (int i=0;i<3;++i) {
                     RDPF &dpf = dt.dpf[i];
-                    dpf.expand(op_counter);
+                    dpf.expand(aes_ops);
                     RegXS scaled_xor;
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, op_counter);
+                        DPFnode leaf = dpf.leaf(x, aes_ops);
                         RegXS sx = dpf.scaled_xs(leaf);
                         scaled_xor ^= sx;
                     }
@@ -309,13 +309,13 @@ static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &op_counter = tio.aes_ops();
+            size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
                 RDPFPair dp = tio.rdpfpair(depth);
                 for (int i=0;i<2;++i) {
                     RDPF &dpf = dp.dpf[i];
                     RegXS scaled_xor;
-                    auto ev = StreamEval(dpf, start, 0, op_counter, false);
+                    auto ev = StreamEval(dpf, start, 0, aes_ops, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -330,7 +330,7 @@ static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
                 for (int i=0;i<3;++i) {
                     RDPF &dpf = dt.dpf[i];
                     RegXS scaled_xor;
-                    auto ev = StreamEval(dpf, start, 0, op_counter, false);
+                    auto ev = StreamEval(dpf, start, 0, aes_ops, false);
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
                         DPFnode leaf = ev.next();
                         RegXS sx = dpf.scaled_xs(leaf);
@@ -367,11 +367,11 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &op_counter = tio.aes_ops();
+            size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
                 RDPFPair dp = tio.rdpfpair(depth);
                 RegXS scaled_xor0, scaled_xor1;
-                auto ev = StreamEval(dp, start, 0, op_counter, false);
+                auto ev = StreamEval(dp, start, 0, aes_ops, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
                     auto [L0, L1] = ev.next();
                     RegXS sx0 = dp.dpf[0].scaled_xs(L0);
@@ -388,7 +388,7 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
             } else {
                 RDPFTriple dt = tio.rdpftriple(depth);
                 RegXS scaled_xor0, scaled_xor1, scaled_xor2;
-                auto ev = StreamEval(dt, start, 0, op_counter, false);
+                auto ev = StreamEval(dt, start, 0, aes_ops, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
                     auto [L0, L1, L2] = ev.next();
                     RegXS sx0 = dt.dpf[0].scaled_xs(L0);
@@ -438,7 +438,7 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
         boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, share] {
             size_t size = size_t(1)<<depth;
             MPCTIO tio(mpcio, thread_num);
-            // size_t &op_counter = tio.aes_ops();
+            // size_t &aes_ops = tio.aes_ops();
             Duoram<T> oram(mpcio.player, size);
             auto A = oram.flat(tio, yield);
             RegAS aidx;

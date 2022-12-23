@@ -261,7 +261,7 @@ size_t RDPF::size() const
 }
 
 // Get the leaf node for the given input
-DPFnode RDPF::leaf(address_t input, size_t &op_counter) const
+DPFnode RDPF::leaf(address_t input, size_t &aes_ops) const
 {
     // If we have a precomputed expansion, just use it
     if (expansion.size()) {
@@ -272,7 +272,7 @@ DPFnode RDPF::leaf(address_t input, size_t &op_counter) const
     DPFnode node = seed;
     for (nbits_t d=0;d<totdepth;++d) {
         bit_t dir = !!(input & (address_t(1)<<(totdepth-d-1)));
-        node = descend(node, d, dir, op_counter);
+        node = descend(node, d, dir, aes_ops);
     }
     return node;
 }
@@ -281,7 +281,7 @@ DPFnode RDPF::leaf(address_t input, size_t &op_counter) const
 //
 // This routine is slightly more efficient than repeatedly calling
 // Eval::next(), but it uses a lot more memory.
-void RDPF::expand(size_t &op_counter)
+void RDPF::expand(size_t &aes_ops)
 {
     nbits_t depth = this->depth();
     size_t num_leaves = size_t(1)<<depth;
@@ -292,10 +292,10 @@ void RDPF::expand(size_t &op_counter)
     DPFnode *path = new DPFnode[depth];
     path[0] = seed;
     for (nbits_t i=1;i<depth;++i) {
-        path[i] = descend(path[i-1], i-1, 0, op_counter);
+        path[i] = descend(path[i-1], i-1, 0, aes_ops);
     }
-    expansion[index++] = descend(path[depth-1], depth-1, 0, op_counter);
-    expansion[index++] = descend(path[depth-1], depth-1, 1, op_counter);
+    expansion[index++] = descend(path[depth-1], depth-1, 0, aes_ops);
+    expansion[index++] = descend(path[depth-1], depth-1, 1, aes_ops);
     while(index < num_leaves) {
         // Invariant: lastindex and index will both be even, and
         // index=lastindex+2
@@ -310,13 +310,13 @@ void RDPF::expand(size_t &op_counter)
         // left children.
         path[depth-how_many_1_bits] =
             descend(path[depth-how_many_1_bits-1],
-                depth-how_many_1_bits-1, 1, op_counter);
+                depth-how_many_1_bits-1, 1, aes_ops);
         for (nbits_t i = depth-how_many_1_bits; i < depth-1; ++i) {
-            path[i+1] = descend(path[i], i, 0, op_counter);
+            path[i+1] = descend(path[i], i, 0, aes_ops);
         }
         lastindex = index;
-        expansion[index++] = descend(path[depth-1], depth-1, 0, op_counter);
-        expansion[index++] = descend(path[depth-1], depth-1, 1, op_counter);
+        expansion[index++] = descend(path[depth-1], depth-1, 0, aes_ops);
+        expansion[index++] = descend(path[depth-1], depth-1, 1, aes_ops);
     }
 
     delete[] path;
@@ -349,23 +349,23 @@ RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
 
 RDPFTriple::node RDPFTriple::descend(const RDPFTriple::node &parent,
     nbits_t parentdepth, bit_t whichchild,
-    size_t &op_counter) const
+    size_t &aes_ops) const
 {
     auto [P0, P1, P2] = parent;
     DPFnode C0, C1, C2;
-    C0 = dpf[0].descend(P0, parentdepth, whichchild, op_counter);
-    C1 = dpf[1].descend(P1, parentdepth, whichchild, op_counter);
-    C2 = dpf[2].descend(P2, parentdepth, whichchild, op_counter);
+    C0 = dpf[0].descend(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf[1].descend(P1, parentdepth, whichchild, aes_ops);
+    C2 = dpf[2].descend(P2, parentdepth, whichchild, aes_ops);
     return std::make_tuple(C0,C1,C2);
 }
 
 RDPFPair::node RDPFPair::descend(const RDPFPair::node &parent,
     nbits_t parentdepth, bit_t whichchild,
-    size_t &op_counter) const
+    size_t &aes_ops) const
 {
     auto [P0, P1] = parent;
     DPFnode C0, C1;
-    C0 = dpf[0].descend(P0, parentdepth, whichchild, op_counter);
-    C1 = dpf[1].descend(P1, parentdepth, whichchild, op_counter);
+    C0 = dpf[0].descend(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf[1].descend(P1, parentdepth, whichchild, aes_ops);
     return std::make_tuple(C0,C1);
 }

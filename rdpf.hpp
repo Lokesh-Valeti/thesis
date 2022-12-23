@@ -61,10 +61,10 @@ struct RDPF : public DPF {
     // Get the leaf node for the given input
     //
     // Cost: depth AES operations
-    DPFnode leaf(address_t input, size_t &op_counter) const;
+    DPFnode leaf(address_t input, size_t &aes_ops) const;
 
     // Expand the DPF if it's not already expanded
-    void expand(size_t &op_counter);
+    void expand(size_t &aes_ops);
 
     // Get the bit-shared unit vector entry from the leaf node
     inline RegBS unit_bs(DPFnode leaf) const {
@@ -153,7 +153,7 @@ struct RDPFTriple {
 
     // Descend the three RDPFs in lock step
     node descend(const node &parent, nbits_t parentdepth,
-        bit_t whichchild, size_t &op_counter) const;
+        bit_t whichchild, size_t &aes_ops) const;
 
     // Templated versions of functions to get DPF components and outputs
     // so that the appropriate one can be selected with a template
@@ -207,7 +207,7 @@ struct RDPFPair {
 
     // Descend the two RDPFs in lock step
     node descend(const node &parent, nbits_t parentdepth,
-        bit_t whichchild, size_t &op_counter) const;
+        bit_t whichchild, size_t &aes_ops) const;
 
     // Templated versions of functions to get DPF components and outputs
     // so that the appropriate one can be selected with a template
@@ -229,7 +229,7 @@ struct RDPFPair {
 template <typename T>
 class StreamEval {
     const T &rdpf;
-    size_t &op_counter;
+    size_t &aes_ops;
     bool use_expansion;
     nbits_t depth;
     address_t counter_xor_offset;
@@ -249,7 +249,7 @@ public:
     // DPF((start+2) XOR xor_offset)
     // etc.
     StreamEval(const T &rdpf, address_t start,
-        address_t xor_offset, size_t &op_counter,
+        address_t xor_offset, size_t &aes_ops,
         bool use_expansion = true);
 
     // Get the next value (or tuple of values) from the evaluator
