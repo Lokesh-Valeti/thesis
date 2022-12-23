@@ -4,6 +4,7 @@
 #include "coroutine.hpp"
 #include "preproc.hpp"
 #include "rdpf.hpp"
+#include "cdpf.hpp"
 
 // Keep track of open files that coroutines might be writing into
 class Openfiles {
@@ -129,6 +130,16 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                                 tripfile.os() << rdpftrip;
                             });
                     }
+                } else if (type == 0x40) {
+                    // Comparison DPFs
+                    auto cdpffile = ofiles.open("cdpf",
+                        mpcio.player, thread_num);
+
+                    CDPF C;
+                    for (unsigned int i=0; i<num; ++i) {
+                        C = tio.cdpf();
+                        cdpffile.os() << C;
+                    }
                 }
             }
             run_coroutines(tio, coroutines);
@@ -230,6 +241,16 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                                     pairfile.os() << rdpfpair;
                                 });
                         }
+                    }
+                } else if (type[0] == 'c') {
+                    unsigned char typetag = 0x40;
+                    stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&num, 4);
+                    stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&num, 4);
+
+                    for (unsigned int i=0; i<num; ++i) {
+                        stio.cdpf();
                     }
 		}
                 free(arg);

@@ -89,13 +89,34 @@ struct CDPF : public DPF {
     // 64), and having the 128-bit labels on the leaf nodes directly
     // represent the 128 bits that would have come out of the subtree of
     // a (notional) depth-64 tree rooted at that depth-57 node.
-    DPFnode leaf_cw;
+    DPFnode leaf_cwr;
 
     // Generate a pair of CDPFs with the given target value
-    static std::tuple<CDPF,CDPF> generate(value_t target);
+    static std::tuple<CDPF,CDPF> generate(value_t target, size_t &aes_ops);
 
     // Generate a pair of CDPFs with a random target value
-    static std::tuple<CDPF,CDPF> generate();
+    static std::tuple<CDPF,CDPF> generate(size_t &aes_ops);
+
+    // Descend from the parent of a leaf node to the leaf node
+    inline DPFnode descend_to_leaf(const DPFnode &parent,
+        bit_t whichchild, size_t &aes_ops) const;
 };
+
+// Descend from the parent of a leaf node to the leaf node
+inline DPFnode CDPF::descend_to_leaf(const DPFnode &parent,
+    bit_t whichchild, size_t &aes_ops) const
+{
+    DPFnode prgout;
+    bool flag = get_lsb(parent);
+    prg(prgout, parent, whichchild, aes_ops);
+    if (flag) {
+        DPFnode CW = cw.back();
+        DPFnode CWR = leaf_cwr;
+        prgout ^= (whichchild ? CWR : CW);
+    }
+    return prgout;
+}
+
+#include "cdpf.tcc"
 
 #endif

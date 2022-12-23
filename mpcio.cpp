@@ -2,6 +2,7 @@
 #include <sys/resource.h>  // getrusage
 #include "mpcio.hpp"
 #include "rdpf.hpp"
+#include "cdpf.hpp"
 #include "bitutils.hpp"
 
 // T is the type being stored
@@ -637,6 +638,24 @@ RDPFPair MPCTIO::rdpfpair(nbits_t depth)
     if (!mpcio.preprocessing && mpcio.player == 2) {
         MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
         mpcsrvio.rdpfpairs[thread_num][depth-1].get(val);
+    }
+    return val;
+}
+
+CDPF MPCTIO::cdpf()
+{
+    CDPF val;
+    if (mpcio.player < 2) {
+        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+        if (mpcpio.preprocessing) {
+            iostream_server() >> val;
+        } else {
+            mpcpio.cdpfs[thread_num].get(val);
+        }
+    } else if (mpcio.preprocessing) {
+        auto [ cdpf0, cdpf1 ] = CDPF::generate(aes_ops());
+        iostream_p0() << cdpf0;
+        iostream_p1() << cdpf1;
     }
     return val;
 }

@@ -200,6 +200,7 @@ struct MPCPeerIO : public MPCIO {
     std::deque<MPCSingleIO> serverios;
     std::vector<PreCompStorage<MultTriple, MultTripleName>> triples;
     std::vector<PreCompStorage<HalfTriple, HalfTripleName>> halftriples;
+    std::vector<PreCompStorage<CDPF, CDPFName>> cdpfs;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
     std::vector<std::array<PreCompStorage<RDPFTriple, RDPFTripleName>,ADDRESS_MAX_BITS>> rdpftriples;
@@ -341,6 +342,8 @@ public:
     RDPFTriple rdpftriple(nbits_t depth);
     // The server calls:
     RDPFPair rdpfpair(nbits_t depth);
+    // Anyone can call:
+    CDPF cdpf();
 
     // Accessors
 

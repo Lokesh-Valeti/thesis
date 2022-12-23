@@ -487,6 +487,8 @@ struct RDPFPair;
 struct RDPFPairName { static constexpr const char *name = "r"; };
 struct RDPFTriple;
 struct RDPFTripleName { static constexpr const char *name = "r"; };
+struct CDPF;
+struct CDPFName { static constexpr const char *name = "c"; };
 
 // We want the I/O (using << and >>) for many classes
 // to just be a common thing: write out the bytes

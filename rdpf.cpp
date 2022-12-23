@@ -32,7 +32,7 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
     RegXS target, nbits_t depth, bool save_expansion)
 {
     int player = tio.player();
-    size_t &aesops = tio.aes_ops();
+    size_t &aes_ops = tio.aes_ops();
 
     // Choose a random seed
     arc4random_buf(&seed, sizeof(seed));
@@ -72,7 +72,7 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
         if (player < 2) {
             for(size_t i=0;i<curlevel_size;++i) {
                 DPFnode lchild, rchild;
-                prgboth(lchild, rchild, curlevel[i], aesops);
+                prgboth(lchild, rchild, curlevel[i], aes_ops);
                 L = (L ^ lchild);
                 R = (R ^ rchild);
                 if (nextlevel) {
@@ -148,7 +148,7 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
             });
         run_coroutines(yield, coroutines);
         bool parity_bit = our_parity_bit ^ peer_parity_bit;
-        cfbits |= (size_t(parity_bit)<<level);
+        cfbits |= (value_t(parity_bit)<<level);
         DPFnode CWR = CW ^ lsb128_mask[parity_bit];
         if (player < 2) {
             if (level < depth-1) {
