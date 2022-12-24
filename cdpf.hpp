@@ -65,18 +65,18 @@
 // of the DPF.
 //
 // So at the end, we've computed a bit sharing of [x>0] with local
-// computation linear in the depth of the DPF (concretely, fewer than
-// 200 AES operations), and only a *single word* of communication in
-// each direction (exchanging the target{i}-x{i} values).  Of course,
-// this assumes you have one pair of these DPFs lying around, and you
-// have to use a fresh pair with a fresh random target value for each
+// computation linear in the depth of the DPF (concretely, 170 AES
+// operations), and only a *single word* of communication in each
+// direction (exchanging the target{i}-x{i} values).  Of course, this
+// assumes you have one pair of these DPFs lying around, and you have to
+// use a fresh pair with a fresh random target value for each
 // comparison, since revealing target-x for two different x's but the
 // same target leaks the difference of the x's. But in the 3-party
 // setting (or even the 2+1-party setting), you can just have the server
-// precompute a bunch of these pairs in advance, and hand bunches of the
-// first item in each pair to player 0 and the second item in each pair
-// to player 1, at preprocessing time (a single message from the server
-// to each of player 0 and player 1), and these DPFs are very fast to
+// at preprocessing time precompute a bunch of these pairs in advance,
+// and hand bunches of the first item in each pair to player 0 and the
+// second item in each pair to player 1 (a single message from the
+// server to each of player 0 and player 1). These DPFs are very fast to
 // compute, and very small (< 1KB each) to transmit and store.
 
 // See also dpf.hpp for the differences between these DPFs and the ones
@@ -95,9 +95,15 @@ struct CDPF : public DPF {
     DPFnode leaf_cwr;
 
     // Generate a pair of CDPFs with the given target value
+    //
+    // Cost:
+    // 4*VALUE_BITS - 28 = 228 local AES operations
     static std::tuple<CDPF,CDPF> generate(value_t target, size_t &aes_ops);
 
     // Generate a pair of CDPFs with a random target value
+    //
+    // Cost:
+    // 4*VALUE_BITS - 28 = 228 local AES operations
     static std::tuple<CDPF,CDPF> generate(size_t &aes_ops);
 
     // Descend from the parent of a leaf node to the leaf node
@@ -117,12 +123,19 @@ struct CDPF : public DPF {
     // equal to" just by adding the greater and equal outputs together.
     // Note also that you can compare two RegAS values A and B by
     // passing A-B here.
+    //
+    // Cost:
+    // 1 word sent in 1 message
+    // 3*VALUE_BITS - 22 = 170 local AES operations
     std::tuple<RegBS,RegBS,RegBS> compare(MPCTIO &tio, yield_t &yield,
         RegAS x, size_t &aes_ops);
 
     // You can call this version directly if you already have S = target-x
     // reconstructed.  This routine is entirely local; no communication
     // is needed.
+    //
+    // Cost:
+    // 3*VALUE_BITS - 22 = 170 local AES operations
     std::tuple<RegBS,RegBS,RegBS> compare(value_t S, size_t &aes_ops);
 
 };

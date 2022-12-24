@@ -58,6 +58,9 @@ inline __m128i set_lsb(const __m128i & block, const bool val = true)
     return _mm_or_si128(clear_lsb(block, 0b01), lsb128_mask[val ? 0b01 : 0b00]);
 }
 
+// The following can probably be improved by someone who knows the SIMD
+// instruction sets better than I do.
+
 // Return the parity of the number of bits set in block; that is, 1 if
 // there are an odd number of bits set in block; 0 if even
 inline uint8_t parity(const __m128i & block)

@@ -3,6 +3,9 @@
 #include "cdpf.hpp"
 
 // Generate a pair of CDPFs with the given target value
+//
+// Cost:
+// 4*VALUE_BITS - 28 = 228 local AES operations
 std::tuple<CDPF,CDPF> CDPF::generate(value_t target, size_t &aes_ops)
 {
     CDPF dpf0, dpf1;
@@ -129,6 +132,9 @@ std::tuple<CDPF,CDPF> CDPF::generate(value_t target, size_t &aes_ops)
 }
 
 // Generate a pair of CDPFs with a random target value
+//
+// Cost:
+// 4*VALUE_BITS - 28 = 228 local AES operations
 std::tuple<CDPF,CDPF> CDPF::generate(size_t &aes_ops)
 {
     value_t target;
@@ -162,6 +168,10 @@ DPFnode CDPF::leaf(value_t input, size_t &aes_ops) const
 // equal to" just by adding the greater and equal outputs together.
 // Note also that you can compare two RegAS values A and B by
 // passing A-B here.
+//
+// Cost:
+// 1 word sent in 1 message
+// 3*VALUE_BITS - 22 = 170 local AES operations
 std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
     RegAS x, size_t &aes_ops)
 {
@@ -169,7 +179,7 @@ std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
     // The server does nothing in this protocol
     if (tio.player() < 2) {
         RegAS S_share = as_target - x;
-        tio.iostream_peer() << x;
+        tio.iostream_peer() << S_share;
         yield();
         RegAS peer_S_share;
         tio.iostream_peer() >> peer_S_share;
@@ -188,6 +198,9 @@ std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
 // You can call this version directly if you already have S = target-x
 // reconstructed.  This routine is entirely local; no communication
 // is needed.
+//
+// Cost:
+// 3*VALUE_BITS - 22 = 170 local AES operations
 std::tuple<RegBS,RegBS,RegBS> CDPF::compare(value_t S, size_t &aes_ops)
 {
     RegBS gt, eq;
@@ -269,12 +282,15 @@ std::tuple<RegBS,RegBS,RegBS> CDPF::compare(value_t S, size_t &aes_ops)
     // and all the higher bits into gt.  Also pull out the bits strictly
     // below that for T in Tnode into gt.
 
-    // TODO...
+    nbits_t Spos = S & 0x7f;
+    eq.bshare = bit_at(Snode, Spos);
+    gt ^= parity_above(Snode, Spos);
+    gt ^= parity_below(Tnode, Spos);
 
     // Once we have gt and eq (which cannot both be 1), lt is just 1
     // exactly if they're both 0.
     RegBS lt;
-    lt.bshare = 1 ^ eq.bshare ^ gt.bshare;
+    lt.bshare = whichhalf ^ eq.bshare ^ gt.bshare;
 
     return std::make_tuple(lt, eq, gt);
 }

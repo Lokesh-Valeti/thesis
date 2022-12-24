@@ -547,6 +547,132 @@ static void cdpf_test(MPCIO &mpcio, yield_t &yield,
     pool.join();
 }
 
+static int compare_test_one(MPCTIO &tio, yield_t &yield,
+    value_t target, value_t x)
+{
+    int player = tio.player();
+    size_t &aes_ops = tio.aes_ops();
+    int res = 1;
+    if (player == 2) {
+        // Create a CDPF pair with the given target
+        auto [dpf0, dpf1] = CDPF::generate(target, aes_ops);
+        // Send it and a share of x to the computational parties
+        RegAS x0, x1;
+        x0.randomize();
+        x1.set(x-x0.share());
+        tio.iostream_p0() << dpf0 << x0;
+        tio.iostream_p1() << dpf1 << x1;
+    } else {
+        CDPF dpf;
+        RegAS xsh;
+        tio.iostream_server() >> dpf >> xsh;
+        auto [lt, eq, gt] = dpf.compare(tio, yield, xsh, aes_ops);
+        printf("%016lx %016lx %d %d %d ", target, x, lt.bshare,
+            eq.bshare, gt.bshare);
+        // Check the answer
+        if (player == 1) {
+            tio.iostream_peer() << xsh << lt << eq << gt;
+        } else {
+            RegAS peer_xsh;
+            RegBS peer_lt, peer_eq, peer_gt;
+            tio.iostream_peer() >> peer_xsh >> peer_lt >> peer_eq >> peer_gt;
+            lt ^= peer_lt;
+            eq ^= peer_eq;
+            gt ^= peer_gt;
+            xsh += peer_xsh;
+            int lti = int(lt.bshare);
+            int eqi = int(eq.bshare);
+            int gti = int(gt.bshare);
+            x = xsh.share();
+            printf(": %d %d %d ", lti, eqi, gti);
+            bool signbit = (x >> 63);
+            if (lti + eqi + gti != 1) {
+                printf("INCONSISTENT");
+                res = 0;
+            } else if (x == 0 && eqi) {
+                printf("=");
+            } else if (!signbit && gti) {
+                printf(">");
+            } else if (signbit && lti) {
+                printf("<");
+            } else {
+                printf("INCORRECT");
+                res = 0;
+            }
+        }
+        printf("\n");
+    }
+    return res;
+}
+
+static int compare_test_target(MPCTIO &tio, yield_t &yield,
+    value_t target, value_t x)
+{
+    int res = 1;
+    res &= compare_test_one(tio, yield, target, x);
+    res &= compare_test_one(tio, yield, target, 0);
+    res &= compare_test_one(tio, yield, target, 1);
+    res &= compare_test_one(tio, yield, target, 15);
+    res &= compare_test_one(tio, yield, target, 16);
+    res &= compare_test_one(tio, yield, target, 17);
+    res &= compare_test_one(tio, yield, target, -1);
+    res &= compare_test_one(tio, yield, target, -15);
+    res &= compare_test_one(tio, yield, target, -16);
+    res &= compare_test_one(tio, yield, target, -17);
+    res &= compare_test_one(tio, yield, target, (value_t(1)<<63));
+    res &= compare_test_one(tio, yield, target, (value_t(1)<<63)+1);
+    res &= compare_test_one(tio, yield, target, (value_t(1)<<63)-1);
+    return res;
+}
+
+static void compare_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
+{
+    value_t target, x;
+    arc4random_buf(&target, sizeof(target));
+    arc4random_buf(&x, sizeof(x));
+
+    if (*args) {
+        target = strtoull(*args, NULL, 16);
+        ++args;
+    }
+    if (*args) {
+        x = strtoull(*args, NULL, 16);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, &target, &x] {
+            MPCTIO tio(mpcio, thread_num);
+            int res = 1;
+            res &= compare_test_target(tio, yield, target, x);
+            res &= compare_test_target(tio, yield, 0, x);
+            res &= compare_test_target(tio, yield, 1, x);
+            res &= compare_test_target(tio, yield, 15, x);
+            res &= compare_test_target(tio, yield, 16, x);
+            res &= compare_test_target(tio, yield, 17, x);
+            res &= compare_test_target(tio, yield, -1, x);
+            res &= compare_test_target(tio, yield, -15, x);
+            res &= compare_test_target(tio, yield, -16, x);
+            res &= compare_test_target(tio, yield, -17, x);
+            res &= compare_test_target(tio, yield, (value_t(1)<<63), x);
+            res &= compare_test_target(tio, yield, (value_t(1)<<63)+1, x);
+            res &= compare_test_target(tio, yield, (value_t(1)<<63)-1, x);
+            tio.send();
+            if (tio.player() == 0) {
+                if (res == 1) {
+                    printf("All tests passed!\n");
+                } else {
+                    printf("TEST FAILURES\n");
+                }
+            }
+        });
+    }
+    pool.join();
+}
+
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     // Run everything inside a coroutine so that simple tests don't have
@@ -586,6 +712,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
             } else if (!strcmp(*args, "cdpftest")) {
                 ++args;
                 cdpf_test(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "cmptest")) {
+                ++args;
+                compare_test(mpcio, yield, opts, args);
             } else {
                 std::cerr << "Unknown mode " << *args << "\n";
             }

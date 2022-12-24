@@ -35,8 +35,9 @@ preproc.o: types.hpp coroutine.hpp mpcio.hpp preproc.hpp options.hpp rdpf.hpp
 preproc.o: bitutils.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc cdpf.hpp cdpf.tcc
 online.o: online.hpp mpcio.hpp types.hpp options.hpp mpcops.hpp coroutine.hpp
 online.o: rdpf.hpp bitutils.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc duoram.hpp
-online.o: duoram.tcc
+online.o: duoram.tcc cdpf.hpp cdpf.tcc
 mpcops.o: mpcops.hpp types.hpp mpcio.hpp coroutine.hpp bitutils.hpp
 rdpf.o: rdpf.hpp mpcio.hpp types.hpp coroutine.hpp bitutils.hpp dpf.hpp
 rdpf.o: prg.hpp aes.hpp rdpf.tcc mpcops.hpp
-cdpf.o: bitutils.hpp cdpf.hpp types.hpp dpf.hpp prg.hpp aes.hpp cdpf.tcc
+cdpf.o: bitutils.hpp cdpf.hpp mpcio.hpp types.hpp coroutine.hpp dpf.hpp
+cdpf.o: prg.hpp aes.hpp cdpf.tcc
