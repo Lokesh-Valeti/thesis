@@ -206,11 +206,10 @@ template <typename T>
 T& operator>>(T &is, RDPF &rdpf)
 {
     is.read((char *)&rdpf.seed, sizeof(rdpf.seed));
+    rdpf.whichhalf = get_lsb(rdpf.seed);
     uint8_t depth;
-    // The whichhalf bit is the high bit of depth
+    // Add 64 to depth to indicate an expanded RDPF
     is.read((char *)&depth, sizeof(depth));
-    rdpf.whichhalf = !!(depth & 0x80);
-    depth &= 0x7f;
     bool read_expanded = false;
     if (depth > 64) {
         read_expanded = true;
@@ -248,17 +247,14 @@ T& write_maybe_expanded(T &os, const RDPF &rdpf,
     os.write((const char *)&rdpf.seed, sizeof(rdpf.seed));
     uint8_t depth = rdpf.cw.size();
     assert(depth <= ADDRESS_MAX_BITS);
-    // The whichhalf bit is the high bit of depth
-    // If we're writing an expansion, add 64 to depth as well
-    uint8_t whichhalf_and_depth = depth |
-        (uint8_t(rdpf.whichhalf)<<7);
+    // If we're writing an expansion, add 64 to depth
+    uint8_t expanded_depth = depth;
     bool write_expansion = false;
     if (expanded && rdpf.expansion.size() == (size_t(1)<<depth)) {
         write_expansion = true;
-        whichhalf_and_depth += 64;
+        expanded_depth += 64;
     }
-    os.write((const char *)&whichhalf_and_depth,
-        sizeof(whichhalf_and_depth));
+    os.write((const char *)&expanded_depth, sizeof(expanded_depth));
     for (uint8_t i=0; i<depth; ++i) {
         os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));
     }
