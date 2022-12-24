@@ -58,10 +58,61 @@ inline __m128i set_lsb(const __m128i & block, const bool val = true)
     return _mm_or_si128(clear_lsb(block, 0b01), lsb128_mask[val ? 0b01 : 0b00]);
 }
 
+// Return the parity of the number of bits set in block; that is, 1 if
+// there are an odd number of bits set in block; 0 if even
 inline uint8_t parity(const __m128i & block)
 {
-    // TODO...
-    return 0;
+    uint64_t low = uint64_t(_mm_cvtsi128_si64x(block));
+    uint64_t high = uint64_t(_mm_cvtsi128_si64x(_mm_srli_si128(block,8)));
+    return ((__builtin_popcountll(low) ^ __builtin_popcountll(high)) & 1);
+}
+
+// Return the parity of the number of the number of bits set in block
+// strictly above the given position
+inline uint8_t parity_above(const __m128i &block, uint8_t position)
+{
+    uint64_t high = uint64_t(_mm_cvtsi128_si64x(_mm_srli_si128(block,8)));
+    if (position >= 64) {
+        uint64_t mask = (uint64_t(1)<<(position-64));
+        mask |= (mask-1);
+        mask = ~mask;
+        return (__builtin_popcountll(high & mask) & 1);
+    } else {
+        uint64_t low = uint64_t(_mm_cvtsi128_si64x(block));
+        uint64_t mask = (uint64_t(1)<<position);
+        mask |= (mask-1);
+        mask = ~mask;
+        return ((__builtin_popcountll(high) +
+            __builtin_popcountll(low & mask)) & 1);
+    }
+}
+
+// Return the parity of the number of the number of bits set in block
+// strictly below the given position
+inline uint8_t parity_below(const __m128i &block, uint8_t position)
+{
+    uint64_t low = uint64_t(_mm_cvtsi128_si64x(block));
+    if (position >= 64) {
+        uint64_t high = uint64_t(_mm_cvtsi128_si64x(_mm_srli_si128(block,8)));
+        uint64_t mask = (uint64_t(1)<<(position-64))-1;
+        return ((__builtin_popcountll(low) +
+            __builtin_popcountll(high & mask)) & 1);
+    } else {
+        uint64_t mask = (uint64_t(1)<<position)-1;
+        return (__builtin_popcountll(low & mask) & 1);
+    }
+}
+
+// Return the bit at the given position in block
+inline uint8_t bit_at(const __m128i &block, uint8_t position)
+{
+    if (position >= 64) {
+        uint64_t high = uint64_t(_mm_cvtsi128_si64x(_mm_srli_si128(block,8)));
+        return !!(high & (uint64_t(1)<<(position-64)));
+    } else {
+        uint64_t low = uint64_t(_mm_cvtsi128_si64x(block));
+        return !!(low & (uint64_t(1)<<position));
+    }
 }
 
 #endif
