@@ -704,7 +704,6 @@ static void sort_test(MPCIO &mpcio, yield_t &yield,
                     });
             }
             run_coroutines(yield, coroutines);
-            //A.osort(0,1);
             A.bitonic_sort(0, depth);
             if (depth <= 10) {
                 oram.dump();
@@ -714,6 +713,91 @@ static void sort_test(MPCIO &mpcio, yield_t &yield,
                         printf("%04x %016lx\n", i, check[i].share());
                     }
                 }
+            }
+            tio.send();
+        });
+    }
+    pool.join();
+}
+
+static void bsearch_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
+{
+    value_t target;
+    arc4random_buf(&target, sizeof(target));
+    target >>= 1;
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        target = strtoull(*args, NULL, 16);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, target] {
+            address_t size = address_t(1)<<depth;
+            MPCTIO tio(mpcio, thread_num);
+            RegAS tshare;
+            if (tio.player() == 2) {
+                // Send shares of the target to the computational
+                // players
+                RegAS tshare0, tshare1;
+                tshare0.randomize();
+                tshare1.set(target-tshare0.share());
+                tio.iostream_p0() << tshare0;
+                tio.iostream_p1() << tshare1;
+                printf("Using target = %016lx\n", target);
+                yield();
+            } else {
+                // Get the share of the target
+                tio.iostream_server() >> tshare;
+            }
+
+            // Create a random database and sort it
+            // size_t &aes_ops = tio.aes_ops();
+            Duoram<RegAS> oram(mpcio.player, size);
+            auto A = oram.flat(tio, yield);
+            // Initialize the memory to random values in parallel
+            std::vector<coro_t> coroutines;
+            for (address_t i=0; i<size; ++i) {
+                coroutines.emplace_back(
+                    [&A, i](yield_t &yield) {
+                        auto Acoro = A.context(yield);
+                        RegAS v;
+                        v.randomize(62);
+                        Acoro[i] += v;
+                    });
+            }
+            run_coroutines(yield, coroutines);
+            A.bitonic_sort(0, depth);
+
+            // Binary search for the target
+            RegAS tindex = A.obliv_binary_search(tshare);
+
+            // Check the answer
+            if (tio.player() == 1) {
+                tio.iostream_peer() << tindex;
+            } else if (tio.player() == 0) {
+                RegAS peer_tindex;
+                tio.iostream_peer() >> peer_tindex;
+                tindex += peer_tindex;
+            }
+            if (depth <= 10) {
+                auto check = A.reconstruct();
+                if (tio.player() == 0) {
+                    for (address_t i=0;i<size;++i) {
+                        printf("%04x %016lx\n", i, check[i].share());
+                    }
+                }
+            }
+            if (tio.player() == 0) {
+                printf("Found index = %lu\n", tindex.share());
             }
             tio.send();
         });
@@ -766,6 +850,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
             } else if (!strcmp(*args, "sorttest")) {
                 ++args;
                 sort_test(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "bsearch")) {
+                ++args;
+                bsearch_test(mpcio, yield, opts, args);
             } else {
                 std::cerr << "Unknown mode " << *args << "\n";
             }

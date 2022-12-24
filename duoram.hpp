@@ -235,6 +235,13 @@ public:
     // the elements must be at most 63 bits long each for the notion of
     // ">" to make consistent sense.
     void bitonic_sort(address_t start, nbits_t depth, bool dir=0);
+
+    // Assuming the memory is already sorted, do an oblivious binary
+    // search for the largest index containing the value at most the
+    // given one.  (The answer will be 0 if all of the memory elements
+    // are greate than the target.) This Flat must be a power of 2 size.
+    // Only available for additive shared databases for now.
+    RegAS obliv_binary_search(RegAS &target);
 };
 
 // The parent class of shared memory references
