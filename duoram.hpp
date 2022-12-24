@@ -87,6 +87,8 @@ class Duoram<T>::Shape {
     // additive-shared index (x) into an XOR-shared database (T), for
     // example.
 
+    // The parent class of the MemRef* classes
+    class MemRef;
     // When x is unshared explicit value
     class MemRefExpl;
     // When x is additively shared
@@ -165,15 +167,6 @@ public:
     // Get the size
     inline size_t size() { return shape_size; }
 
-    // Update the context (MPCTIO and yield if you've started a new
-    // thread, or just yield if you've started a new coroutine in the
-    // same thread)
-    void context(MPCTIO &new_tio, yield_t &new_yield) {
-        tio = new_tio;
-        yield = new_yield;
-    }
-    void context(yield_t &new_yield) { yield = new_yield; }
-
     // Index into this Shape in various ways
     MemRefAS operator[](const RegAS &idx) { return MemRefAS(*this, idx); }
     MemRefXS operator[](const RegXS &idx) { return MemRefXS(*this, idx); }
@@ -197,6 +190,7 @@ template <typename T>
 class Duoram<T>::Flat : public Duoram<T>::Shape {
     // If this is a subrange, start may be non-0, but it's usually 0
     size_t start;
+    size_t len;
 
     inline size_t indexmap(size_t idx) const {
         size_t paridx = idx + start;
@@ -207,11 +201,61 @@ class Duoram<T>::Flat : public Duoram<T>::Shape {
         }
     }
 
+    // Internal function to aid bitonic_sort
+    void butterfly(address_t start, nbits_t depth, bool dir);
+
 public:
     // Constructor.  len=0 means the maximum size (the parent's size
     // minus start).
     Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield, size_t start = 0,
         size_t len = 0);
+
+    // Update the context (MPCTIO and yield if you've started a new
+    // thread, or just yield if you've started a new coroutine in the
+    // same thread).  Returns a new Shape with an updated context.
+    Flat context(MPCTIO &new_tio, yield_t &new_yield) const {
+        return Flat(this->duoram, new_tio, new_yield, start, len);
+    }
+    Flat context(yield_t &new_yield) const {
+        return Flat(this->duoram, this->tio, new_yield, start, len);
+    }
+
+    // Oblivious sort the elements indexed by the two given indices.
+    // Without reconstructing the values, if dir=0, this[idx1] will
+    // become a share of the smaller of the reconstructed values, and
+    // this[idx2] will become a share of the larger.  If dir=1, it's the
+    // other way around.
+    //
+    // Note: this only works for additively shared databases
+    template<typename U,typename V>
+    void osort(const U &idx1, const V &idx2, bool dir=0);
+
+    // Bitonic sort the elements from start to start+(1<<depth)-1, in
+    // increasing order if dir=0 or decreasing order if dir=1. Note that
+    // the elements must be at most 63 bits long each for the notion of
+    // ">" to make consistent sense.
+    void bitonic_sort(address_t start, nbits_t depth, bool dir=0);
+};
+
+// The parent class of shared memory references
+template <typename T>
+class Duoram<T>::Shape::MemRef {
+protected:
+    const Shape &shape;
+
+    MemRef(const Shape &shape): shape(shape) {}
+
+public:
+
+    // Oblivious read from an additively shared index of Duoram memory
+    virtual operator T() = 0;
+
+    // Oblivious update to an additively shared index of Duoram memory
+    virtual MemRef &operator+=(const T& M) = 0;
+
+    // Convenience function
+    MemRef &operator-=(const T& M) { *this += (-M); return *this; }
+
 };
 
 // An additively shared memory reference.  You get one of these from a
@@ -219,19 +263,18 @@ public:
 // perform operations on this object, which do the Duoram operations.
 
 template <typename T>
-class Duoram<T>::Shape::MemRefAS {
-    const Shape &shape;
+class Duoram<T>::Shape::MemRefAS : public Duoram<T>::Shape::MemRef {
     RegAS idx;
 
 public:
     MemRefAS(const Shape &shape, const RegAS &idx) :
-        shape(shape), idx(idx) {}
+        MemRef(shape), idx(idx) {}
 
     // Oblivious read from an additively shared index of Duoram memory
-    operator T();
+    operator T() override;
 
     // Oblivious update to an additively shared index of Duoram memory
-    MemRefAS &operator+=(const T& M);
+    MemRefAS &operator+=(const T& M) override;
 };
 
 // An XOR shared memory reference.  You get one of these from a Shape A
@@ -239,19 +282,21 @@ public:
 // operations on this object, which do the Duoram operations.
 
 template <typename T>
-class Duoram<T>::Shape::MemRefXS {
-    const Shape &shape;
+class Duoram<T>::Shape::MemRefXS : public Duoram<T>::Shape::MemRef {
     RegXS idx;
 
 public:
     MemRefXS(const Shape &shape, const RegXS &idx) :
-        shape(shape), idx(idx) {}
+        MemRef(shape), idx(idx) {}
 
     // Oblivious read from an XOR shared index of Duoram memory
-    operator T();
+    operator T() override;
 
     // Oblivious update to an XOR shared index of Duoram memory
-    MemRefXS &operator+=(const T& M);
+    MemRefXS &operator+=(const T& M) override;
+
+    // Convenience function
+    MemRefXS &operator-=(const T& M) { *this += (-M); return *this; }
 };
 
 // An explicit memory reference.  You get one of these from a Shape A
@@ -260,19 +305,21 @@ public:
 // operations.
 
 template <typename T>
-class Duoram<T>::Shape::MemRefExpl {
-    const Shape &shape;
+class Duoram<T>::Shape::MemRefExpl : public Duoram<T>::Shape::MemRef {
     address_t idx;
 
 public:
     MemRefExpl(const Shape &shape, address_t idx) :
-        shape(shape), idx(idx) {}
+        MemRef(shape), idx(idx) {}
 
     // Explicit read from a given index of Duoram memory
-    operator T();
+    operator T() override;
 
     // Explicit update to a given index of Duoram memory
-    MemRefExpl &operator+=(const T& M);
+    MemRefExpl &operator+=(const T& M) override;
+
+    // Convenience function
+    MemRefExpl &operator-=(const T& M) { *this += (-M); return *this; }
 };
 
 #include "duoram.tcc"

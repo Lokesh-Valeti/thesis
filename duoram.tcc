@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 
+#include "cdpf.hpp"
+
 // Pass the player number and desired size
 template <typename T>
 Duoram<T>::Duoram(int player, size_t size) : player(player),
@@ -111,7 +113,68 @@ Duoram<T>::Flat::Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield,
     if (len > maxshapesize || len == 0) {
         len = maxshapesize;
     }
+    this->len = len;
     this->set_shape_size(len);
+}
+
+// Bitonic sort the elements from start to start+(1<<depth)-1, in
+// increasing order if dir=0 or decreasing order if dir=1. Note that
+// the elements must be at most 63 bits long each for the notion of
+// ">" to make consistent sense.
+template <typename T>
+void Duoram<T>::Flat::bitonic_sort(address_t start, nbits_t depth, bool dir)
+{
+    if (depth == 0) return;
+    if (depth == 1) {
+        osort(start, start+1, dir);
+        return;
+    }
+    // Recurse on the first half (increasing order) and the second half
+    // (decreasing order) in parallel
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        Acoro.bitonic_sort(start, depth-1, 0);
+    });
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        Acoro.bitonic_sort(start+(1<<(depth-1)), depth-1, 1);
+    });
+    run_coroutines(this->yield, coroutines);
+    // Merge the two into the desired order
+    butterfly(start, depth, dir);
+}
+
+// Internal function to aid bitonic_sort
+template <typename T>
+void Duoram<T>::Flat::butterfly(address_t start, nbits_t depth, bool dir)
+{
+    if (depth == 0) return;
+    if (depth == 1) {
+        osort(start, start+1, dir);
+        return;
+    }
+    // Sort pairs of elements half the width apart in parallel
+    address_t halfwidth = address_t(1)<<(depth-1);
+    std::vector<coro_t> coroutines;
+    for (address_t i=0; i<halfwidth;++i) {
+        coroutines.emplace_back([&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            Acoro.osort(start+i, start+i+halfwidth, dir);
+        });
+    }
+    run_coroutines(this->yield, coroutines);
+    // Recurse on each half in parallel
+    coroutines.clear();
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        Acoro.butterfly(start, depth-1, dir);
+    });
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        Acoro.butterfly(start+halfwidth, depth-1, dir);
+    });
+    run_coroutines(this->yield, coroutines);
 }
 
 // Oblivious read from an additively shared index of Duoram memory
@@ -119,6 +182,7 @@ template <typename T>
 Duoram<T>::Shape::MemRefAS::operator T()
 {
     T res;
+    const Shape &shape = this->shape;
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this
@@ -212,6 +276,7 @@ template <typename T>
 typename Duoram<T>::Shape::MemRefAS
     &Duoram<T>::Shape::MemRefAS::operator+=(const T& M)
 {
+    const Shape &shape = this->shape;
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this
@@ -293,6 +358,50 @@ typename Duoram<T>::Shape::MemRefAS
     return *this;
 }
 
+// Oblivious sort with the provided other element.  Without
+// reconstructing the values, *this will become a share of the
+// smaller of the reconstructed values, and other will become a
+// share of the larger.
+//
+// Note: this only works for additively shared databases
+template <> template <typename U,typename V>
+void Duoram<RegAS>::Flat::osort(const U &idx1, const V &idx2, bool dir)
+{
+    printf("osort %u %u %d\n", idx1, idx2, dir);
+    // Load the values in parallel
+    std::vector<coro_t> coroutines;
+    RegAS val1, val2;
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        val1 = Acoro[idx1];
+    });
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        val2 = Acoro[idx2];
+    });
+    run_coroutines(yield, coroutines);
+    // Get a CDPF
+    CDPF cdpf = tio.cdpf();
+    // Use it to compare the values
+    RegAS diff = val1-val2;
+    auto [lt, eq, gt] = cdpf.compare(tio, yield, diff, tio.aes_ops());
+    RegBS cmp = dir ? lt : gt;
+    // Get additive shares of cmp*diff
+    RegAS cmp_diff;
+    mpc_flagmult(tio, yield, cmp_diff, cmp, diff);
+    // Update the two locations in parallel
+    coroutines.clear();
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        Acoro[idx1] -= cmp_diff;
+    });
+    coroutines.emplace_back([&](yield_t &yield) {
+        Flat Acoro = context(yield);
+        Acoro[idx2] += cmp_diff;
+    });
+    run_coroutines(yield, coroutines);
+}
+
 // The MemRefXS routines are almost identical to the MemRefAS routines,
 // but I couldn't figure out how to get them to be two instances of a
 // template.  Sorry for the code duplication.
@@ -301,6 +410,7 @@ typename Duoram<T>::Shape::MemRefAS
 template <typename T>
 Duoram<T>::Shape::MemRefXS::operator T()
 {
+    const Shape &shape = this->shape;
     T res;
     int player = shape.tio.player();
     if (player < 2) {
@@ -393,6 +503,7 @@ template <typename T>
 typename Duoram<T>::Shape::MemRefXS
     &Duoram<T>::Shape::MemRefXS::operator+=(const T& M)
 {
+    const Shape &shape = this->shape;
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this
@@ -478,6 +589,7 @@ typename Duoram<T>::Shape::MemRefXS
 template <typename T>
 Duoram<T>::Shape::MemRefExpl::operator T()
 {
+    const Shape &shape = this->shape;
     T res;
     int player = shape.tio.player();
     if (player < 2) {
@@ -491,6 +603,7 @@ template <typename T>
 typename Duoram<T>::Shape::MemRefExpl
     &Duoram<T>::Shape::MemRefExpl::operator+=(const T& M)
 {
+    const Shape &shape = this->shape;
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this

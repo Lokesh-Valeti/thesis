@@ -80,6 +80,12 @@ struct RegAS {
         return res;
     }
 
+    inline RegAS operator-() const {
+        RegAS res = *this;
+        res.ashare = -res.ashare;
+        return res;
+    }
+
     inline RegAS &operator*=(value_t rhs) {
         this->ashare *= rhs;
         return *this;
@@ -192,6 +198,11 @@ struct RegXS {
     inline RegXS operator-(const RegXS &rhs) const {
         RegXS res = *this;
         res -= rhs;
+        return res;
+    }
+
+    inline RegXS operator-() const {
+        RegXS res = *this;
         return res;
     }
 

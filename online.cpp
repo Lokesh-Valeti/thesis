@@ -673,6 +673,54 @@ static void compare_test(MPCIO &mpcio, yield_t &yield,
     pool.join();
 }
 
+static void sort_test(MPCIO &mpcio, yield_t &yield,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
+            address_t size = address_t(1)<<depth;
+            MPCTIO tio(mpcio, thread_num);
+            // size_t &aes_ops = tio.aes_ops();
+            Duoram<RegAS> oram(mpcio.player, size);
+            auto A = oram.flat(tio, yield);
+            // Initialize the memory to random values in parallel
+            std::vector<coro_t> coroutines;
+            for (address_t i=0; i<size; ++i) {
+                coroutines.emplace_back(
+                    [&A, i](yield_t &yield) {
+                        auto Acoro = A.context(yield);
+                        RegAS v;
+                        v.randomize(62);
+                        Acoro[i] += v;
+                    });
+            }
+            run_coroutines(yield, coroutines);
+            //A.osort(0,1);
+            A.bitonic_sort(0, depth);
+            if (depth <= 10) {
+                oram.dump();
+                auto check = A.reconstruct();
+                if (tio.player() == 0) {
+                    for (address_t i=0;i<size;++i) {
+                        printf("%04x %016lx\n", i, check[i].share());
+                    }
+                }
+            }
+            tio.send();
+        });
+    }
+    pool.join();
+}
+
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     // Run everything inside a coroutine so that simple tests don't have
@@ -715,6 +763,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
             } else if (!strcmp(*args, "cmptest")) {
                 ++args;
                 compare_test(mpcio, yield, opts, args);
+            } else if (!strcmp(*args, "sorttest")) {
+                ++args;
+                sort_test(mpcio, yield, opts, args);
             } else {
                 std::cerr << "Unknown mode " << *args << "\n";
             }

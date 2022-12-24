@@ -351,6 +351,7 @@ public:
     inline bool preprocessing() { return mpcio.preprocessing; }
     inline bool is_server() { return mpcio.player == 2; }
     inline size_t& aes_ops() { return mpcio.aes_ops[thread_num]; }
+    inline size_t msgs_sent() { return mpcio.msgs_sent[thread_num]; }
 };
 
 // Set up the socket connections between the two computational parties
