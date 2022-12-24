@@ -138,6 +138,17 @@ struct RegBS {
         res ^= rhs;
         return res;
     }
+
+    inline RegBS &operator^=(const bit_t &rhs) {
+        this->bshare ^= rhs;
+        return *this;
+    }
+
+    inline RegBS operator^(const bit_t &rhs) const {
+        RegBS res = *this;
+        res ^= rhs;
+        return res;
+    }
 };
 
 // The type of a register holding an XOR share of a value

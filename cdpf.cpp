@@ -6,7 +6,7 @@
 std::tuple<CDPF,CDPF> CDPF::generate(value_t target, size_t &aes_ops)
 {
     CDPF dpf0, dpf1;
-    nbits_t depth = VALUE_BITS - 7;
+    const nbits_t depth = VALUE_BITS - 7;
 
     // Pick two random seeds
     arc4random_buf(&dpf0.seed, sizeof(dpf0.seed));
@@ -163,10 +163,9 @@ DPFnode CDPF::leaf(value_t input, size_t &aes_ops) const
 // Note also that you can compare two RegAS values A and B by
 // passing A-B here.
 std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
-    RegAS x)
+    RegAS x, size_t &aes_ops)
 {
     // Reconstruct S = target-x
-    RegBS gt, eq;
     // The server does nothing in this protocol
     if (tio.player() < 2) {
         RegAS S_share = as_target - x;
@@ -176,25 +175,102 @@ std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
         tio.iostream_peer() >> peer_S_share;
         value_t S = S_share.ashare + peer_S_share.ashare;
 
-        // Now we're going to simultaneously descend the DPF tree for
-        // the values S and T = S + 2^63.  Note that the 1 values of V
-        // (see the explanation of the algorithm in cdpf.hpp) are those
-        // values _strictly_ larger than S and smaller than T (noting
-        // they can "wrap around" 2^64).  In level 1 of the tree, the
-        // paths to S and T will necessarily be at the two different
-        // children of the root seed, but they could be in either order.
-        // From then on, they will proceed in lockstep, either both
-        // going left, or both going right.  If they both go left, we
-        // also compute the right sibling on the S path, and add it to
-        // the gt flag.  If they both go right, we also compute the left
-        // sibling on the T path, and add it to the gt flag.  When we
-        // hit the leaves, the gt flag will account for all of the
-        // complete leaf nodes strictly greater than S and strictly less
-        // than T.  Then we just have to pull out the parity of the
-        // appropriate bits in the two leaf nodes containing S and T
-        // respectively to complete the computation of gt, and also to
-        // get the single bit eq.
+        // After that one single-word exchange, the rest of this
+        // algorithm is entirely a local computation.
+        return compare(S, aes_ops);
     }
+    // The server gets three shares of 0 (which is not a valid output
+    // for the computational players)
+    RegBS lt, eq, gt;
+    return std::make_tuple(lt, eq, gt);
+}
+
+// You can call this version directly if you already have S = target-x
+// reconstructed.  This routine is entirely local; no communication
+// is needed.
+std::tuple<RegBS,RegBS,RegBS> CDPF::compare(value_t S, size_t &aes_ops)
+{
+    RegBS gt, eq;
+
+    // Now we're going to simultaneously descend the DPF tree for
+    // the values S and T = S + 2^63.  Note that the 1 values of V
+    // (see the explanation of the algorithm in cdpf.hpp) are those
+    // values _strictly_ larger than S and smaller than T (noting
+    // they can "wrap around" 2^64).  In level 1 of the tree, the
+    // paths to S and T will necessarily be at the two different
+    // children of the root seed, but they could be in either order.
+    // From then on, they will proceed in lockstep, either both
+    // going left, or both going right.  If they both go left, we
+    // also compute the right sibling on the S path, and add it to
+    // the gt flag.  If they both go right, we also compute the left
+    // sibling on the T path, and add it to the gt flag.  When we
+    // hit the leaves, the gt flag will account for all of the
+    // complete leaf nodes strictly greater than S and strictly less
+    // than T.  Then we just have to pull out the parity of the
+    // appropriate bits in the two leaf nodes containing S and T
+    // respectively to complete the computation of gt, and also to
+    // get the single bit eq.
+
+    // Invariant: Snode is the node on level curlevel on the path to
+    // S, and Tnode is the node on level curlevel on the path to
+    // T = S + 2^63.
+    nbits_t curlevel = 0;
+    const nbits_t depth = VALUE_BITS - 7;
+    DPFnode Snode = seed;
+    DPFnode Tnode = seed;
+
+    // The top level is the only place where the paths to S and T go
+    // in different directions.
+    bool Sdir = !!(S & (value_t(1)<<63));
+    Snode = descend(Snode, curlevel, Sdir, aes_ops);
+    Tnode = descend(Tnode, curlevel, !Sdir, aes_ops);
+    curlevel = 1;
+
+    // The last level is special
+    while(curlevel < depth-1) {
+        Sdir = !!(S & (value_t(1)<<((depth+7)-curlevel-1)));
+        if (Sdir == 0) {
+            // They're both going left; include the right child of
+            // Snode in the gt computation
+            DPFnode gtnode = descend(Snode, curlevel, 1, aes_ops);
+            gt ^= get_lsb(gtnode);
+        } else {
+            // They're both going right; include the left child of
+            // Tnode in the gt computation
+            DPFnode gtnode = descend(Tnode, curlevel, 0, aes_ops);
+            gt ^= get_lsb(gtnode);
+        }
+        Snode = descend(Snode, curlevel, Sdir, aes_ops);
+        Tnode = descend(Tnode, curlevel, Sdir, aes_ops);
+        ++curlevel;
+    }
+    // Now we're at the level just above the leaves.  If we go left,
+    // include *all* the bits (not just the low bit) of the right
+    // child of Snode, and if we go right, include all the bits of
+    // the left child of Tnode.
+    Sdir = !!(S & (value_t(1)<<((depth+7)-curlevel-1)));
+    if (Sdir == 0) {
+        // They're both going left; include the right child of
+        // Snode in the gt computation
+        DPFnode gtnode = descend_to_leaf(Snode, 1, aes_ops);
+        gt ^= parity(gtnode);
+    } else {
+        // They're both going right; include the left child of
+        // Tnode in the gt computation
+        DPFnode gtnode = descend_to_leaf(Tnode, 0, aes_ops);
+        gt ^= parity(gtnode);
+    }
+    Snode = descend_to_leaf(Snode, Sdir, aes_ops);
+    Tnode = descend_to_leaf(Tnode, Sdir, aes_ops);
+    ++curlevel;
+
+    // Now Snode and Tnode are the leaves containing S and T
+    // respectively.  Pull out the bit in Snode for S itself into eq,
+    // and all the higher bits into gt.  Also pull out the bits strictly
+    // below that for T in Tnode into gt.
+
+    // TODO...
+
     // Once we have gt and eq (which cannot both be 1), lt is just 1
     // exactly if they're both 0.
     RegBS lt;

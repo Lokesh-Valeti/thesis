@@ -58,4 +58,10 @@ inline __m128i set_lsb(const __m128i & block, const bool val = true)
     return _mm_or_si128(clear_lsb(block, 0b01), lsb128_mask[val ? 0b01 : 0b00]);
 }
 
+inline uint8_t parity(const __m128i & block)
+{
+    // TODO...
+    return 0;
+}
+
 #endif

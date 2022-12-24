@@ -118,7 +118,13 @@ struct CDPF : public DPF {
     // Note also that you can compare two RegAS values A and B by
     // passing A-B here.
     std::tuple<RegBS,RegBS,RegBS> compare(MPCTIO &tio, yield_t &yield,
-        RegAS x);
+        RegAS x, size_t &aes_ops);
+
+    // You can call this version directly if you already have S = target-x
+    // reconstructed.  This routine is entirely local; no communication
+    // is needed.
+    std::tuple<RegBS,RegBS,RegBS> compare(value_t S, size_t &aes_ops);
+
 };
 
 // Descend from the parent of a leaf node to the leaf node
