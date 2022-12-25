@@ -43,13 +43,6 @@ struct RDPF : public DPF {
     RDPF(MPCTIO &tio, yield_t &yield,
         RegXS target, nbits_t depth, bool save_expansion = false);
 
-    // The number of bytes it will take to store this RDPF
-    size_t size() const;
-
-    // The number of bytes it will take to store a RDPF of the given
-    // depth
-    static size_t size(nbits_t depth);
-
     // Do we have a precomputed expansion?
     inline bool has_expansion() const { return expansion.size() > 0; }
 

@@ -242,21 +242,6 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
     }
 }
 
-// The number of bytes it will take to store a RDPF of the given depth
-size_t RDPF::size(nbits_t depth)
-{
-    return sizeof(seed) + depth*sizeof(DPFnode) + BITBYTES(depth) +
-        sizeof(unit_sum_inverse) + sizeof(scaled_sum) +
-        sizeof(scaled_xor);
-}
-
-// The number of bytes it will take to store this RDPF
-size_t RDPF::size() const
-{
-    uint8_t depth = cw.size();
-    return size(depth);
-}
-
 // Get the leaf node for the given input
 DPFnode RDPF::leaf(address_t input, size_t &aes_ops) const
 {
