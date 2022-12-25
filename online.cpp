@@ -797,7 +797,7 @@ static void bsearch_test(MPCIO &mpcio, yield_t &yield,
                 }
             }
             if (tio.player() == 0) {
-                printf("Found index = %lu\n", tindex.share());
+                printf("Found index = %lx\n", tindex.share());
             }
             tio.send();
         });
