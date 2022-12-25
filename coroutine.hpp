@@ -2,12 +2,14 @@
 #define __COROUTINE_HPP__
 
 #include <vector>
+#include <functional>
 #include <boost/coroutine2/coroutine.hpp>
 
 #include "mpcio.hpp"
 
-typedef boost::coroutines2::coroutine<void>::pull_type  coro_t;
-typedef boost::coroutines2::coroutine<void>::push_type  yield_t;
+using coro_t = boost::coroutines2::coroutine<void>::pull_type;
+using yield_t = boost::coroutines2::coroutine<void>::push_type;
+using coro_lambda_t = std::function<void(yield_t&)>;
 
 // The top-level coroutine runner will call run_coroutines with
 // a MPCTIO, and we should call its send() method.  Subcoroutines that
@@ -17,6 +19,8 @@ typedef boost::coroutines2::coroutine<void>::push_type  yield_t;
 static inline void send_or_yield(MPCTIO &tio) { tio.send(); }
 static inline void send_or_yield(yield_t &yield) { yield(); }
 
+// Use this version if you have a variable number of coroutines (or a
+// larger constant number than is supported below).
 template <typename T>
 inline void run_coroutines(T &mpctio_or_yield, std::vector<coro_t> &coroutines) {
     // Loop until all the coroutines are finished
@@ -38,6 +42,52 @@ inline void run_coroutines(T &mpctio_or_yield, std::vector<coro_t> &coroutines) 
             }
         }
     }
+}
+
+// Use one of these versions if you have a small fixed number of
+// coroutines.  You can of course also use the above, but the API for
+// this version is simpler.
+
+template <typename T>
+inline void run_coroutines(T &mpctio_or_yield, const coro_lambda_t &l1)
+{
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back(l1);
+    run_coroutines(mpctio_or_yield, coroutines);
+}
+
+template <typename T>
+inline void run_coroutines(T &mpctio_or_yield, const coro_lambda_t &l1,
+    const coro_lambda_t &l2)
+{
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back(l1);
+    coroutines.emplace_back(l2);
+    run_coroutines(mpctio_or_yield, coroutines);
+}
+
+template <typename T>
+inline void run_coroutines(T &mpctio_or_yield, const coro_lambda_t &l1,
+    const coro_lambda_t &l2, const coro_lambda_t &l3)
+{
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back(l1);
+    coroutines.emplace_back(l2);
+    coroutines.emplace_back(l3);
+    run_coroutines(mpctio_or_yield, coroutines);
+}
+
+template <typename T>
+inline void run_coroutines(T &mpctio_or_yield, const coro_lambda_t &l1,
+    const coro_lambda_t &l2, const coro_lambda_t &l3,
+    const coro_lambda_t &l4)
+{
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back(l1);
+    coroutines.emplace_back(l2);
+    coroutines.emplace_back(l3);
+    coroutines.emplace_back(l4);
+    run_coroutines(mpctio_or_yield, coroutines);
 }
 
 #endif

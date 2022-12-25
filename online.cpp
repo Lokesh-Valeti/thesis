@@ -810,8 +810,7 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     // Run everything inside a coroutine so that simple tests don't have
     // to start one themselves
     MPCTIO tio(mpcio, 0);
-    std::vector<coro_t> coroutines;
-    coroutines.emplace_back(
+    run_coroutines(tio,
         [&](yield_t &yield) {
             if (!*args) {
                 std::cerr << "Mode is required as the first argument when not preprocessing.\n";
@@ -857,5 +856,4 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
                 std::cerr << "Unknown mode " << *args << "\n";
             }
         });
-    run_coroutines(tio, coroutines);
 }

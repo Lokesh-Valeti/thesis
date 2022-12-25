@@ -132,21 +132,18 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
         bool peer_parity_bit;
         // Exchange the parities and do mpc_reconstruct_choice at the
         // same time (bundled into the same rounds)
-        std::vector<coro_t> coroutines;
-        coroutines.emplace_back(
+        run_coroutines(yield,
             [&](yield_t &yield) {
                 tio.queue_peer(&our_parity_bit, 1);
                 yield();
                 uint8_t peer_parity_byte;
                 tio.recv_peer(&peer_parity_byte, 1);
                 peer_parity_bit = peer_parity_byte & 1;
-            });
-        coroutines.emplace_back(
+            },
             [&](yield_t &yield) {
                 mpc_reconstruct_choice(tio, yield, CW, bs_choice,
                     (R ^ our_parity), L);
             });
-        run_coroutines(yield, coroutines);
         bool parity_bit = our_parity_bit ^ peer_parity_bit;
         cfbits |= (value_t(parity_bit)<<level);
         DPFnode CWR = CW ^ lsb128_mask[parity_bit];

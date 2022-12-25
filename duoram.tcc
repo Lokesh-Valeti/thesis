@@ -131,16 +131,15 @@ void Duoram<T>::Flat::bitonic_sort(address_t start, nbits_t depth, bool dir)
     }
     // Recurse on the first half (increasing order) and the second half
     // (decreasing order) in parallel
-    std::vector<coro_t> coroutines;
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        Acoro.bitonic_sort(start, depth-1, 0);
-    });
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        Acoro.bitonic_sort(start+(1<<(depth-1)), depth-1, 1);
-    });
-    run_coroutines(this->yield, coroutines);
+    run_coroutines(this->yield,
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            Acoro.bitonic_sort(start, depth-1, 0);
+        },
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            Acoro.bitonic_sort(start+(1<<(depth-1)), depth-1, 1);
+        });
     // Merge the two into the desired order
     butterfly(start, depth, dir);
 }
@@ -165,16 +164,15 @@ void Duoram<T>::Flat::butterfly(address_t start, nbits_t depth, bool dir)
     }
     run_coroutines(this->yield, coroutines);
     // Recurse on each half in parallel
-    coroutines.clear();
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        Acoro.butterfly(start, depth-1, dir);
-    });
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        Acoro.butterfly(start+halfwidth, depth-1, dir);
-    });
-    run_coroutines(this->yield, coroutines);
+    run_coroutines(this->yield,
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            Acoro.butterfly(start, depth-1, dir);
+        },
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            Acoro.butterfly(start+halfwidth, depth-1, dir);
+        });
 }
 
 // Assuming the memory is already sorted, do an oblivious binary
@@ -421,17 +419,16 @@ template <> template <typename U,typename V>
 void Duoram<RegAS>::Flat::osort(const U &idx1, const V &idx2, bool dir)
 {
     // Load the values in parallel
-    std::vector<coro_t> coroutines;
     RegAS val1, val2;
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        val1 = Acoro[idx1];
-    });
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        val2 = Acoro[idx2];
-    });
-    run_coroutines(yield, coroutines);
+    run_coroutines(yield,
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            val1 = Acoro[idx1];
+        },
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            val2 = Acoro[idx2];
+        });
     // Get a CDPF
     CDPF cdpf = tio.cdpf();
     // Use it to compare the values
@@ -442,16 +439,15 @@ void Duoram<RegAS>::Flat::osort(const U &idx1, const V &idx2, bool dir)
     RegAS cmp_diff;
     mpc_flagmult(tio, yield, cmp_diff, cmp, diff);
     // Update the two locations in parallel
-    coroutines.clear();
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        Acoro[idx1] -= cmp_diff;
-    });
-    coroutines.emplace_back([&](yield_t &yield) {
-        Flat Acoro = context(yield);
-        Acoro[idx2] += cmp_diff;
-    });
-    run_coroutines(yield, coroutines);
+    run_coroutines(yield,
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            Acoro[idx1] -= cmp_diff;
+        },
+        [&](yield_t &yield) {
+            Flat Acoro = context(yield);
+            Acoro[idx2] += cmp_diff;
+        });
 }
 
 // The MemRefXS routines are almost identical to the MemRefAS routines,
