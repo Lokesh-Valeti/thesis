@@ -299,6 +299,10 @@ void MPCPeerIO::dump_precomp_stats(std::ostream &os)
                 os << " r" << int(depth) << ":" << cnt;
             }
         }
+        size_t ccnt = cdpfs[i].get_stats();
+        if (ccnt > 0) {
+            os << " c:" << ccnt;
+        }
     }
     os << "\n";
 }
