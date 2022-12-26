@@ -4,24 +4,25 @@
 #include "rdpf.hpp"
 #include "cdpf.hpp"
 #include "bitutils.hpp"
+#include "coroutine.hpp"
 
 // T is the type being stored
 // N is a type whose "name" static member is a string naming the type
 //   so that we can report something useful to the user if they try
 //   to read a type that we don't have any more values for
 template<typename T, typename N>
-PreCompStorage<T,N>::PreCompStorage(unsigned player, bool preprocessing,
+PreCompStorage<T,N>::PreCompStorage(unsigned player, ProcessingMode mode,
         const char *filenameprefix, unsigned thread_num) :
         name(N::name), depth(0)
 {
-    init(player, preprocessing, filenameprefix, thread_num);
+    init(player, mode, filenameprefix, thread_num);
 }
 
 template<typename T, typename N>
-void PreCompStorage<T,N>::init(unsigned player, bool preprocessing,
+void PreCompStorage<T,N>::init(unsigned player, ProcessingMode mode,
         const char *filenameprefix, unsigned thread_num, nbits_t depth)
 {
-    if (preprocessing) return;
+    if (mode != MODE_ONLINE) return;
     std::string filename(filenameprefix);
     char suffix[20];
     if (depth) {
@@ -255,27 +256,27 @@ void MPCIO::dump_stats(std::ostream &os)
     dump_memusage(os);
 }
 
-MPCPeerIO::MPCPeerIO(unsigned player, bool preprocessing,
+MPCPeerIO::MPCPeerIO(unsigned player, ProcessingMode mode,
         std::deque<tcp::socket> &peersocks,
         std::deque<tcp::socket> &serversocks) :
-    MPCIO(player, preprocessing, peersocks.size())
+    MPCIO(player, mode, peersocks.size())
 {
     unsigned num_threads = unsigned(peersocks.size());
     for (unsigned i=0; i<num_threads; ++i) {
-        triples.emplace_back(player, preprocessing, "triples", i);
+        triples.emplace_back(player, mode, "triples", i);
     }
     for (unsigned i=0; i<num_threads; ++i) {
-        halftriples.emplace_back(player, preprocessing, "halves", i);
+        halftriples.emplace_back(player, mode, "halves", i);
     }
     rdpftriples.resize(num_threads);
     for (unsigned i=0; i<num_threads; ++i) {
         for (unsigned depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
-            rdpftriples[i][depth-1].init(player, preprocessing,
+            rdpftriples[i][depth-1].init(player, mode,
                 "rdpf", i, depth);
         }
     }
     for (unsigned i=0; i<num_threads; ++i) {
-        cdpfs.emplace_back(player, preprocessing, "cdpf", i);
+        cdpfs.emplace_back(player, mode, "cdpf", i);
     }
     for (auto &&sock : peersocks) {
         peerios.emplace_back(std::move(sock));
@@ -325,15 +326,15 @@ void MPCPeerIO::dump_stats(std::ostream &os)
     dump_precomp_stats(os);
 }
 
-MPCServerIO::MPCServerIO(bool preprocessing,
+MPCServerIO::MPCServerIO(ProcessingMode mode,
         std::deque<tcp::socket> &p0socks,
         std::deque<tcp::socket> &p1socks) :
-    MPCIO(2, preprocessing, p0socks.size())
+    MPCIO(2, mode, p0socks.size())
 {
     rdpfpairs.resize(num_threads);
     for (unsigned i=0; i<num_threads; ++i) {
         for (unsigned depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
-            rdpfpairs[i][depth-1].init(player, preprocessing,
+            rdpfpairs[i][depth-1].init(player, mode,
                 "rdpf", i, depth);
         }
     }
@@ -532,18 +533,19 @@ void MPCTIO::send()
 
 // Functions to get precomputed values.  If we're in the online
 // phase, get them from PreCompStorage.  If we're in the
-// preprocessing phase, read them from the server.
+// preprocessing or online-only phase, read them from the server.
 MultTriple MPCTIO::triple()
 {
     MultTriple val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        if (mpcpio.preprocessing) {
+        if (mpcpio.mode != MODE_ONLINE) {
             recv_server(&val, sizeof(val));
+            mpcpio.triples[thread_num].inc();
         } else {
             mpcpio.triples[thread_num].get(val);
         }
-    } else if (mpcio.preprocessing) {
+    } else if (mpcio.mode != MODE_ONLINE) {
         // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
         // (X0*Y1 + Y0*X1) = (Z0+Z1)
         value_t X0, Y0, Z0, X1, Y1, Z1;
@@ -567,12 +569,13 @@ HalfTriple MPCTIO::halftriple()
     HalfTriple val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        if (mpcpio.preprocessing) {
+        if (mpcpio.mode != MODE_ONLINE) {
             recv_server(&val, sizeof(val));
+            mpcpio.halftriples[thread_num].inc();
         } else {
             mpcpio.halftriples[thread_num].get(val);
         }
-    } else if (mpcio.preprocessing) {
+    } else if (mpcio.mode != MODE_ONLINE) {
         // Create half-triples (X0,Z0),(Y1,Z1) such that
         // X0*Y1 = Z0 + Z1
         value_t X0, Z0, Y1, Z1;
@@ -594,7 +597,7 @@ SelectTriple MPCTIO::selecttriple()
     SelectTriple val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        if (mpcpio.preprocessing) {
+        if (mpcpio.mode != MODE_ONLINE) {
             uint8_t Xbyte;
             recv_server(&Xbyte, sizeof(Xbyte));
             val.X = Xbyte & 1;
@@ -603,7 +606,7 @@ SelectTriple MPCTIO::selecttriple()
         } else {
             std::cerr << "Attempted to read SelectTriple in online phase\n";
         }
-    } else if (mpcio.preprocessing) {
+    } else if (mpcio.mode != MODE_ONLINE) {
         // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
         // (X0*Y1 ^ Y0*X1) = (Z0^Z1)
         bit_t X0, X1;
@@ -629,22 +632,38 @@ SelectTriple MPCTIO::selecttriple()
     return val;
 }
 
-RDPFTriple MPCTIO::rdpftriple(nbits_t depth)
+RDPFTriple MPCTIO::rdpftriple(yield_t &yield, nbits_t depth,
+    bool keep_expansion)
 {
     RDPFTriple val;
-    if (!mpcio.preprocessing && mpcio.player <= 2) {
+    if (mpcio.player <= 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        mpcpio.rdpftriples[thread_num][depth-1].get(val);
+        if (mpcio.mode == MODE_ONLINE) {
+            mpcpio.rdpftriples[thread_num][depth-1].get(val);
+        } else {
+            val = RDPFTriple(*this, yield, depth,
+                keep_expansion);
+            iostream_server() <<
+                val.dpf[(mpcio.player == 0) ? 1 : 2];
+            mpcpio.rdpftriples[thread_num][depth-1].inc();
+        }
     }
     return val;
 }
 
-RDPFPair MPCTIO::rdpfpair(nbits_t depth)
+RDPFPair MPCTIO::rdpfpair(yield_t &yield, nbits_t depth)
 {
     RDPFPair val;
-    if (!mpcio.preprocessing && mpcio.player == 2) {
+    if (mpcio.player == 2) {
         MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
-        mpcsrvio.rdpfpairs[thread_num][depth-1].get(val);
+        if (mpcio.mode == MODE_ONLINE) {
+            mpcsrvio.rdpfpairs[thread_num][depth-1].get(val);
+        } else {
+            RDPFTriple trip(*this, yield, depth, true);
+            iostream_p0() >> val.dpf[0];
+            iostream_p1() >> val.dpf[1];
+            mpcsrvio.rdpfpairs[thread_num][depth-1].inc();
+        }
     }
     return val;
 }
@@ -654,12 +673,13 @@ CDPF MPCTIO::cdpf()
     CDPF val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
-        if (mpcpio.preprocessing) {
+        if (mpcpio.mode != MODE_ONLINE) {
             iostream_server() >> val;
+            mpcpio.cdpfs[thread_num].inc();
         } else {
             mpcpio.cdpfs[thread_num].get(val);
         }
-    } else if (mpcio.preprocessing) {
+    } else if (mpcio.mode != MODE_ONLINE) {
         auto [ cdpf0, cdpf1 ] = CDPF::generate(aes_ops());
         iostream_p0() << cdpf0;
         iostream_p1() << cdpf1;

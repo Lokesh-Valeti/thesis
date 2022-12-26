@@ -117,16 +117,15 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
                             [&, tripfile, type](yield_t &yield) {
-                                RDPFTriple rdpftrip(tio, yield, type,
-                                    opts.expand_rdpfs);
+                                RDPFTriple rdpftrip =
+                                    tio.rdpftriple(yield, type, opts.expand_rdpfs);
+                                printf("dep  = %d\n", type);
                                 printf("usi0 = %016lx\n", rdpftrip.dpf[0].unit_sum_inverse);
                                 printf("sxr0 = %016lx\n", rdpftrip.dpf[0].scaled_xor.xshare);
                                 printf("usi1 = %016lx\n", rdpftrip.dpf[1].unit_sum_inverse);
                                 printf("sxr1 = %016lx\n", rdpftrip.dpf[1].scaled_xor.xshare);
                                 printf("usi2 = %016lx\n", rdpftrip.dpf[2].unit_sum_inverse);
                                 printf("sxr2 = %016lx\n", rdpftrip.dpf[2].scaled_xor.xshare);
-                                tio.iostream_server() <<
-                                    rdpftrip.dpf[(mpcio.player == 0) ? 1 : 2];
                                 tripfile.os() << rdpftrip;
                             });
                     }
@@ -224,10 +223,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                         for (unsigned int i=0; i<num; ++i) {
                             coroutines.emplace_back(
                                 [&, pairfile, depth](yield_t &yield) {
-                                    RDPFTriple rdpftrip(stio, yield, depth);
-                                    RDPFPair rdpfpair;
-                                    stio.iostream_p0() >> rdpfpair.dpf[0];
-                                    stio.iostream_p1() >> rdpfpair.dpf[1];
+                                    RDPFPair rdpfpair = stio.rdpfpair(yield, depth);
                                 printf("usi0 = %016lx\n", rdpfpair.dpf[0].unit_sum_inverse);
                                 printf("sxr0 = %016lx\n", rdpfpair.dpf[0].scaled_xor.xshare);
                                 printf("dep0 = %d\n", rdpfpair.dpf[0].depth());

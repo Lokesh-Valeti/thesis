@@ -168,11 +168,11 @@ static void rdpf_test(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
             MPCTIO tio(mpcio, thread_num);
             size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(depth);
+                RDPFPair dp = tio.rdpfpair(yield, depth);
                 for (int i=0;i<2;++i) {
                     const RDPF &dpf = dp.dpf[i];
                     for (address_t x=0;x<(address_t(1)<<depth);++x) {
@@ -187,7 +187,7 @@ static void rdpf_test(MPCIO &mpcio, yield_t &yield,
                     printf("\n");
                 }
             } else {
-                RDPFTriple dt = tio.rdpftriple(depth);
+                RDPFTriple dt = tio.rdpftriple(yield, depth);
                 for (int i=0;i<3;++i) {
                     const RDPF &dpf = dt.dpf[i];
                     RegXS peer_scaled_xor;
@@ -250,11 +250,11 @@ static void rdpf_timing(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
             MPCTIO tio(mpcio, thread_num);
             size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(depth);
+                RDPFPair dp = tio.rdpfpair(yield, depth);
                 for (int i=0;i<2;++i) {
                     RDPF &dpf = dp.dpf[i];
                     dpf.expand(aes_ops);
@@ -269,7 +269,7 @@ static void rdpf_timing(MPCIO &mpcio, yield_t &yield,
                     printf("\n");
                 }
             } else {
-                RDPFTriple dt = tio.rdpftriple(depth);
+                RDPFTriple dt = tio.rdpftriple(yield, depth);
                 for (int i=0;i<3;++i) {
                     RDPF &dpf = dt.dpf[i];
                     dpf.expand(aes_ops);
@@ -308,11 +308,11 @@ static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, start] {
             MPCTIO tio(mpcio, thread_num);
             size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(depth);
+                RDPFPair dp = tio.rdpfpair(yield, depth);
                 for (int i=0;i<2;++i) {
                     RDPF &dpf = dp.dpf[i];
                     RegXS scaled_xor;
@@ -327,7 +327,7 @@ static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
                     printf("\n");
                 }
             } else {
-                RDPFTriple dt = tio.rdpftriple(depth);
+                RDPFTriple dt = tio.rdpftriple(yield, depth);
                 for (int i=0;i<3;++i) {
                     RDPF &dpf = dt.dpf[i];
                     RegXS scaled_xor;
@@ -366,11 +366,11 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, start] {
             MPCTIO tio(mpcio, thread_num);
             size_t &aes_ops = tio.aes_ops();
             if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(depth);
+                RDPFPair dp = tio.rdpfpair(yield, depth);
                 RegXS scaled_xor0, scaled_xor1;
                 auto ev = StreamEval(dp, start, 0, aes_ops, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
@@ -387,7 +387,7 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
                     dp.dpf[1].scaled_xor.xshare);
                 printf("\n");
             } else {
-                RDPFTriple dt = tio.rdpftriple(depth);
+                RDPFTriple dt = tio.rdpftriple(yield, depth);
                 RegXS scaled_xor0, scaled_xor1, scaled_xor2;
                 auto ev = StreamEval(dt, start, 0, aes_ops, false);
                 for (address_t x=0;x<(address_t(1)<<depth);++x) {
@@ -501,6 +501,7 @@ static void cdpf_test(MPCIO &mpcio, yield_t &yield,
     const PRACOptions &opts, char **args)
 {
     value_t query, target;
+    int iters = 1;
     arc4random_buf(&query, sizeof(query));
     arc4random_buf(&target, sizeof(target));
 
@@ -512,33 +513,40 @@ static void cdpf_test(MPCIO &mpcio, yield_t &yield,
         target = strtoull(*args, NULL, 16);
         ++args;
     }
+    if (*args) {
+        iters = atoi(*args);
+        ++args;
+    }
 
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, &query, &target] {
+        boost::asio::post(pool, [&mpcio, thread_num, &query, &target, &iters] {
             MPCTIO tio(mpcio, thread_num);
             size_t &aes_ops = tio.aes_ops();
-            if (mpcio.player == 2) {
-                auto [ dpf0, dpf1 ] = CDPF::generate(target, aes_ops);
-                DPFnode leaf0 = dpf0.leaf(query, aes_ops);
-                DPFnode leaf1 = dpf1.leaf(query, aes_ops);
-                printf("DPFXOR_{%016lx}(%016lx} = ", target, query);
-                dump_node(leaf0 ^ leaf1);
-            } else {
-                CDPF dpf = tio.cdpf();
-                printf("ashare = %016lX\nxshare = %016lX\n",
-                    dpf.as_target.ashare, dpf.xs_target.xshare);
-                DPFnode leaf = dpf.leaf(query, aes_ops);
-                printf("DPF(%016lx) = ", query);
-                dump_node(leaf);
-                if (mpcio.player == 1) {
-                    tio.iostream_peer() << leaf;
+            for (int i=0;i<iters;++i) {
+                if (mpcio.player == 2) {
+                    tio.cdpf();
+                    auto [ dpf0, dpf1 ] = CDPF::generate(target, aes_ops);
+                    DPFnode leaf0 = dpf0.leaf(query, aes_ops);
+                    DPFnode leaf1 = dpf1.leaf(query, aes_ops);
+                    printf("DPFXOR_{%016lx}(%016lx} = ", target, query);
+                    dump_node(leaf0 ^ leaf1);
                 } else {
-                    DPFnode peerleaf;
-                    tio.iostream_peer() >> peerleaf;
-                    printf("XOR = ");
-                    dump_node(leaf ^ peerleaf);
+                    CDPF dpf = tio.cdpf();
+                    printf("ashare = %016lX\nxshare = %016lX\n",
+                        dpf.as_target.ashare, dpf.xs_target.xshare);
+                    DPFnode leaf = dpf.leaf(query, aes_ops);
+                    printf("DPF(%016lx) = ", query);
+                    dump_node(leaf);
+                    if (mpcio.player == 1) {
+                        tio.iostream_peer() << leaf;
+                    } else {
+                        DPFnode peerleaf;
+                        tio.iostream_peer() >> peerleaf;
+                        printf("XOR = ");
+                        dump_node(leaf ^ peerleaf);
+                    }
                 }
             }
             tio.send();

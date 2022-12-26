@@ -10,6 +10,7 @@ static void usage(const char *progname)
 {
     std::cerr << "Usage: " << progname << " [-p] [-t num] player_num player_addrs args ...\n";
     std::cerr << "-p: preprocessing mode\n";
+    std::cerr << "-o: online-only mode\n";
     std::cerr << "-t num: use num threads\n";
     std::cerr << "-c: store DPFs compressed (default is expanded)\n";
     std::cerr << "-x: use XOR-shared database (default is additive)\n";
@@ -28,11 +29,11 @@ static void comp_player_main(boost::asio::io_context &io_context,
     std::deque<tcp::socket> peersocks, serversocks;
     mpcio_setup_computational(player, io_context, p0addr,
         opts.num_threads, peersocks, serversocks);
-    MPCPeerIO mpcio(player, opts.preprocessing, peersocks, serversocks);
+    MPCPeerIO mpcio(player, opts.mode, peersocks, serversocks);
 
     // Queue up the work to be done
     boost::asio::post(io_context, [&]{
-        if (opts.preprocessing) {
+        if (opts.mode == MODE_PREPROCESSING) {
             preprocessing_comp(mpcio, opts, args);
         } else {
             online_main(mpcio, opts, args);
@@ -54,11 +55,11 @@ static void server_player_main(boost::asio::io_context &io_context,
     std::deque<tcp::socket> p0socks, p1socks;
     mpcio_setup_server(io_context, p0addr, p1addr,
         opts.num_threads, p0socks, p1socks);
-    MPCServerIO mpcserverio(opts.preprocessing, p0socks, p1socks);
+    MPCServerIO mpcserverio(opts.mode, p0socks, p1socks);
 
     // Queue up the work to be done
     boost::asio::post(io_context, [&]{
-        if (opts.preprocessing) {
+        if (opts.mode == MODE_PREPROCESSING) {
             preprocessing_server(mpcserverio, opts, args);
         } else {
             online_main(mpcserverio, opts, args);
@@ -83,7 +84,10 @@ int main(int argc, char **argv)
     // Get the options
     while (*args && *args[0] == '-') {
         if (!strcmp("-p", *args)) {
-            opts.preprocessing = true;
+            opts.mode = MODE_PREPROCESSING;
+            ++args;
+        } else if (!strcmp("-o", *args)) {
+            opts.mode = MODE_ONLINEONLY;
             ++args;
         } else if (!strcmp("-t", *args)) {
             if (args[1]) {

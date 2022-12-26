@@ -44,7 +44,7 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
     yield();
 
     // Read the peer's x+X and y+Y
-    value_t  peer_blind_x, peer_blind_y;
+    value_t  peer_blind_x=0, peer_blind_y=0;
     tio.recv_peer(&peer_blind_x, nbytes);
     tio.recv_peer(&peer_blind_y, nbytes);
 
@@ -75,7 +75,7 @@ void mpc_valuemul(MPCTIO &tio, yield_t &yield,
     yield();
 
     // Read the peer's y+Y
-    value_t  peer_blind_y;
+    value_t  peer_blind_y=0;
     tio.recv_peer(&peer_blind_y, nbytes);
 
     if (tio.player() == 0) {

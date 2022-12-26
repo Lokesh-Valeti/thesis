@@ -188,6 +188,8 @@ std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
         // After that one single-word exchange, the rest of this
         // algorithm is entirely a local computation.
         return compare(S, aes_ops);
+    } else {
+        yield();
     }
     // The server gets three shares of 0 (which is not a valid output
     // for the computational players)

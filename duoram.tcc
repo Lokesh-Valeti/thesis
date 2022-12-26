@@ -281,7 +281,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+        RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index offset
         RegAS indoffset = dt.as_target;
@@ -324,7 +324,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
     } else {
         // The server does this
 
-        RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
+        RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         RegAS p0indoffset, p1indoffset;
 
         // Receive the index offset from the computational players and
@@ -376,7 +376,7 @@ typename Duoram<T>::Shape::MemRefAS
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+        RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index and message offsets
         RegAS indoffset = dt.as_target;
@@ -425,7 +425,7 @@ typename Duoram<T>::Shape::MemRefAS
     } else {
         // The server does this
 
-        RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
+        RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         RegAS p0indoffset, p1indoffset;
         std::tuple<T,T> p0Moffset, p1Moffset;
 
@@ -509,7 +509,7 @@ Duoram<T>::Shape::MemRefXS::operator T()
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+        RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index offset
         RegXS indoffset = dt.xs_target;
@@ -550,7 +550,7 @@ Duoram<T>::Shape::MemRefXS::operator T()
     } else {
         // The server does this
 
-        RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
+        RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         RegXS p0indoffset, p1indoffset;
 
         // Receive the index offset from the computational players and
@@ -602,7 +602,7 @@ typename Duoram<T>::Shape::MemRefXS
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple dt = shape.tio.rdpftriple(shape.addr_size);
+        RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index and message offsets
         RegXS indoffset = dt.xs_target;
@@ -651,7 +651,7 @@ typename Duoram<T>::Shape::MemRefXS
     } else {
         // The server does this
 
-        RDPFPair dp = shape.tio.rdpfpair(shape.addr_size);
+        RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         RegXS p0indoffset, p1indoffset;
         std::tuple<T,T> p0Moffset, p1Moffset;
 

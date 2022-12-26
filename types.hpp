@@ -574,4 +574,10 @@ DEFAULT_IO(HalfTriple)
 DEFAULT_TUPLE_IO(RegAS)
 DEFAULT_TUPLE_IO(RegXS)
 
+enum ProcessingMode {
+    MODE_ONLINE,        // Online mode, after preprocessing has been done
+    MODE_PREPROCESSING, // Preprocessing mode
+    MODE_ONLINEONLY     // Online-only mode, where all computations are
+};                      // done online
+
 #endif

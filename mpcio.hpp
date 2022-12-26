@@ -17,6 +17,7 @@
 #include <boost/chrono.hpp>
 
 #include "types.hpp"
+#include "corotypes.hpp"
 
 using boost::asio::ip::tcp;
 
@@ -26,12 +27,13 @@ template<typename T, typename N>
 class PreCompStorage {
 public:
     PreCompStorage() : name(N::name), depth(0), count(0) {}
-    PreCompStorage(unsigned player, bool preprocessing,
+    PreCompStorage(unsigned player, ProcessingMode mode,
         const char *filenameprefix, unsigned thread_num);
-    void init(unsigned player, bool preprocessing,
+    void init(unsigned player, ProcessingMode mode,
         const char *filenameprefix, unsigned thread_num, nbits_t depth = 0);
     void get(T& nextval);
 
+    inline void inc() { ++count; }
     inline size_t get_stats() { return count; }
     inline void reset_stats() { count = 0; }
 private:
@@ -166,7 +168,7 @@ public:
 
 struct MPCIO {
     int player;
-    bool preprocessing;
+    ProcessingMode mode;
     size_t num_threads;
     atomic_lamport_t lamport;
     std::vector<size_t> msgs_sent;
@@ -175,8 +177,8 @@ struct MPCIO {
     boost::chrono::steady_clock::time_point steady_start;
     boost::chrono::process_cpu_clock::time_point cpu_start;
 
-    MPCIO(int player, bool preprocessing, size_t num_threads) :
-        player(player), preprocessing(preprocessing),
+    MPCIO(int player, ProcessingMode mode, size_t num_threads) :
+        player(player), mode(mode),
         num_threads(num_threads), lamport(0)
     {
         reset_stats();
@@ -205,7 +207,7 @@ struct MPCPeerIO : public MPCIO {
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
     std::vector<std::array<PreCompStorage<RDPFTriple, RDPFTripleName>,ADDRESS_MAX_BITS>> rdpftriples;
 
-    MPCPeerIO(unsigned player, bool preprocessing,
+    MPCPeerIO(unsigned player, ProcessingMode mode,
             std::deque<tcp::socket> &peersocks,
             std::deque<tcp::socket> &serversocks);
 
@@ -226,7 +228,7 @@ struct MPCServerIO : public MPCIO {
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
     std::vector<std::array<PreCompStorage<RDPFPair, RDPFPairName>,ADDRESS_MAX_BITS>> rdpfpairs;
 
-    MPCServerIO(bool preprocessing,
+    MPCServerIO(ProcessingMode mode,
             std::deque<tcp::socket> &p0socks,
             std::deque<tcp::socket> &p1socks);
 
@@ -339,16 +341,17 @@ public:
 
     // These ones only work during the online phase
     // Computational peers call:
-    RDPFTriple rdpftriple(nbits_t depth);
+    RDPFTriple rdpftriple(yield_t &yield, nbits_t depth,
+        bool keep_expansion = true);
     // The server calls:
-    RDPFPair rdpfpair(nbits_t depth);
+    RDPFPair rdpfpair(yield_t &yield, nbits_t depth);
     // Anyone can call:
     CDPF cdpf();
 
     // Accessors
 
     inline int player() { return mpcio.player; }
-    inline bool preprocessing() { return mpcio.preprocessing; }
+    inline bool preprocessing() { return mpcio.mode == MODE_PREPROCESSING; }
     inline bool is_server() { return mpcio.player == 2; }
     inline size_t& aes_ops() { return mpcio.aes_ops[thread_num]; }
     inline size_t msgs_sent() { return mpcio.msgs_sent[thread_num]; }
