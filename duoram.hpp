@@ -119,6 +119,15 @@ protected:
     MPCTIO &tio;
     yield_t &yield;
 
+    // If you enable explicit-only mode, sending updates of your blind
+    // to the server and of your blinded database to your peer will be
+    // temporarily disabled.  When you disable it (which will happen
+    // automatically at the next ORAM read or write, or you can do it
+    // explicitly), new random blinds will be chosen for the whole
+    // Shape, and the blinds sent to the server, and the blinded
+    // database sent to the peer.
+    bool explicitmode;
+
     // A function to set the shape_size and compute addr_size and
     // addr_mask
     void set_shape_size(size_t sz);
@@ -127,7 +136,13 @@ protected:
     // constructor is called by the subclass constructors
     Shape(const Shape &parent, Duoram &duoram, MPCTIO &tio,
         yield_t &yield) : parent(parent), duoram(duoram), shape_size(0),
-        tio(tio), yield(yield) {}
+        tio(tio), yield(yield), explicitmode(false) {}
+
+    // Copy the given Shape except for the tio and yield
+    Shape(const Shape &copy_from, MPCTIO &tio, yield_t &yield) :
+        parent(copy_from.parent), duoram(copy_from.duoram),
+        shape_size(copy_from.shape_size), tio(tio), yield(yield),
+        explicitmode(copy_from.explicitmode) {}
 
     // The index-mapping function. Input the index relative to this
     // shape, and output the corresponding physical address.  The
@@ -172,6 +187,18 @@ public:
     MemRefXS operator[](const RegXS &idx) { return MemRefXS(*this, idx); }
     MemRefExpl operator[](address_t idx) { return MemRefExpl(*this, idx); }
 
+    // Enable or disable explicit-only mode.  Only using [] with
+    // explicit (address_t) indices are allowed in this mode.  Using []
+    // with RegAS or RegXS indices will automatically turn off this
+    // mode, or you can turn it off explicitly.  In explicit-only mode,
+    // updates to the memory in the Shape will not induce communication
+    // to the server or peer, but when it turns off, a message of the
+    // size of the entire Shape will be sent to each of the server and
+    // the peer.  This is useful if you're going to be doing multiple
+    // explicit writes to every element of the Shape before you do your
+    // next oblivious read or write.  Bitonic sort is a prime example.
+    void explicitonly(bool enable);
+
     // For debugging or checking your answers (using this in general is
     // of course insecure)
 
@@ -210,14 +237,19 @@ public:
     Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield, size_t start = 0,
         size_t len = 0);
 
+    // Copy the given Flat except for the tio and yield
+    Flat(const Flat &copy_from, MPCTIO &tio, yield_t &yield) :
+        Shape(copy_from, tio, yield), start(copy_from.start),
+        len(copy_from.len) {}
+
     // Update the context (MPCTIO and yield if you've started a new
     // thread, or just yield if you've started a new coroutine in the
     // same thread).  Returns a new Shape with an updated context.
     Flat context(MPCTIO &new_tio, yield_t &new_yield) const {
-        return Flat(this->duoram, new_tio, new_yield, start, len);
+        return Flat(*this, new_tio, new_yield);
     }
     Flat context(yield_t &new_yield) const {
-        return Flat(this->duoram, this->tio, new_yield, start, len);
+        return Flat(*this, this->tio, new_yield);
     }
 
     // Oblivious sort the elements indexed by the two given indices.
@@ -248,9 +280,9 @@ public:
 template <typename T>
 class Duoram<T>::Shape::MemRef {
 protected:
-    const Shape &shape;
+    Shape &shape;
 
-    MemRef(const Shape &shape): shape(shape) {}
+    MemRef(Shape &shape): shape(shape) {}
 
 public:
 
@@ -274,7 +306,7 @@ class Duoram<T>::Shape::MemRefAS : public Duoram<T>::Shape::MemRef {
     RegAS idx;
 
 public:
-    MemRefAS(const Shape &shape, const RegAS &idx) :
+    MemRefAS(Shape &shape, const RegAS &idx) :
         MemRef(shape), idx(idx) {}
 
     // Oblivious read from an additively shared index of Duoram memory
@@ -293,7 +325,7 @@ class Duoram<T>::Shape::MemRefXS : public Duoram<T>::Shape::MemRef {
     RegXS idx;
 
 public:
-    MemRefXS(const Shape &shape, const RegXS &idx) :
+    MemRefXS(Shape &shape, const RegXS &idx) :
         MemRef(shape), idx(idx) {}
 
     // Oblivious read from an XOR shared index of Duoram memory
@@ -316,7 +348,7 @@ class Duoram<T>::Shape::MemRefExpl : public Duoram<T>::Shape::MemRef {
     address_t idx;
 
 public:
-    MemRefExpl(const Shape &shape, address_t idx) :
+    MemRefExpl(Shape &shape, address_t idx) :
         MemRef(shape), idx(idx) {}
 
     // Explicit read from a given index of Duoram memory

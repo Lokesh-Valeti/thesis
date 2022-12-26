@@ -35,6 +35,48 @@ void Duoram<T>::dump() const
     printf("\n");
 }
 
+// Enable or disable explicit-only mode.  Only using [] with
+// explicit (address_t) indices are allowed in this mode.  Using []
+// with RegAS or RegXS indices will automatically turn off this
+// mode, or you can turn it off explicitly.  In explicit-only mode,
+// updates to the memory in the Shape will not induce communication
+// to the server or peer, but when it turns off, a message of the
+// size of the entire Shape will be sent to each of the server and
+// the peer.  This is useful if you're going to be doing multiple
+// explicit writes to every element of the Shape before you do your
+// next oblivious read or write.  Bitonic sort is a prime example.
+template <typename T>
+void Duoram<T>::Shape::explicitonly(bool enable)
+{
+    if (enable == true)  {
+        explicitmode = true;
+    } else if (explicitmode == true) {
+        explicitmode = false;
+        // Reblind the whole Shape
+        int player = tio.player();
+        if (player < 2) {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [ DB, BL, PBD ] = get_comp(i);
+                BL.randomize();
+                tio.iostream_server() << BL;
+                tio.iostream_peer() << (DB + BL);
+            }
+            yield();
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [ DB, BL, PBD ] = get_comp(i);
+                tio.iostream_peer() >> PBD;
+            }
+        } else {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [BL0, BL1] = get_server(i);
+                tio.iostream_p0() >> BL0;
+                tio.iostream_p1() >> BL1;
+            }
+        }
+    }
+
+}
+
 // For debugging or checking your answers (using this in general is
 // of course insecure)
 // This one reconstructs the whole database
@@ -233,7 +275,8 @@ template <typename T>
 Duoram<T>::Shape::MemRefAS::operator T()
 {
     T res;
-    const Shape &shape = this->shape;
+    Shape &shape = this->shape;
+    shape.explicitonly(false);
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this
@@ -327,7 +370,8 @@ template <typename T>
 typename Duoram<T>::Shape::MemRefAS
     &Duoram<T>::Shape::MemRefAS::operator+=(const T& M)
 {
-    const Shape &shape = this->shape;
+    Shape &shape = this->shape;
+    shape.explicitonly(false);
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this
@@ -458,7 +502,8 @@ void Duoram<RegAS>::Flat::osort(const U &idx1, const V &idx2, bool dir)
 template <typename T>
 Duoram<T>::Shape::MemRefXS::operator T()
 {
-    const Shape &shape = this->shape;
+    Shape &shape = this->shape;
+    shape.explicitonly(false);
     T res;
     int player = shape.tio.player();
     if (player < 2) {
@@ -551,7 +596,8 @@ template <typename T>
 typename Duoram<T>::Shape::MemRefXS
     &Duoram<T>::Shape::MemRefXS::operator+=(const T& M)
 {
-    const Shape &shape = this->shape;
+    Shape &shape = this->shape;
+    shape.explicitonly(false);
     int player = shape.tio.player();
     if (player < 2) {
         // Computational players do this
@@ -637,7 +683,7 @@ typename Duoram<T>::Shape::MemRefXS
 template <typename T>
 Duoram<T>::Shape::MemRefExpl::operator T()
 {
-    const Shape &shape = this->shape;
+    Shape &shape = this->shape;
     T res;
     int player = shape.tio.player();
     if (player < 2) {
@@ -651,8 +697,17 @@ template <typename T>
 typename Duoram<T>::Shape::MemRefExpl
     &Duoram<T>::Shape::MemRefExpl::operator+=(const T& M)
 {
-    const Shape &shape = this->shape;
+    Shape &shape = this->shape;
     int player = shape.tio.player();
+    // In explicit-only mode, just update the local DB; we'll sync the
+    // blinds and the blinded DB when we leave explicit-only mode.
+    if (shape.explicitmode) {
+        if (player < 2) {
+            auto [ DB, BL, PBD ] = shape.get_comp(idx);
+            DB += M;
+        }
+        return *this;
+    }
     if (player < 2) {
         // Computational players do this
 

@@ -692,6 +692,7 @@ static void sort_test(MPCIO &mpcio, yield_t &yield,
             // size_t &aes_ops = tio.aes_ops();
             Duoram<RegAS> oram(mpcio.player, size);
             auto A = oram.flat(tio, yield);
+            A.explicitonly(true);
             // Initialize the memory to random values in parallel
             std::vector<coro_t> coroutines;
             for (address_t i=0; i<size; ++i) {
@@ -763,6 +764,7 @@ static void bsearch_test(MPCIO &mpcio, yield_t &yield,
             // size_t &aes_ops = tio.aes_ops();
             Duoram<RegAS> oram(mpcio.player, size);
             auto A = oram.flat(tio, yield);
+            A.explicitonly(true);
             // Initialize the memory to random values in parallel
             std::vector<coro_t> coroutines;
             for (address_t i=0; i<size; ++i) {
