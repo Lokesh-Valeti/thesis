@@ -144,7 +144,11 @@ class MPCSingleIO {
 
 public:
     MPCSingleIO(tcp::socket &&sock) :
-        sock(std::move(sock)), totread(0), totwritten(0) {}
+        sock(std::move(sock)), totread(0), totwritten(0)
+#ifdef SEND_LAMPORT_CLOCKS
+        , recvdataremain(0)
+#endif
+        {}
 
     // Returns 1 if a new message is started, 0 otherwise
     size_t queue(const void *data, size_t len, lamport_t lamport);
