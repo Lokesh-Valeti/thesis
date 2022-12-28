@@ -235,7 +235,7 @@ RegAS Duoram<RegAS>::Flat::obliv_binary_search(RegAS &target)
         // Obliviously read the value there
         RegAS val = operator[](index);
         // Compare it to the target
-        CDPF cdpf = tio.cdpf();
+        CDPF cdpf = tio.cdpf(this->yield);
         auto [lt, eq, gt] = cdpf.compare(this->tio, this->yield,
             val-target, tio.aes_ops());
         if (depth > 1) {
@@ -474,7 +474,7 @@ void Duoram<RegAS>::Flat::osort(const U &idx1, const V &idx2, bool dir)
             val2 = Acoro[idx2];
         });
     // Get a CDPF
-    CDPF cdpf = tio.cdpf();
+    CDPF cdpf = tio.cdpf(yield);
     // Use it to compare the values
     RegAS diff = val1-val2;
     auto [lt, eq, gt] = cdpf.compare(tio, yield, diff, tio.aes_ops());

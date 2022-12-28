@@ -231,6 +231,8 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
                 unit_sum_inverse = inverse_value_t(low_sum);
             }
             cw.push_back(CW);
+        } else if (level == depth-1) {
+            yield();
         }
 
         ++level;

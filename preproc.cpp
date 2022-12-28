@@ -96,20 +96,26 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     auto tripfile = ofiles.open("triples",
                         mpcio.player, thread_num);
 
-                    MultTriple T;
                     for (unsigned int i=0; i<num; ++i) {
-                        T = tio.triple();
-                        tripfile.os() << T;
+                        coroutines.emplace_back(
+                            [&, tripfile](yield_t &yield) {
+                                yield();
+                                MultTriple T = tio.triple(yield);
+                                tripfile.os() << T;
+                            });
                     }
                 } else if (type == 0x81) {
                     // Multiplication half triples
                     auto halffile = ofiles.open("halves",
                         mpcio.player, thread_num);
 
-                    HalfTriple H;
                     for (unsigned int i=0; i<num; ++i) {
-                        H = tio.halftriple();
-                        halffile.os() << H;
+                        coroutines.emplace_back(
+                            [&, halffile](yield_t &yield) {
+                                yield();
+                                HalfTriple H = tio.halftriple(yield);
+                                halffile.os() << H;
+                            });
                     }
                 } else if (type >= 0x01 && type <= 0x30) {
                     // RAM DPFs
@@ -118,6 +124,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
                             [&, tripfile, type](yield_t &yield) {
+                                yield();
                                 RDPFTriple rdpftrip =
                                     tio.rdpftriple(yield, type, opts.expand_rdpfs);
                                 printf("dep  = %d\n", type);
@@ -135,10 +142,13 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     auto cdpffile = ofiles.open("cdpf",
                         mpcio.player, thread_num);
 
-                    CDPF C;
                     for (unsigned int i=0; i<num; ++i) {
-                        C = tio.cdpf();
-                        cdpffile.os() << C;
+                        coroutines.emplace_back(
+                            [&, cdpffile](yield_t &yield) {
+                                yield();
+                                CDPF C = tio.cdpf(yield);
+                                cdpffile.os() << C;
+                            });
                     }
                 } else if (type == 0x82) {
                     coroutines.emplace_back(
@@ -215,7 +225,11 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
-                        stio.triple();
+                        coroutines.emplace_back(
+                            [&](yield_t &yield) {
+                                yield();
+                                stio.triple(yield);
+                            });
                     }
                 } else if (!strcmp(type, "h")) {
                     unsigned char typetag = 0x81;
@@ -225,7 +239,11 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
-                        stio.halftriple();
+                        coroutines.emplace_back(
+                            [&](yield_t &yield) {
+                                yield();
+                                stio.halftriple(yield);
+                            });
                     }
                 } else if (type[0] == 'r') {
                     int depth = atoi(type+1);
@@ -243,6 +261,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                         for (unsigned int i=0; i<num; ++i) {
                             coroutines.emplace_back(
                                 [&, pairfile, depth](yield_t &yield) {
+                                    yield();
                                     RDPFPair rdpfpair = stio.rdpfpair(yield, depth);
                                 printf("usi0 = %016lx\n", rdpfpair.dpf[0].unit_sum_inverse);
                                 printf("sxr0 = %016lx\n", rdpfpair.dpf[0].scaled_xor.xshare);
@@ -266,7 +285,11 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
-                        stio.cdpf();
+                        coroutines.emplace_back(
+                            [&](yield_t &yield) {
+                                yield();
+                                stio.cdpf(yield);
+                            });
                     }
                 } else if (!strcmp(type, "i")) {
                     unsigned char typetag = 0x82;

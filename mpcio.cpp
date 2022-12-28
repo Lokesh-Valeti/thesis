@@ -563,12 +563,13 @@ void MPCTIO::send()
 // Functions to get precomputed values.  If we're in the online
 // phase, get them from PreCompStorage.  If we're in the
 // preprocessing or online-only phase, read them from the server.
-MultTriple MPCTIO::triple()
+MultTriple MPCTIO::triple(yield_t &yield)
 {
     MultTriple val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         if (mpcpio.mode != MODE_ONLINE) {
+            yield();
             recv_server(&val, sizeof(val));
             mpcpio.triples[thread_num].inc();
         } else {
@@ -589,16 +590,18 @@ MultTriple MPCTIO::triple()
         T1 = std::make_tuple(X1, Y1, Z1);
         queue_p0(&T0, sizeof(T0));
         queue_p1(&T1, sizeof(T1));
+        yield();
     }
     return val;
 }
 
-HalfTriple MPCTIO::halftriple()
+HalfTriple MPCTIO::halftriple(yield_t &yield)
 {
     HalfTriple val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         if (mpcpio.mode != MODE_ONLINE) {
+            yield();
             recv_server(&val, sizeof(val));
             mpcpio.halftriples[thread_num].inc();
         } else {
@@ -617,17 +620,19 @@ HalfTriple MPCTIO::halftriple()
         H1 = std::make_tuple(Y1, Z1);
         queue_p0(&H0, sizeof(H0));
         queue_p1(&H1, sizeof(H1));
+        yield();
     }
     return val;
 }
 
-SelectTriple MPCTIO::selecttriple()
+SelectTriple MPCTIO::selecttriple(yield_t &yield)
 {
     SelectTriple val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         if (mpcpio.mode != MODE_ONLINE) {
             uint8_t Xbyte;
+            yield();
             recv_server(&Xbyte, sizeof(Xbyte));
             val.X = Xbyte & 1;
             recv_server(&val.Y, sizeof(val.Y));
@@ -657,6 +662,7 @@ SelectTriple MPCTIO::selecttriple()
         queue_p1(&X1, sizeof(X1));
         queue_p1(&Y1, sizeof(Y1));
         queue_p1(&Z1, sizeof(Z1));
+        yield();
     }
     return val;
 }
@@ -675,6 +681,7 @@ RDPFTriple MPCTIO::rdpftriple(yield_t &yield, nbits_t depth,
             iostream_server() <<
                 val.dpf[(mpcio.player == 0) ? 1 : 2];
             mpcpio.rdpftriples[thread_num][depth-1].inc();
+            yield();
         }
     }
     return val;
@@ -689,6 +696,7 @@ RDPFPair MPCTIO::rdpfpair(yield_t &yield, nbits_t depth)
             mpcsrvio.rdpfpairs[thread_num][depth-1].get(val);
         } else {
             RDPFTriple trip(*this, yield, depth, true);
+            yield();
             iostream_p0() >> val.dpf[0];
             iostream_p1() >> val.dpf[1];
             mpcsrvio.rdpfpairs[thread_num][depth-1].inc();
@@ -697,12 +705,13 @@ RDPFPair MPCTIO::rdpfpair(yield_t &yield, nbits_t depth)
     return val;
 }
 
-CDPF MPCTIO::cdpf()
+CDPF MPCTIO::cdpf(yield_t &yield)
 {
     CDPF val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         if (mpcpio.mode != MODE_ONLINE) {
+            yield();
             iostream_server() >> val;
             mpcpio.cdpfs[thread_num].inc();
         } else {
@@ -712,6 +721,7 @@ CDPF MPCTIO::cdpf()
         auto [ cdpf0, cdpf1 ] = CDPF::generate(aes_ops());
         iostream_p0() << cdpf0;
         iostream_p1() << cdpf1;
+        yield();
     }
     return val;
 }

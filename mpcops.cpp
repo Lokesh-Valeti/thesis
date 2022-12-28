@@ -32,7 +32,7 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
 {
     const value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
-    auto [X, Y, Z] = tio.triple();
+    auto [X, Y, Z] = tio.triple(yield);
 
     // Send x+X and y+Y
     value_t blind_x = (x.ashare + X) & mask;
@@ -65,7 +65,7 @@ void mpc_valuemul(MPCTIO &tio, yield_t &yield,
 {
     const value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
-    auto [X, Z] = tio.halftriple();
+    auto [X, Z] = tio.halftriple(yield);
 
     // Send x+X
     value_t blind_x = (x + X) & mask;
@@ -215,7 +215,7 @@ void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
     DPFnode fext = if128_mask[f.bshare];
 
     // Compute XOR shares of f & (x ^ y)
-    auto [X, Y, Z] = tio.selecttriple();
+    auto [X, Y, Z] = tio.selecttriple(yield);
 
     bit_t blind_f = f.bshare ^ X;
     DPFnode d = x ^ y;

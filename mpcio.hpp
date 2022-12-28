@@ -345,9 +345,9 @@ public:
     // phase, get them from PreCompStorage.  If we're in the
     // preprocessing phase, read them from the server.
 
-    MultTriple triple();
-    HalfTriple halftriple();
-    SelectTriple selecttriple();
+    MultTriple triple(yield_t &yield);
+    HalfTriple halftriple(yield_t &yield);
+    SelectTriple selecttriple(yield_t &yield);
 
     // These ones only work during the online phase
     // Computational peers call:
@@ -356,7 +356,7 @@ public:
     // The server calls:
     RDPFPair rdpfpair(yield_t &yield, nbits_t depth);
     // Anyone can call:
-    CDPF cdpf();
+    CDPF cdpf(yield_t &yield);
 
     // Accessors
 
