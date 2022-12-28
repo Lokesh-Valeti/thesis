@@ -159,79 +159,86 @@ static void rdpf_test(MPCIO &mpcio, yield_t &yield,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
+    size_t num_iters = 1;
 
     if (*args) {
         depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        num_iters = atoi(*args);
         ++args;
     }
 
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
+        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, num_iters] {
             MPCTIO tio(mpcio, thread_num);
             size_t &aes_ops = tio.aes_ops();
-            if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(yield, depth);
-                for (int i=0;i<2;++i) {
-                    const RDPF &dpf = dp.dpf[i];
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, aes_ops);
-                        RegBS ub = dpf.unit_bs(leaf);
-                        RegAS ua = dpf.unit_as(leaf);
-                        RegXS sx = dpf.scaled_xs(leaf);
-                        RegAS sa = dpf.scaled_as(leaf);
-                        printf("%04x %x %016lx %016lx %016lx\n", x,
-                            ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+            for (size_t iter=0; iter < num_iters; ++iter) {
+                if (mpcio.player == 2) {
+                    RDPFPair dp = tio.rdpfpair(yield, depth);
+                    for (int i=0;i<2;++i) {
+                        const RDPF &dpf = dp.dpf[i];
+                        for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                            DPFnode leaf = dpf.leaf(x, aes_ops);
+                            RegBS ub = dpf.unit_bs(leaf);
+                            RegAS ua = dpf.unit_as(leaf);
+                            RegXS sx = dpf.scaled_xs(leaf);
+                            RegAS sa = dpf.scaled_as(leaf);
+                            printf("%04x %x %016lx %016lx %016lx\n", x,
+                                ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                        }
+                        printf("\n");
                     }
-                    printf("\n");
-                }
-            } else {
-                RDPFTriple dt = tio.rdpftriple(yield, depth);
-                for (int i=0;i<3;++i) {
-                    const RDPF &dpf = dt.dpf[i];
-                    RegXS peer_scaled_xor;
-                    RegAS peer_scaled_sum;
-                    if (mpcio.player == 1) {
-                        tio.iostream_peer() << dpf.scaled_xor << dpf.scaled_sum;
-                    } else {
-                        tio.iostream_peer() >> peer_scaled_xor >> peer_scaled_sum;
-                        peer_scaled_sum += dpf.scaled_sum;
-                        peer_scaled_xor ^= dpf.scaled_xor;
-                    }
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, aes_ops);
-                        RegBS ub = dpf.unit_bs(leaf);
-                        RegAS ua = dpf.unit_as(leaf);
-                        RegXS sx = dpf.scaled_xs(leaf);
-                        RegAS sa = dpf.scaled_as(leaf);
-                        printf("%04x %x %016lx %016lx %016lx\n", x,
-                            ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                } else {
+                    RDPFTriple dt = tio.rdpftriple(yield, depth);
+                    for (int i=0;i<3;++i) {
+                        const RDPF &dpf = dt.dpf[i];
+                        RegXS peer_scaled_xor;
+                        RegAS peer_scaled_sum;
                         if (mpcio.player == 1) {
-                            tio.iostream_peer() << ub << ua << sx << sa;
+                            tio.iostream_peer() << dpf.scaled_xor << dpf.scaled_sum;
                         } else {
-                            RegBS peer_ub;
-                            RegAS peer_ua;
-                            RegXS peer_sx;
-                            RegAS peer_sa;
-                            tio.iostream_peer() >> peer_ub >> peer_ua >>
-                                peer_sx >> peer_sa;
-                            ub ^= peer_ub;
-                            ua += peer_ua;
-                            sx ^= peer_sx;
-                            sa += peer_sa;
-                            if (ub.bshare || ua.ashare || sx.xshare || sa.ashare) {
-                                printf("**** %x %016lx %016lx %016lx\n",
-                                    ub.bshare, ua.ashare, sx.xshare, sa.ashare);
-                                printf("SCALE                   %016lx %016lx\n",
-                                    peer_scaled_xor.xshare, peer_scaled_sum.ashare);
+                            tio.iostream_peer() >> peer_scaled_xor >> peer_scaled_sum;
+                            peer_scaled_sum += dpf.scaled_sum;
+                            peer_scaled_xor ^= dpf.scaled_xor;
+                        }
+                        for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                            DPFnode leaf = dpf.leaf(x, aes_ops);
+                            RegBS ub = dpf.unit_bs(leaf);
+                            RegAS ua = dpf.unit_as(leaf);
+                            RegXS sx = dpf.scaled_xs(leaf);
+                            RegAS sa = dpf.scaled_as(leaf);
+                            printf("%04x %x %016lx %016lx %016lx\n", x,
+                                ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                            if (mpcio.player == 1) {
+                                tio.iostream_peer() << ub << ua << sx << sa;
+                            } else {
+                                RegBS peer_ub;
+                                RegAS peer_ua;
+                                RegXS peer_sx;
+                                RegAS peer_sa;
+                                tio.iostream_peer() >> peer_ub >> peer_ua >>
+                                    peer_sx >> peer_sa;
+                                ub ^= peer_ub;
+                                ua += peer_ua;
+                                sx ^= peer_sx;
+                                sa += peer_sa;
+                                if (ub.bshare || ua.ashare || sx.xshare || sa.ashare) {
+                                    printf("**** %x %016lx %016lx %016lx\n",
+                                        ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                                    printf("SCALE                   %016lx %016lx\n",
+                                        peer_scaled_xor.xshare, peer_scaled_sum.ashare);
+                                }
                             }
                         }
+                        printf("\n");
                     }
-                    printf("\n");
                 }
+                tio.send();
             }
-            tio.send();
         });
     }
     pool.join();
