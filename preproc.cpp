@@ -67,6 +67,7 @@ void Openfiles::closeall()
 //   0x81: Multiplication half-triple
 //   0x01 to 0x30: RAM DPF of that depth
 //   0x40: Comparison DPF
+//   0x82: Counter (for testing)
 //   0x00: End of preprocessing
 //
 // Four bytes: number of objects of that type (not sent for type == 0x00)
@@ -139,6 +140,25 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                         C = tio.cdpf();
                         cdpffile.os() << C;
                     }
+                } else if (type == 0x82) {
+                    coroutines.emplace_back(
+                        [&, num](yield_t &yield) {
+                            yield();
+                            unsigned int istart = 0x31415080;
+                            for (unsigned int i=istart; i<istart+num; ++i) {
+                                tio.queue_peer(&i, sizeof(i));
+                                tio.queue_server(&i, sizeof(i));
+                                yield();
+                                unsigned int peeri, srvi;
+                                tio.recv_peer(&peeri, sizeof(peeri));
+                                tio.recv_server(&srvi, sizeof(srvi));
+                                if (peeri != i || srvi != i) {
+                                    printf("Incorrect counter received: "
+                                        "peer=%08x srv=%08x\n", peeri,
+                                        srvi);
+                                }
+                            }
+                        });
                 }
             }
             run_coroutines(tio, coroutines);
@@ -238,7 +258,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                                 });
                         }
                     }
-                } else if (type[0] == 'c') {
+                } else if (!strcmp(type, "c")) {
                     unsigned char typetag = 0x40;
                     stio.queue_p0(&typetag, 1);
                     stio.queue_p0(&num, 4);
@@ -248,6 +268,32 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     for (unsigned int i=0; i<num; ++i) {
                         stio.cdpf();
                     }
+                } else if (!strcmp(type, "i")) {
+                    unsigned char typetag = 0x82;
+                    stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&num, 4);
+                    stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&num, 4);
+
+                    coroutines.emplace_back(
+                        [&, num] (yield_t &yield) {
+                            unsigned int istart = 0x31415080;
+                            yield();
+                            for (unsigned int i=istart; i<istart+num; ++i) {
+                                stio.queue_p0(&i, sizeof(i));
+                                stio.queue_p1(&i, sizeof(i));
+                                yield();
+                                unsigned int p0i, p1i;
+                                stio.recv_p0(&p0i, sizeof(p0i));
+                                stio.recv_p1(&p1i, sizeof(p1i));
+                                if (p0i != i || p1i != i) {
+                                    printf("Incorrect counter received: "
+                                        "p0=%08x p1=%08x\n", p0i,
+                                        p1i);
+                                }
+                            }
+                        });
+
 		}
                 free(arg);
                 ++threadargs;
