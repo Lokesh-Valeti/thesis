@@ -75,6 +75,8 @@ struct MessageWithHeader {
 class MPCSingleIO {
     tcp::socket sock;
     size_t totread, totwritten;
+    std::string dest;
+    int thread_num;
 #ifdef RECORD_IOTRACE
     std::vector<ssize_t> iotrace;
 #endif
@@ -143,8 +145,9 @@ class MPCSingleIO {
     void async_send_from_msgqueue();
 
 public:
-    MPCSingleIO(tcp::socket &&sock) :
-        sock(std::move(sock)), totread(0), totwritten(0)
+    MPCSingleIO(tcp::socket &&sock, const char *dest, int thread_num) :
+        sock(std::move(sock)), totread(0), totwritten(0), dest(dest),
+        thread_num(thread_num)
 #ifdef SEND_LAMPORT_CLOCKS
         , recvdataremain(0)
 #endif
@@ -278,6 +281,9 @@ class MPCTIO {
     std::optional<MPCSingleIOStream> server_iostream;
     std::optional<MPCSingleIOStream> p0_iostream;
     std::optional<MPCSingleIOStream> p1_iostream;
+#ifdef VERBOSE_COMMS
+    size_t round_num;
+#endif
 
 public:
     MPCTIO(MPCIO &mpcio, int thread_num);

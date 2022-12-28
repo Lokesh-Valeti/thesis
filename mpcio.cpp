@@ -94,6 +94,15 @@ size_t MPCSingleIO::queue(const void *data, size_t len, lamport_t lamport)
         newmsg = 1;
     }
 
+#ifdef VERBOSE_COMMS
+    printf("Queue %s.%d len=%lu lamp=%u: ", dest.c_str(), thread_num,
+        len, message_lamport.value());
+    for (size_t i=0;i<len;++i) {
+        printf("%02x", ((const unsigned char*)data)[i]);
+    }
+    printf("\n");
+#endif
+
     // If we already have some full packets worth of data, may as
     // well send it.
     if (dataqueue.size() > 28800) {
@@ -147,9 +156,16 @@ void MPCSingleIO::send(bool implicit_send)
 
 size_t MPCSingleIO::recv(void *data, size_t len, lamport_t &lamport)
 {
+#ifdef VERBOSE_COMMS
+    size_t orig_len = len;
+    printf("Recv %s.%d len=%lu lamp=%u ", dest.c_str(), thread_num,
+        len, lamport);
+#endif
+
 #ifdef SEND_LAMPORT_CLOCKS
     char *cdata = (char *)data;
     size_t res = 0;
+
     while (len > 0) {
         while (recvdataremain == 0) {
             // Read a new header
@@ -182,6 +198,13 @@ size_t MPCSingleIO::recv(void *data, size_t len, lamport_t &lamport)
     }
 #else
     size_t res = boost::asio::read(sock, boost::asio::buffer(data, len));
+#endif
+#ifdef VERBOSE_COMMS
+    printf("nlamp=%u: ", lamport);
+    for (size_t i=0;i<orig_len;++i) {
+        printf("%02x", ((const unsigned char*)data)[i]);
+    }
+    printf("\n");
 #endif
 #ifdef RECORD_IOTRACE
     iotrace.push_back(-(ssize_t(res)));
@@ -278,11 +301,11 @@ MPCPeerIO::MPCPeerIO(unsigned player, ProcessingMode mode,
     for (unsigned i=0; i<num_threads; ++i) {
         cdpfs.emplace_back(player, mode, "cdpf", i);
     }
-    for (auto &&sock : peersocks) {
-        peerios.emplace_back(std::move(sock));
+    for (unsigned i=0; i<num_threads; ++i) {
+        peerios.emplace_back(std::move(peersocks[i]), "peer", i);
     }
-    for (auto &&sock : serversocks) {
-        serverios.emplace_back(std::move(sock));
+    for (unsigned i=0; i<num_threads; ++i) {
+        serverios.emplace_back(std::move(serversocks[i]), "srv", i);
     }
 }
 
@@ -338,11 +361,11 @@ MPCServerIO::MPCServerIO(ProcessingMode mode,
                 "rdpf", i, depth);
         }
     }
-    for (auto &&sock : p0socks) {
-        p0ios.emplace_back(std::move(sock));
+    for (unsigned i=0; i<num_threads; ++i) {
+        p0ios.emplace_back(std::move(p0socks[i]), "p0", i);
     }
-    for (auto &&sock : p1socks) {
-        p1ios.emplace_back(std::move(sock));
+    for (unsigned i=0; i<num_threads; ++i) {
+        p1ios.emplace_back(std::move(p1socks[i]), "p1", i);
     }
 }
 
@@ -382,6 +405,9 @@ void MPCServerIO::dump_stats(std::ostream &os)
 MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num) :
         thread_num(thread_num), thread_lamport(mpcio.lamport),
         mpcio(mpcio)
+#ifdef VERBOSE_COMMS
+        , round_num(0)
+#endif
 {
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
@@ -520,6 +546,9 @@ size_t MPCTIO::recv_p1(void *data, size_t len)
 
 void MPCTIO::send()
 {
+#ifdef VERBOSE_COMMS
+    printf("Thread %u sending round %lu\n", thread_num, ++round_num);
+#endif
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         mpcpio.peerios[thread_num].send();
