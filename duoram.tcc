@@ -67,6 +67,7 @@ void Duoram<T>::Shape::explicitonly(bool enable)
                 tio.iostream_peer() >> PBD;
             }
         } else {
+            yield();
             for (size_t i=0; i<shape_size; ++i) {
                 auto [BL0, BL1] = get_server(i);
                 tio.iostream_p0() >> BL0;
@@ -317,6 +318,8 @@ Duoram<T>::Shape::MemRefAS::operator T()
             res += (DB + PBD) * V0.share() - BL * (V1-V0).share();
         }
 
+        shape.yield();
+
         // Receive the cancellation term from the server
         T gamma;
         shape.tio.iostream_server() >> gamma;
@@ -326,6 +329,8 @@ Duoram<T>::Shape::MemRefAS::operator T()
 
         RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         RegAS p0indoffset, p1indoffset;
+
+        shape.yield();
 
         // Receive the index offset from the computational players and
         // combine them
@@ -543,6 +548,8 @@ Duoram<T>::Shape::MemRefXS::operator T()
             res += (DB + PBD) * V0.share() - BL * (V1-V0).share();
         }
 
+        shape.yield();
+
         // Receive the cancellation term from the server
         T gamma;
         shape.tio.iostream_server() >> gamma;
@@ -552,6 +559,8 @@ Duoram<T>::Shape::MemRefXS::operator T()
 
         RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         RegXS p0indoffset, p1indoffset;
+
+        shape.yield();
 
         // Receive the index offset from the computational players and
         // combine them
