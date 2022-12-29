@@ -190,7 +190,7 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     std::vector<coro_t> coroutines;
     for (nbits_t i=0; i<nbits-1; ++i) {
         coroutines.emplace_back(
-            [&](yield_t &yield) {
+            [&, i](yield_t &yield) {
                 mpc_valuemul(tio, yield, as_bitand[i], (xs_x.xshare>>i)&1, nbits);
             });
     }

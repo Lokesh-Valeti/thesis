@@ -200,7 +200,7 @@ void Duoram<T>::Flat::butterfly(address_t start, nbits_t depth, bool dir)
     address_t halfwidth = address_t(1)<<(depth-1);
     std::vector<coro_t> coroutines;
     for (address_t i=0; i<halfwidth;++i) {
-        coroutines.emplace_back([&](yield_t &yield) {
+        coroutines.emplace_back([&, i](yield_t &yield) {
             Flat Acoro = context(yield);
             Acoro.osort(start+i, start+i+halfwidth, dir);
         });
