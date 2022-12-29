@@ -98,7 +98,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
 
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&, tripfile](yield_t &yield) {
+                            [&tio, tripfile](yield_t &yield) {
                                 yield();
                                 MultTriple T = tio.triple(yield);
                                 tripfile.os() << T;
@@ -111,7 +111,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
 
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&, halffile](yield_t &yield) {
+                            [&tio, halffile](yield_t &yield) {
                                 yield();
                                 HalfTriple H = tio.halftriple(yield);
                                 halffile.os() << H;
@@ -123,7 +123,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                         mpcio.player, thread_num, type);
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&, tripfile, type](yield_t &yield) {
+                            [&tio, &opts, tripfile, type](yield_t &yield) {
                                 yield();
                                 RDPFTriple rdpftrip =
                                     tio.rdpftriple(yield, type, opts.expand_rdpfs);
@@ -144,7 +144,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
 
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&, cdpffile](yield_t &yield) {
+                            [&tio, cdpffile](yield_t &yield) {
                                 yield();
                                 CDPF C = tio.cdpf(yield);
                                 cdpffile.os() << C;
@@ -152,7 +152,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     }
                 } else if (type == 0x82) {
                     coroutines.emplace_back(
-                        [&, num](yield_t &yield) {
+                        [&tio, num](yield_t &yield) {
                             yield();
                             unsigned int istart = 0x31415080;
                             for (unsigned int i=istart; i<istart+num; ++i) {
@@ -226,7 +226,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
 
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&](yield_t &yield) {
+                            [&stio](yield_t &yield) {
                                 yield();
                                 stio.triple(yield);
                             });
@@ -240,7 +240,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
 
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&](yield_t &yield) {
+                            [&stio](yield_t &yield) {
                                 yield();
                                 stio.halftriple(yield);
                             });
@@ -260,7 +260,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                             mpcsrvio.player, thread_num, depth);
                         for (unsigned int i=0; i<num; ++i) {
                             coroutines.emplace_back(
-                                [&, pairfile, depth](yield_t &yield) {
+                                [&stio, &opts, pairfile, depth](yield_t &yield) {
                                     yield();
                                     RDPFPair rdpfpair = stio.rdpfpair(yield, depth);
                                 printf("usi0 = %016lx\n", rdpfpair.dpf[0].unit_sum_inverse);
@@ -286,7 +286,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
 
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&](yield_t &yield) {
+                            [&stio](yield_t &yield) {
                                 yield();
                                 stio.cdpf(yield);
                             });
@@ -299,7 +299,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     stio.queue_p1(&num, 4);
 
                     coroutines.emplace_back(
-                        [&, num] (yield_t &yield) {
+                        [&stio, num] (yield_t &yield) {
                             unsigned int istart = 0x31415080;
                             yield();
                             for (unsigned int i=istart; i<istart+num; ++i) {

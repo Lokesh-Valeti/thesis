@@ -44,23 +44,23 @@ static void online_test(MPCIO &mpcio, yield_t &yield,
     }
     std::vector<coro_t> coroutines;
     coroutines.emplace_back(
-        [&](yield_t &yield) {
+        [&tio, &A, nbits](yield_t &yield) {
             mpc_mul(tio, yield, A[2], A[0], A[1], nbits);
         });
     coroutines.emplace_back(
-        [&](yield_t &yield) {
+        [&tio, &A, V, nbits](yield_t &yield) {
             mpc_valuemul(tio, yield, A[3], V, nbits);
         });
     coroutines.emplace_back(
-        [&](yield_t &yield) {
+        [&tio, &A, &F0, nbits](yield_t &yield) {
             mpc_flagmult(tio, yield, A[5], F0, A[4], nbits);
         });
     coroutines.emplace_back(
-        [&](yield_t &yield) {
+        [&tio, &A, &F1, nbits](yield_t &yield) {
             mpc_oswap(tio, yield, A[6], A[7], F1, nbits);
         });
     coroutines.emplace_back(
-        [&](yield_t &yield) {
+        [&tio, &A, &X, nbits](yield_t &yield) {
             mpc_xs_to_as(tio, yield, A[8], X, nbits);
         });
     run_coroutines(yield, coroutines);
@@ -828,7 +828,7 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     // to start one themselves
     MPCTIO tio(mpcio, 0);
     run_coroutines(tio,
-        [&](yield_t &yield) {
+        [&mpcio, &opts, &args](yield_t &yield) {
             if (!*args) {
                 std::cerr << "Mode is required as the first argument when not preprocessing.\n";
                 return;

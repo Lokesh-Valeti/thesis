@@ -133,14 +133,14 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
         // Exchange the parities and do mpc_reconstruct_choice at the
         // same time (bundled into the same rounds)
         run_coroutines(yield,
-            [&](yield_t &yield) {
+            [this, &tio, &our_parity_bit, &peer_parity_bit](yield_t &yield) {
                 tio.queue_peer(&our_parity_bit, 1);
                 yield();
                 uint8_t peer_parity_byte;
                 tio.recv_peer(&peer_parity_byte, 1);
                 peer_parity_bit = peer_parity_byte & 1;
             },
-            [&](yield_t &yield) {
+            [this, &tio, &CW, &L, &R, &bs_choice, &our_parity](yield_t &yield) {
                 mpc_reconstruct_choice(tio, yield, CW, bs_choice,
                     (R ^ our_parity), L);
             });
@@ -319,13 +319,13 @@ RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
     std::vector<coro_t> coroutines;
     for (int i=0;i<3;++i) {
         coroutines.emplace_back(
-            [&, i](yield_t &yield) {
+            [this, &tio, depth, i, save_expansion](yield_t &yield) {
                 dpf[i] = RDPF(tio, yield, xs_target, depth,
                     save_expansion);
             });
     }
     coroutines.emplace_back(
-        [&](yield_t &yield) {
+        [this, &tio, depth](yield_t &yield) {
             mpc_xs_to_as(tio, yield, as_target, xs_target, depth);
         });
     run_coroutines(yield, coroutines);
