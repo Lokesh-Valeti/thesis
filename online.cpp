@@ -7,7 +7,7 @@
 #include "cdpf.hpp"
 
 
-static void online_test(MPCIO &mpcio, yield_t &yield,
+static void online_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t nbits = VALUE_BITS;
@@ -63,7 +63,7 @@ static void online_test(MPCIO &mpcio, yield_t &yield,
         [&tio, &A, &X, nbits](yield_t &yield) {
             mpc_xs_to_as(tio, yield, A[8], X, nbits);
         });
-    run_coroutines(yield, coroutines);
+    run_coroutines(tio, coroutines);
     if (!is_server) {
         printf("\n");
         printf("A:\n"); for (size_t i=0; i<memsize; ++i) printf("%3lu: %016lX\n", i, A[i].ashare);
@@ -109,7 +109,7 @@ static void online_test(MPCIO &mpcio, yield_t &yield,
     delete[] A;
 }
 
-static void lamport_test(MPCIO &mpcio, yield_t &yield,
+static void lamport_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     // Create a bunch of threads and send a bunch of data to the other
@@ -155,7 +155,7 @@ static void lamport_test(MPCIO &mpcio, yield_t &yield,
     pool.join();
 }
 
-static void rdpf_test(MPCIO &mpcio, yield_t &yield,
+static void rdpf_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
@@ -173,131 +173,133 @@ static void rdpf_test(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, num_iters] {
+        boost::asio::post(pool, [&mpcio, thread_num, depth, num_iters] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &aes_ops = tio.aes_ops();
-            for (size_t iter=0; iter < num_iters; ++iter) {
-                if (mpcio.player == 2) {
+            run_coroutines(tio, [&tio, depth, num_iters] (yield_t &yield) {
+                size_t &aes_ops = tio.aes_ops();
+                for (size_t iter=0; iter < num_iters; ++iter) {
+                    if (tio.player() == 2) {
+                        RDPFPair dp = tio.rdpfpair(yield, depth);
+                        for (int i=0;i<2;++i) {
+                            const RDPF &dpf = dp.dpf[i];
+                            for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                                DPFnode leaf = dpf.leaf(x, aes_ops);
+                                RegBS ub = dpf.unit_bs(leaf);
+                                RegAS ua = dpf.unit_as(leaf);
+                                RegXS sx = dpf.scaled_xs(leaf);
+                                RegAS sa = dpf.scaled_as(leaf);
+                                printf("%04x %x %016lx %016lx %016lx\n", x,
+                                    ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                            }
+                            printf("\n");
+                        }
+                    } else {
+                        RDPFTriple dt = tio.rdpftriple(yield, depth);
+                        for (int i=0;i<3;++i) {
+                            const RDPF &dpf = dt.dpf[i];
+                            RegXS peer_scaled_xor;
+                            RegAS peer_scaled_sum;
+                            if (tio.player() == 1) {
+                                tio.iostream_peer() << dpf.scaled_xor << dpf.scaled_sum;
+                            } else {
+                                tio.iostream_peer() >> peer_scaled_xor >> peer_scaled_sum;
+                                peer_scaled_sum += dpf.scaled_sum;
+                                peer_scaled_xor ^= dpf.scaled_xor;
+                            }
+                            for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                                DPFnode leaf = dpf.leaf(x, aes_ops);
+                                RegBS ub = dpf.unit_bs(leaf);
+                                RegAS ua = dpf.unit_as(leaf);
+                                RegXS sx = dpf.scaled_xs(leaf);
+                                RegAS sa = dpf.scaled_as(leaf);
+                                printf("%04x %x %016lx %016lx %016lx\n", x,
+                                    ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                                if (tio.player() == 1) {
+                                    tio.iostream_peer() << ub << ua << sx << sa;
+                                } else {
+                                    RegBS peer_ub;
+                                    RegAS peer_ua;
+                                    RegXS peer_sx;
+                                    RegAS peer_sa;
+                                    tio.iostream_peer() >> peer_ub >> peer_ua >>
+                                        peer_sx >> peer_sa;
+                                    ub ^= peer_ub;
+                                    ua += peer_ua;
+                                    sx ^= peer_sx;
+                                    sa += peer_sa;
+                                    if (ub.bshare || ua.ashare || sx.xshare || sa.ashare) {
+                                        printf("**** %x %016lx %016lx %016lx\n",
+                                            ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                                        printf("SCALE                   %016lx %016lx\n",
+                                            peer_scaled_xor.xshare, peer_scaled_sum.ashare);
+                                    }
+                                }
+                            }
+                            printf("\n");
+                        }
+                    }
+                }
+            });
+        });
+    }
+    pool.join();
+}
+
+static void rdpf_timing(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    boost::asio::thread_pool pool(num_threads);
+    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
+        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+            MPCTIO tio(mpcio, thread_num);
+            run_coroutines(tio, [&tio, depth] (yield_t &yield) {
+                size_t &aes_ops = tio.aes_ops();
+                if (tio.player() == 2) {
                     RDPFPair dp = tio.rdpfpair(yield, depth);
                     for (int i=0;i<2;++i) {
-                        const RDPF &dpf = dp.dpf[i];
+                        RDPF &dpf = dp.dpf[i];
+                        dpf.expand(aes_ops);
+                        RegXS scaled_xor;
                         for (address_t x=0;x<(address_t(1)<<depth);++x) {
                             DPFnode leaf = dpf.leaf(x, aes_ops);
-                            RegBS ub = dpf.unit_bs(leaf);
-                            RegAS ua = dpf.unit_as(leaf);
                             RegXS sx = dpf.scaled_xs(leaf);
-                            RegAS sa = dpf.scaled_as(leaf);
-                            printf("%04x %x %016lx %016lx %016lx\n", x,
-                                ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                            scaled_xor ^= sx;
                         }
+                        printf("%016lx\n%016lx\n", scaled_xor.xshare,
+                            dpf.scaled_xor.xshare);
                         printf("\n");
                     }
                 } else {
                     RDPFTriple dt = tio.rdpftriple(yield, depth);
                     for (int i=0;i<3;++i) {
-                        const RDPF &dpf = dt.dpf[i];
-                        RegXS peer_scaled_xor;
-                        RegAS peer_scaled_sum;
-                        if (mpcio.player == 1) {
-                            tio.iostream_peer() << dpf.scaled_xor << dpf.scaled_sum;
-                        } else {
-                            tio.iostream_peer() >> peer_scaled_xor >> peer_scaled_sum;
-                            peer_scaled_sum += dpf.scaled_sum;
-                            peer_scaled_xor ^= dpf.scaled_xor;
-                        }
+                        RDPF &dpf = dt.dpf[i];
+                        dpf.expand(aes_ops);
+                        RegXS scaled_xor;
                         for (address_t x=0;x<(address_t(1)<<depth);++x) {
                             DPFnode leaf = dpf.leaf(x, aes_ops);
-                            RegBS ub = dpf.unit_bs(leaf);
-                            RegAS ua = dpf.unit_as(leaf);
                             RegXS sx = dpf.scaled_xs(leaf);
-                            RegAS sa = dpf.scaled_as(leaf);
-                            printf("%04x %x %016lx %016lx %016lx\n", x,
-                                ub.bshare, ua.ashare, sx.xshare, sa.ashare);
-                            if (mpcio.player == 1) {
-                                tio.iostream_peer() << ub << ua << sx << sa;
-                            } else {
-                                RegBS peer_ub;
-                                RegAS peer_ua;
-                                RegXS peer_sx;
-                                RegAS peer_sa;
-                                tio.iostream_peer() >> peer_ub >> peer_ua >>
-                                    peer_sx >> peer_sa;
-                                ub ^= peer_ub;
-                                ua += peer_ua;
-                                sx ^= peer_sx;
-                                sa += peer_sa;
-                                if (ub.bshare || ua.ashare || sx.xshare || sa.ashare) {
-                                    printf("**** %x %016lx %016lx %016lx\n",
-                                        ub.bshare, ua.ashare, sx.xshare, sa.ashare);
-                                    printf("SCALE                   %016lx %016lx\n",
-                                        peer_scaled_xor.xshare, peer_scaled_sum.ashare);
-                                }
-                            }
+                            scaled_xor ^= sx;
                         }
+                        printf("%016lx\n%016lx\n", scaled_xor.xshare,
+                            dpf.scaled_xor.xshare);
                         printf("\n");
                     }
                 }
-                tio.send();
-            }
+            });
         });
     }
     pool.join();
 }
 
-static void rdpf_timing(MPCIO &mpcio, yield_t &yield,
-    const PRACOptions &opts, char **args)
-{
-    nbits_t depth=6;
-
-    if (*args) {
-        depth = atoi(*args);
-        ++args;
-    }
-
-    int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
-            MPCTIO tio(mpcio, thread_num);
-            size_t &aes_ops = tio.aes_ops();
-            if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(yield, depth);
-                for (int i=0;i<2;++i) {
-                    RDPF &dpf = dp.dpf[i];
-                    dpf.expand(aes_ops);
-                    RegXS scaled_xor;
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, aes_ops);
-                        RegXS sx = dpf.scaled_xs(leaf);
-                        scaled_xor ^= sx;
-                    }
-                    printf("%016lx\n%016lx\n", scaled_xor.xshare,
-                        dpf.scaled_xor.xshare);
-                    printf("\n");
-                }
-            } else {
-                RDPFTriple dt = tio.rdpftriple(yield, depth);
-                for (int i=0;i<3;++i) {
-                    RDPF &dpf = dt.dpf[i];
-                    dpf.expand(aes_ops);
-                    RegXS scaled_xor;
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = dpf.leaf(x, aes_ops);
-                        RegXS sx = dpf.scaled_xs(leaf);
-                        scaled_xor ^= sx;
-                    }
-                    printf("%016lx\n%016lx\n", scaled_xor.xshare,
-                        dpf.scaled_xor.xshare);
-                    printf("\n");
-                }
-            }
-            tio.send();
-        });
-    }
-    pool.join();
-}
-
-static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
+static void rdpfeval_timing(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
@@ -315,47 +317,48 @@ static void rdpfeval_timing(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, start] {
+        boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &aes_ops = tio.aes_ops();
-            if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(yield, depth);
-                for (int i=0;i<2;++i) {
-                    RDPF &dpf = dp.dpf[i];
-                    RegXS scaled_xor;
-                    auto ev = StreamEval(dpf, start, 0, aes_ops, false);
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = ev.next();
-                        RegXS sx = dpf.scaled_xs(leaf);
-                        scaled_xor ^= sx;
+            run_coroutines(tio, [&tio, depth, start] (yield_t &yield) {
+                size_t &aes_ops = tio.aes_ops();
+                if (tio.player() == 2) {
+                    RDPFPair dp = tio.rdpfpair(yield, depth);
+                    for (int i=0;i<2;++i) {
+                        RDPF &dpf = dp.dpf[i];
+                        RegXS scaled_xor;
+                        auto ev = StreamEval(dpf, start, 0, aes_ops, false);
+                        for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                            DPFnode leaf = ev.next();
+                            RegXS sx = dpf.scaled_xs(leaf);
+                            scaled_xor ^= sx;
+                        }
+                        printf("%016lx\n%016lx\n", scaled_xor.xshare,
+                            dpf.scaled_xor.xshare);
+                        printf("\n");
                     }
-                    printf("%016lx\n%016lx\n", scaled_xor.xshare,
-                        dpf.scaled_xor.xshare);
-                    printf("\n");
-                }
-            } else {
-                RDPFTriple dt = tio.rdpftriple(yield, depth);
-                for (int i=0;i<3;++i) {
-                    RDPF &dpf = dt.dpf[i];
-                    RegXS scaled_xor;
-                    auto ev = StreamEval(dpf, start, 0, aes_ops, false);
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        DPFnode leaf = ev.next();
-                        RegXS sx = dpf.scaled_xs(leaf);
-                        scaled_xor ^= sx;
+                } else {
+                    RDPFTriple dt = tio.rdpftriple(yield, depth);
+                    for (int i=0;i<3;++i) {
+                        RDPF &dpf = dt.dpf[i];
+                        RegXS scaled_xor;
+                        auto ev = StreamEval(dpf, start, 0, aes_ops, false);
+                        for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                            DPFnode leaf = ev.next();
+                            RegXS sx = dpf.scaled_xs(leaf);
+                            scaled_xor ^= sx;
+                        }
+                        printf("%016lx\n%016lx\n", scaled_xor.xshare,
+                            dpf.scaled_xor.xshare);
+                        printf("\n");
                     }
-                    printf("%016lx\n%016lx\n", scaled_xor.xshare,
-                        dpf.scaled_xor.xshare);
-                    printf("\n");
                 }
-            }
-            tio.send();
+            });
         });
     }
     pool.join();
 }
 
-static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
+static void tupleeval_timing(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
@@ -373,50 +376,51 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, start] {
+        boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &aes_ops = tio.aes_ops();
-            if (mpcio.player == 2) {
-                RDPFPair dp = tio.rdpfpair(yield, depth);
-                RegXS scaled_xor0, scaled_xor1;
-                auto ev = StreamEval(dp, start, 0, aes_ops, false);
-                for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                    auto [L0, L1] = ev.next();
-                    RegXS sx0 = dp.dpf[0].scaled_xs(L0);
-                    RegXS sx1 = dp.dpf[1].scaled_xs(L1);
-                    scaled_xor0 ^= sx0;
-                    scaled_xor1 ^= sx1;
+            run_coroutines(tio, [&tio, depth, start] (yield_t &yield) {
+                size_t &aes_ops = tio.aes_ops();
+                if (tio.player() == 2) {
+                    RDPFPair dp = tio.rdpfpair(yield, depth);
+                    RegXS scaled_xor0, scaled_xor1;
+                    auto ev = StreamEval(dp, start, 0, aes_ops, false);
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        auto [L0, L1] = ev.next();
+                        RegXS sx0 = dp.dpf[0].scaled_xs(L0);
+                        RegXS sx1 = dp.dpf[1].scaled_xs(L1);
+                        scaled_xor0 ^= sx0;
+                        scaled_xor1 ^= sx1;
+                    }
+                    printf("%016lx\n%016lx\n", scaled_xor0.xshare,
+                        dp.dpf[0].scaled_xor.xshare);
+                    printf("\n");
+                    printf("%016lx\n%016lx\n", scaled_xor1.xshare,
+                        dp.dpf[1].scaled_xor.xshare);
+                    printf("\n");
+                } else {
+                    RDPFTriple dt = tio.rdpftriple(yield, depth);
+                    RegXS scaled_xor0, scaled_xor1, scaled_xor2;
+                    auto ev = StreamEval(dt, start, 0, aes_ops, false);
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        auto [L0, L1, L2] = ev.next();
+                        RegXS sx0 = dt.dpf[0].scaled_xs(L0);
+                        RegXS sx1 = dt.dpf[1].scaled_xs(L1);
+                        RegXS sx2 = dt.dpf[2].scaled_xs(L2);
+                        scaled_xor0 ^= sx0;
+                        scaled_xor1 ^= sx1;
+                        scaled_xor2 ^= sx2;
+                    }
+                    printf("%016lx\n%016lx\n", scaled_xor0.xshare,
+                        dt.dpf[0].scaled_xor.xshare);
+                    printf("\n");
+                    printf("%016lx\n%016lx\n", scaled_xor1.xshare,
+                        dt.dpf[1].scaled_xor.xshare);
+                    printf("\n");
+                    printf("%016lx\n%016lx\n", scaled_xor2.xshare,
+                        dt.dpf[2].scaled_xor.xshare);
+                    printf("\n");
                 }
-                printf("%016lx\n%016lx\n", scaled_xor0.xshare,
-                    dp.dpf[0].scaled_xor.xshare);
-                printf("\n");
-                printf("%016lx\n%016lx\n", scaled_xor1.xshare,
-                    dp.dpf[1].scaled_xor.xshare);
-                printf("\n");
-            } else {
-                RDPFTriple dt = tio.rdpftriple(yield, depth);
-                RegXS scaled_xor0, scaled_xor1, scaled_xor2;
-                auto ev = StreamEval(dt, start, 0, aes_ops, false);
-                for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                    auto [L0, L1, L2] = ev.next();
-                    RegXS sx0 = dt.dpf[0].scaled_xs(L0);
-                    RegXS sx1 = dt.dpf[1].scaled_xs(L1);
-                    RegXS sx2 = dt.dpf[2].scaled_xs(L2);
-                    scaled_xor0 ^= sx0;
-                    scaled_xor1 ^= sx1;
-                    scaled_xor2 ^= sx2;
-                }
-                printf("%016lx\n%016lx\n", scaled_xor0.xshare,
-                    dt.dpf[0].scaled_xor.xshare);
-                printf("\n");
-                printf("%016lx\n%016lx\n", scaled_xor1.xshare,
-                    dt.dpf[1].scaled_xor.xshare);
-                printf("\n");
-                printf("%016lx\n%016lx\n", scaled_xor2.xshare,
-                    dt.dpf[2].scaled_xor.xshare);
-                printf("\n");
-            }
-            tio.send();
+            });
         });
     }
     pool.join();
@@ -424,7 +428,7 @@ static void tupleeval_timing(MPCIO &mpcio, yield_t &yield,
 
 // T is RegAS or RegXS for additive or XOR shared database respectively
 template <typename T>
-static void duoram_test(MPCIO &mpcio, yield_t &yield,
+static void duoram_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
@@ -443,68 +447,69 @@ static void duoram_test(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, share] {
-            size_t size = size_t(1)<<depth;
+        boost::asio::post(pool, [&mpcio, thread_num, depth, share] {
             MPCTIO tio(mpcio, thread_num);
-            // size_t &aes_ops = tio.aes_ops();
-            Duoram<T> oram(mpcio.player, size);
-            auto A = oram.flat(tio, yield);
-            RegAS aidx;
-            aidx.ashare = share;
-            T M;
-            if (tio.player() == 0) {
-                M.set(0xbabb0000);
-            } else {
-                M.set(0x0000a66e);
-            }
-            RegXS xidx;
-            xidx.xshare = share;
-            T N;
-            if (tio.player() == 0) {
-                N.set(0xdead0000);
-            } else {
-                N.set(0x0000beef);
-            }
-            // Writing and reading with additively shared indices
-            printf("Updating\n");
-            A[aidx] += M;
-            printf("Reading\n");
-            T Aa = A[aidx];
-            // Writing and reading with XOR shared indices
-            printf("Updating\n");
-            A[xidx] += N;
-            printf("Reading\n");
-            T Ax = A[xidx];
-            T Ae;
-            // Writing and reading with explicit indices
-            if (depth > 2) {
-                A[5] += Aa;
-                Ae = A[6];
-            }
-            if (depth <= 10) {
-                oram.dump();
-                auto check = A.reconstruct();
+            run_coroutines(tio, [&tio, depth, share] (yield_t &yield) {
+                size_t size = size_t(1)<<depth;
+                // size_t &aes_ops = tio.aes_ops();
+                Duoram<T> oram(tio.player(), size);
+                auto A = oram.flat(tio, yield);
+                RegAS aidx;
+                aidx.ashare = share;
+                T M;
                 if (tio.player() == 0) {
-                    for (address_t i=0;i<size;++i) {
-                        printf("%04x %016lx\n", i, check[i].share());
+                    M.set(0xbabb0000);
+                } else {
+                    M.set(0x0000a66e);
+                }
+                RegXS xidx;
+                xidx.xshare = share;
+                T N;
+                if (tio.player() == 0) {
+                    N.set(0xdead0000);
+                } else {
+                    N.set(0x0000beef);
+                }
+                // Writing and reading with additively shared indices
+                printf("Updating\n");
+                A[aidx] += M;
+                printf("Reading\n");
+                T Aa = A[aidx];
+                // Writing and reading with XOR shared indices
+                printf("Updating\n");
+                A[xidx] += N;
+                printf("Reading\n");
+                T Ax = A[xidx];
+                T Ae;
+                // Writing and reading with explicit indices
+                if (depth > 2) {
+                    A[5] += Aa;
+                    Ae = A[6];
+                }
+                if (depth <= 10) {
+                    oram.dump();
+                    auto check = A.reconstruct();
+                    if (tio.player() == 0) {
+                        for (address_t i=0;i<size;++i) {
+                            printf("%04x %016lx\n", i, check[i].share());
+                        }
                     }
                 }
-            }
-            auto checkread = A.reconstruct(Aa);
-            auto checkreade = A.reconstruct(Ae);
-            auto checkreadx = A.reconstruct(Ax);
-            if (tio.player() == 0) {
-                printf("Read AS value = %016lx\n", checkread.share());
-                printf("Read AX value = %016lx\n", checkreadx.share());
-                printf("Read Ex value = %016lx\n", checkreade.share());
-            }
-            tio.send();
+                auto checkread = A.reconstruct(Aa);
+                auto checkreade = A.reconstruct(Ae);
+                auto checkreadx = A.reconstruct(Ax);
+                if (tio.player() == 0) {
+                    printf("Read AS value = %016lx\n", checkread.share());
+                    printf("Read AX value = %016lx\n", checkreadx.share());
+                    printf("Read Ex value = %016lx\n", checkreade.share());
+                }
+            });
         });
     }
     pool.join();
 }
 
-static void cdpf_test(MPCIO &mpcio, yield_t &yield,
+static void cdpf_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     value_t query, target;
@@ -528,35 +533,36 @@ static void cdpf_test(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, &query, &target, &iters] {
+        boost::asio::post(pool, [&mpcio, thread_num, query, target, iters] {
             MPCTIO tio(mpcio, thread_num);
-            size_t &aes_ops = tio.aes_ops();
-            for (int i=0;i<iters;++i) {
-                if (mpcio.player == 2) {
-                    tio.cdpf(yield);
-                    auto [ dpf0, dpf1 ] = CDPF::generate(target, aes_ops);
-                    DPFnode leaf0 = dpf0.leaf(query, aes_ops);
-                    DPFnode leaf1 = dpf1.leaf(query, aes_ops);
-                    printf("DPFXOR_{%016lx}(%016lx} = ", target, query);
-                    dump_node(leaf0 ^ leaf1);
-                } else {
-                    CDPF dpf = tio.cdpf(yield);
-                    printf("ashare = %016lX\nxshare = %016lX\n",
-                        dpf.as_target.ashare, dpf.xs_target.xshare);
-                    DPFnode leaf = dpf.leaf(query, aes_ops);
-                    printf("DPF(%016lx) = ", query);
-                    dump_node(leaf);
-                    if (mpcio.player == 1) {
-                        tio.iostream_peer() << leaf;
+            run_coroutines(tio, [&tio, query, target, iters] (yield_t &yield) {
+                size_t &aes_ops = tio.aes_ops();
+                for (int i=0;i<iters;++i) {
+                    if (tio.player() == 2) {
+                        tio.cdpf(yield);
+                        auto [ dpf0, dpf1 ] = CDPF::generate(target, aes_ops);
+                        DPFnode leaf0 = dpf0.leaf(query, aes_ops);
+                        DPFnode leaf1 = dpf1.leaf(query, aes_ops);
+                        printf("DPFXOR_{%016lx}(%016lx} = ", target, query);
+                        dump_node(leaf0 ^ leaf1);
                     } else {
-                        DPFnode peerleaf;
-                        tio.iostream_peer() >> peerleaf;
-                        printf("XOR = ");
-                        dump_node(leaf ^ peerleaf);
+                        CDPF dpf = tio.cdpf(yield);
+                        printf("ashare = %016lX\nxshare = %016lX\n",
+                            dpf.as_target.ashare, dpf.xs_target.xshare);
+                        DPFnode leaf = dpf.leaf(query, aes_ops);
+                        printf("DPF(%016lx) = ", query);
+                        dump_node(leaf);
+                        if (tio.player() == 1) {
+                            tio.iostream_peer() << leaf;
+                        } else {
+                            DPFnode peerleaf;
+                            tio.iostream_peer() >> peerleaf;
+                            printf("XOR = ");
+                            dump_node(leaf ^ peerleaf);
+                        }
                     }
                 }
-            }
-            tio.send();
+            });
         });
     }
     pool.join();
@@ -640,7 +646,7 @@ static int compare_test_target(MPCTIO &tio, yield_t &yield,
     return res;
 }
 
-static void compare_test(MPCIO &mpcio, yield_t &yield,
+static void compare_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     value_t target, x;
@@ -659,36 +665,37 @@ static void compare_test(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, &target, &x] {
+        boost::asio::post(pool, [&mpcio, thread_num, target, x] {
             MPCTIO tio(mpcio, thread_num);
-            int res = 1;
-            res &= compare_test_target(tio, yield, target, x);
-            res &= compare_test_target(tio, yield, 0, x);
-            res &= compare_test_target(tio, yield, 1, x);
-            res &= compare_test_target(tio, yield, 15, x);
-            res &= compare_test_target(tio, yield, 16, x);
-            res &= compare_test_target(tio, yield, 17, x);
-            res &= compare_test_target(tio, yield, -1, x);
-            res &= compare_test_target(tio, yield, -15, x);
-            res &= compare_test_target(tio, yield, -16, x);
-            res &= compare_test_target(tio, yield, -17, x);
-            res &= compare_test_target(tio, yield, (value_t(1)<<63), x);
-            res &= compare_test_target(tio, yield, (value_t(1)<<63)+1, x);
-            res &= compare_test_target(tio, yield, (value_t(1)<<63)-1, x);
-            tio.send();
-            if (tio.player() == 0) {
-                if (res == 1) {
-                    printf("All tests passed!\n");
-                } else {
-                    printf("TEST FAILURES\n");
+            run_coroutines(tio, [&tio, target, x] (yield_t &yield) {
+                int res = 1;
+                res &= compare_test_target(tio, yield, target, x);
+                res &= compare_test_target(tio, yield, 0, x);
+                res &= compare_test_target(tio, yield, 1, x);
+                res &= compare_test_target(tio, yield, 15, x);
+                res &= compare_test_target(tio, yield, 16, x);
+                res &= compare_test_target(tio, yield, 17, x);
+                res &= compare_test_target(tio, yield, -1, x);
+                res &= compare_test_target(tio, yield, -15, x);
+                res &= compare_test_target(tio, yield, -16, x);
+                res &= compare_test_target(tio, yield, -17, x);
+                res &= compare_test_target(tio, yield, (value_t(1)<<63), x);
+                res &= compare_test_target(tio, yield, (value_t(1)<<63)+1, x);
+                res &= compare_test_target(tio, yield, (value_t(1)<<63)-1, x);
+                if (tio.player() == 0) {
+                    if (res == 1) {
+                        printf("All tests passed!\n");
+                    } else {
+                        printf("TEST FAILURES\n");
+                    }
                 }
-            }
+            });
         });
     }
     pool.join();
 }
 
-static void sort_test(MPCIO &mpcio, yield_t &yield,
+static void sort_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=6;
@@ -701,42 +708,43 @@ static void sort_test(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth] {
-            address_t size = address_t(1)<<depth;
+        boost::asio::post(pool, [&mpcio, thread_num, depth] {
             MPCTIO tio(mpcio, thread_num);
-            // size_t &aes_ops = tio.aes_ops();
-            Duoram<RegAS> oram(mpcio.player, size);
-            auto A = oram.flat(tio, yield);
-            A.explicitonly(true);
-            // Initialize the memory to random values in parallel
-            std::vector<coro_t> coroutines;
-            for (address_t i=0; i<size; ++i) {
-                coroutines.emplace_back(
-                    [&A, i](yield_t &yield) {
-                        auto Acoro = A.context(yield);
-                        RegAS v;
-                        v.randomize(62);
-                        Acoro[i] += v;
-                    });
-            }
-            run_coroutines(yield, coroutines);
-            A.bitonic_sort(0, depth);
-            if (depth <= 10) {
-                oram.dump();
-                auto check = A.reconstruct();
-                if (tio.player() == 0) {
-                    for (address_t i=0;i<size;++i) {
-                        printf("%04x %016lx\n", i, check[i].share());
+            run_coroutines(tio, [&tio, depth] (yield_t &yield) {
+                address_t size = address_t(1)<<depth;
+                // size_t &aes_ops = tio.aes_ops();
+                Duoram<RegAS> oram(tio.player(), size);
+                auto A = oram.flat(tio, yield);
+                A.explicitonly(true);
+                // Initialize the memory to random values in parallel
+                std::vector<coro_t> coroutines;
+                for (address_t i=0; i<size; ++i) {
+                    coroutines.emplace_back(
+                        [&A, i](yield_t &yield) {
+                            auto Acoro = A.context(yield);
+                            RegAS v;
+                            v.randomize(62);
+                            Acoro[i] += v;
+                        });
+                }
+                run_coroutines(yield, coroutines);
+                A.bitonic_sort(0, depth);
+                if (depth <= 10) {
+                    oram.dump();
+                    auto check = A.reconstruct();
+                    if (tio.player() == 0) {
+                        for (address_t i=0;i<size;++i) {
+                            printf("%04x %016lx\n", i, check[i].share());
+                        }
                     }
                 }
-            }
-            tio.send();
+            });
         });
     }
     pool.join();
 }
 
-static void bsearch_test(MPCIO &mpcio, yield_t &yield,
+static void bsearch_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     value_t target;
@@ -756,67 +764,68 @@ static void bsearch_test(MPCIO &mpcio, yield_t &yield,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, &yield, thread_num, depth, target] {
-            address_t size = address_t(1)<<depth;
+        boost::asio::post(pool, [&mpcio, thread_num, depth, target] {
             MPCTIO tio(mpcio, thread_num);
-            RegAS tshare;
-            if (tio.player() == 2) {
-                // Send shares of the target to the computational
-                // players
-                RegAS tshare0, tshare1;
-                tshare0.randomize();
-                tshare1.set(target-tshare0.share());
-                tio.iostream_p0() << tshare0;
-                tio.iostream_p1() << tshare1;
-                printf("Using target = %016lx\n", target);
-                yield();
-            } else {
-                // Get the share of the target
-                tio.iostream_server() >> tshare;
-            }
+            run_coroutines(tio, [&tio, depth, target] (yield_t &yield) {
+                address_t size = address_t(1)<<depth;
+                RegAS tshare;
+                if (tio.player() == 2) {
+                    // Send shares of the target to the computational
+                    // players
+                    RegAS tshare0, tshare1;
+                    tshare0.randomize();
+                    tshare1.set(target-tshare0.share());
+                    tio.iostream_p0() << tshare0;
+                    tio.iostream_p1() << tshare1;
+                    printf("Using target = %016lx\n", target);
+                    yield();
+                } else {
+                    // Get the share of the target
+                    tio.iostream_server() >> tshare;
+                }
 
-            // Create a random database and sort it
-            // size_t &aes_ops = tio.aes_ops();
-            Duoram<RegAS> oram(mpcio.player, size);
-            auto A = oram.flat(tio, yield);
-            A.explicitonly(true);
-            // Initialize the memory to random values in parallel
-            std::vector<coro_t> coroutines;
-            for (address_t i=0; i<size; ++i) {
-                coroutines.emplace_back(
-                    [&A, i](yield_t &yield) {
-                        auto Acoro = A.context(yield);
-                        RegAS v;
-                        v.randomize(62);
-                        Acoro[i] += v;
-                    });
-            }
-            run_coroutines(yield, coroutines);
-            A.bitonic_sort(0, depth);
+                // Create a random database and sort it
+                // size_t &aes_ops = tio.aes_ops();
+                Duoram<RegAS> oram(tio.player(), size);
+                auto A = oram.flat(tio, yield);
+                A.explicitonly(true);
+                // Initialize the memory to random values in parallel
+                std::vector<coro_t> coroutines;
+                for (address_t i=0; i<size; ++i) {
+                    coroutines.emplace_back(
+                        [&A, i](yield_t &yield) {
+                            auto Acoro = A.context(yield);
+                            RegAS v;
+                            v.randomize(62);
+                            Acoro[i] += v;
+                        });
+                }
+                run_coroutines(yield, coroutines);
+                A.bitonic_sort(0, depth);
 
-            // Binary search for the target
-            RegAS tindex = A.obliv_binary_search(tshare);
+                // Binary search for the target
+                RegAS tindex = A.obliv_binary_search(tshare);
 
-            // Check the answer
-            if (tio.player() == 1) {
-                tio.iostream_peer() << tindex;
-            } else if (tio.player() == 0) {
-                RegAS peer_tindex;
-                tio.iostream_peer() >> peer_tindex;
-                tindex += peer_tindex;
-            }
-            if (depth <= 10) {
-                auto check = A.reconstruct();
-                if (tio.player() == 0) {
-                    for (address_t i=0;i<size;++i) {
-                        printf("%04x %016lx\n", i, check[i].share());
+                // Check the answer
+                if (tio.player() == 1) {
+                    tio.iostream_peer() << tindex;
+                } else if (tio.player() == 0) {
+                    RegAS peer_tindex;
+                    tio.iostream_peer() >> peer_tindex;
+                    tindex += peer_tindex;
+                }
+                if (depth <= 10) {
+                    auto check = A.reconstruct();
+                    if (tio.player() == 0) {
+                        for (address_t i=0;i<size;++i) {
+                            printf("%04x %016lx\n", i, check[i].share());
+                        }
                     }
                 }
-            }
-            if (tio.player() == 0) {
-                printf("Found index = %lx\n", tindex.share());
-            }
-            tio.send();
+                if (tio.player() == 0) {
+                    printf("Found index = %lx\n", tindex.share());
+                }
+            });
         });
     }
     pool.join();
@@ -824,53 +833,48 @@ static void bsearch_test(MPCIO &mpcio, yield_t &yield,
 
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
-    // Run everything inside a coroutine so that simple tests don't have
-    // to start one themselves
     MPCTIO tio(mpcio, 0);
-    run_coroutines(tio,
-        [&mpcio, &opts, &args](yield_t &yield) {
-            if (!*args) {
-                std::cerr << "Mode is required as the first argument when not preprocessing.\n";
-                return;
-            } else if (!strcmp(*args, "test")) {
-                ++args;
-                online_test(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "lamporttest")) {
-                ++args;
-                lamport_test(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "rdpftest")) {
-                ++args;
-                rdpf_test(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "rdpftime")) {
-                ++args;
-                rdpf_timing(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "evaltime")) {
-                ++args;
-                rdpfeval_timing(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "tupletime")) {
-                ++args;
-                tupleeval_timing(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "duotest")) {
-                ++args;
-                if (opts.use_xor_db) {
-                    duoram_test<RegXS>(mpcio, yield, opts, args);
-                } else {
-                    duoram_test<RegAS>(mpcio, yield, opts, args);
-                }
-            } else if (!strcmp(*args, "cdpftest")) {
-                ++args;
-                cdpf_test(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "cmptest")) {
-                ++args;
-                compare_test(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "sorttest")) {
-                ++args;
-                sort_test(mpcio, yield, opts, args);
-            } else if (!strcmp(*args, "bsearch")) {
-                ++args;
-                bsearch_test(mpcio, yield, opts, args);
-            } else {
-                std::cerr << "Unknown mode " << *args << "\n";
-            }
-        });
+    if (!*args) {
+        std::cerr << "Mode is required as the first argument when not preprocessing.\n";
+        return;
+    } else if (!strcmp(*args, "test")) {
+        ++args;
+        online_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "lamporttest")) {
+        ++args;
+        lamport_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "rdpftest")) {
+        ++args;
+        rdpf_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "rdpftime")) {
+        ++args;
+        rdpf_timing(mpcio, opts, args);
+    } else if (!strcmp(*args, "evaltime")) {
+        ++args;
+        rdpfeval_timing(mpcio, opts, args);
+    } else if (!strcmp(*args, "tupletime")) {
+        ++args;
+        tupleeval_timing(mpcio, opts, args);
+    } else if (!strcmp(*args, "duotest")) {
+        ++args;
+        if (opts.use_xor_db) {
+            duoram_test<RegXS>(mpcio, opts, args);
+        } else {
+            duoram_test<RegAS>(mpcio, opts, args);
+        }
+    } else if (!strcmp(*args, "cdpftest")) {
+        ++args;
+        cdpf_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "cmptest")) {
+        ++args;
+        compare_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "sorttest")) {
+        ++args;
+        sort_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "bsearch")) {
+        ++args;
+        bsearch_test(mpcio, opts, args);
+    } else {
+        std::cerr << "Unknown mode " << *args << "\n";
+    }
 }
