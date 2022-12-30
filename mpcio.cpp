@@ -402,9 +402,10 @@ void MPCServerIO::dump_stats(std::ostream &os)
     dump_precomp_stats(os);
 }
 
-MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num) :
-        thread_num(thread_num), thread_lamport(mpcio.lamport),
-        mpcio(mpcio)
+MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num, int num_threads) :
+        thread_num(thread_num), local_cpu_nthreads(num_threads),
+        communication_nthreads(num_threads),
+        thread_lamport(mpcio.lamport), mpcio(mpcio)
 #ifdef VERBOSE_COMMS
         , round_num(0)
 #endif

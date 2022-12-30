@@ -275,6 +275,22 @@ public:
 
 class MPCTIO {
     int thread_num;
+
+    // The number of threads a coroutine using this MPCTIO can use for
+    // local computation (no communication and no yielding).  Multiple
+    // coroutines with the same MPCTIO can have this value larger than
+    // 1, since they will not be able to use multiple threads at the
+    // same time.
+    int local_cpu_nthreads;
+
+    // The number of threads a coroutine using this MPCTIO can launch
+    // into separate MPCTIOs with their own communication.  It is
+    // important that at most one coroutine using this MPCTIO can have
+    // this value set larger than 1, since all MPCTIOs with the same
+    // thread_num (and so using the same sockets) have to be controlled
+    // by the same run_coroutines(tio, ...) call.
+    int communication_nthreads;
+
     lamport_t thread_lamport;
     MPCIO &mpcio;
     std::optional<MPCSingleIOStream> peer_iostream;
@@ -286,7 +302,7 @@ class MPCTIO {
 #endif
 
 public:
-    MPCTIO(MPCIO &mpcio, int thread_num);
+    MPCTIO(MPCIO &mpcio, int thread_num, int num_threads = 1);
 
     // Sync our per-thread lamport clock with the master one in the
     // mpcio.  You only need to call this explicitly if your MPCTIO
@@ -365,6 +381,13 @@ public:
     inline bool is_server() { return mpcio.player == 2; }
     inline size_t& aes_ops() { return mpcio.aes_ops[thread_num]; }
     inline size_t msgs_sent() { return mpcio.msgs_sent[thread_num]; }
+    inline int comm_nthreads(int nthreads=0) {
+        int res = communication_nthreads;
+        if (nthreads > 0) {
+            communication_nthreads = nthreads;
+        }
+        return res;
+    }
 };
 
 // Set up the socket connections between the two computational parties

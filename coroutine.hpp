@@ -15,10 +15,30 @@
 static inline void send_or_yield(MPCTIO &tio) { tio.send(); }
 static inline void send_or_yield(yield_t &yield) { yield(); }
 
+// Get and set communication_nthreads for an MPCTIO; for a yield_t, this
+// is a no-op.
+static inline int getset_communication_nthreads(MPCTIO &tio, int nthreads = 0) {
+    return tio.comm_nthreads(nthreads);
+}
+static inline int getset_communication_nthreads(yield_t &yield, int nthreads = 0) {
+    return 0;
+}
+
 // Use this version if you have a variable number of coroutines (or a
 // larger constant number than is supported below).
 template <typename T>
 inline void run_coroutines(T &mpctio_or_yield, std::vector<coro_t> &coroutines) {
+    // If there's more than one coroutine, at most one of them can have
+    // communication_nthreads larger than 1 (see mpcio.hpp for details).
+    // For now, we set them _all_ to 1 (if there's more than one of
+    // them), and restore communication_nthreads when they're all done.
+
+    int saved_communication_nthreads = 0;
+    if (coroutines.size() > 1) {
+        saved_communication_nthreads =
+            getset_communication_nthreads(mpctio_or_yield, 1);
+    }
+
     // Loop until all the coroutines are finished
     bool finished = false;
     while(!finished) {
@@ -37,6 +57,11 @@ inline void run_coroutines(T &mpctio_or_yield, std::vector<coro_t> &coroutines) 
                 c();
             }
         }
+    }
+
+    if (saved_communication_nthreads > 0) {
+        getset_communication_nthreads(mpctio_or_yield,
+            saved_communication_nthreads);
     }
 }
 
