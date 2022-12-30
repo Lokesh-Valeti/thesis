@@ -314,13 +314,16 @@ static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF &dpf,
             [&mpcio, &dpf, &scaled_xor, thread_num, threadstart, threadsize] {
                 MPCTIO tio(mpcio, thread_num);
 //printf("Thread %d from %X for %X\n", thread_num, threadstart, threadsize);
-                auto ev = StreamEval(dpf, threadstart, 0, tio.aes_ops());
+                RegXS local_xor;
+                size_t local_aes_ops = 0;
+                auto ev = StreamEval(dpf, threadstart, 0, local_aes_ops);
                 for (address_t x=0;x<threadsize;++x) {
 //if (x%0x10000 == 0) printf("%d", thread_num);
                     DPFnode leaf = ev.next();
-                    RegXS sx = dpf.scaled_xs(leaf);
-                    scaled_xor[thread_num] ^= sx;
+                    local_xor ^= dpf.scaled_xs(leaf);
                 }
+                scaled_xor[thread_num] = local_xor;
+                tio.aes_ops() += local_aes_ops;
 //printf("Thread %d complete\n", thread_num);
             });
         threadstart = (threadstart + threadsize) % totsize;
