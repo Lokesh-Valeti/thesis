@@ -352,7 +352,7 @@ static void rdpfeval_timing(MPCIO &mpcio,
     }
 
     int num_threads = opts.num_threads;
-    MPCTIO tio(mpcio, 0);
+    MPCTIO tio(mpcio, 0, num_threads);
     run_coroutines(tio, [&mpcio, &tio, depth, start, num_threads] (yield_t &yield) {
         if (tio.player() == 2) {
             RDPFPair dp = tio.rdpfpair(yield, depth);
@@ -394,56 +394,50 @@ static void tupleeval_timing(MPCIO &mpcio,
     }
 
     int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, start] {
-            MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth, start] (yield_t &yield) {
-                size_t &aes_ops = tio.aes_ops();
-                if (tio.player() == 2) {
-                    RDPFPair dp = tio.rdpfpair(yield, depth);
-                    RegXS scaled_xor0, scaled_xor1;
-                    auto ev = StreamEval(dp, start, 0, aes_ops, false);
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        auto [L0, L1] = ev.next();
-                        RegXS sx0 = dp.dpf[0].scaled_xs(L0);
-                        RegXS sx1 = dp.dpf[1].scaled_xs(L1);
-                        scaled_xor0 ^= sx0;
-                        scaled_xor1 ^= sx1;
-                    }
-                    printf("%016lx\n%016lx\n", scaled_xor0.xshare,
-                        dp.dpf[0].scaled_xor.xshare);
-                    printf("\n");
-                    printf("%016lx\n%016lx\n", scaled_xor1.xshare,
-                        dp.dpf[1].scaled_xor.xshare);
-                    printf("\n");
-                } else {
-                    RDPFTriple dt = tio.rdpftriple(yield, depth);
-                    RegXS scaled_xor0, scaled_xor1, scaled_xor2;
-                    auto ev = StreamEval(dt, start, 0, aes_ops, false);
-                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                        auto [L0, L1, L2] = ev.next();
-                        RegXS sx0 = dt.dpf[0].scaled_xs(L0);
-                        RegXS sx1 = dt.dpf[1].scaled_xs(L1);
-                        RegXS sx2 = dt.dpf[2].scaled_xs(L2);
-                        scaled_xor0 ^= sx0;
-                        scaled_xor1 ^= sx1;
-                        scaled_xor2 ^= sx2;
-                    }
-                    printf("%016lx\n%016lx\n", scaled_xor0.xshare,
-                        dt.dpf[0].scaled_xor.xshare);
-                    printf("\n");
-                    printf("%016lx\n%016lx\n", scaled_xor1.xshare,
-                        dt.dpf[1].scaled_xor.xshare);
-                    printf("\n");
-                    printf("%016lx\n%016lx\n", scaled_xor2.xshare,
-                        dt.dpf[2].scaled_xor.xshare);
-                    printf("\n");
-                }
-            });
-        });
-    }
-    pool.join();
+    MPCTIO tio(mpcio, 0, num_threads);
+    run_coroutines(tio, [&tio, depth, start] (yield_t &yield) {
+        size_t &aes_ops = tio.aes_ops();
+        if (tio.player() == 2) {
+            RDPFPair dp = tio.rdpfpair(yield, depth);
+            RegXS scaled_xor0, scaled_xor1;
+            auto ev = StreamEval(dp, start, 0, aes_ops, false);
+            for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                auto [L0, L1] = ev.next();
+                RegXS sx0 = dp.dpf[0].scaled_xs(L0);
+                RegXS sx1 = dp.dpf[1].scaled_xs(L1);
+                scaled_xor0 ^= sx0;
+                scaled_xor1 ^= sx1;
+            }
+            printf("%016lx\n%016lx\n", scaled_xor0.xshare,
+                dp.dpf[0].scaled_xor.xshare);
+            printf("\n");
+            printf("%016lx\n%016lx\n", scaled_xor1.xshare,
+                dp.dpf[1].scaled_xor.xshare);
+            printf("\n");
+        } else {
+            RDPFTriple dt = tio.rdpftriple(yield, depth);
+            RegXS scaled_xor0, scaled_xor1, scaled_xor2;
+            auto ev = StreamEval(dt, start, 0, aes_ops, false);
+            for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                auto [L0, L1, L2] = ev.next();
+                RegXS sx0 = dt.dpf[0].scaled_xs(L0);
+                RegXS sx1 = dt.dpf[1].scaled_xs(L1);
+                RegXS sx2 = dt.dpf[2].scaled_xs(L2);
+                scaled_xor0 ^= sx0;
+                scaled_xor1 ^= sx1;
+                scaled_xor2 ^= sx2;
+            }
+            printf("%016lx\n%016lx\n", scaled_xor0.xshare,
+                dt.dpf[0].scaled_xor.xshare);
+            printf("\n");
+            printf("%016lx\n%016lx\n", scaled_xor1.xshare,
+                dt.dpf[1].scaled_xor.xshare);
+            printf("\n");
+            printf("%016lx\n%016lx\n", scaled_xor2.xshare,
+                dt.dpf[2].scaled_xor.xshare);
+            printf("\n");
+        }
+    });
 }
 
 // T is RegAS or RegXS for additive or XOR shared database respectively
