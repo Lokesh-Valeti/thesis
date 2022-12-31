@@ -330,17 +330,14 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         T init;
-        res = pe.reduce(init, [&dp, &shape] (const ParallelEval<RDPFPair> &pe,
-            int thread_num, address_t i, const RDPFPair::node &leaf) {
+        res = pe.reduce(init, [&dp, &shape] (int thread_num, address_t i,
+                const RDPFPair::node &leaf) {
             // The values from the two DPFs
             auto [V0, V1] = dp.unit<T>(leaf);
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i);
             return (DB + PBD) * V0.share() - BL * (V1-V0).share();
-        },
-        [] (const ParallelEval<RDPFPair> &pe, T &accum, const T &value) {
-            accum += value;
         });
 
         shape.yield();
@@ -368,8 +365,8 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
         ParallelEval pe(dp, IfRegAS<U>(indshift), IfRegXS<U>(indshift),
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
-        gamma = pe.reduce(init, [&dp, &shape] (const ParallelEval<RDPFPair> &pe,
-            int thread_num, address_t i, const RDPFPair::node &leaf) {
+        gamma = pe.reduce(init, [&dp, &shape] (int thread_num, address_t i,
+                const RDPFPair::node &leaf) {
             // The values from the two DPFs
             auto [V0, V1] = dp.unit<T>(leaf);
 
@@ -377,10 +374,6 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
             // appropriate cells in the two blinded databases
             auto [BL0, BL1] = shape.get_server(i);
             return std::make_tuple(-BL0 * V1.share(), -BL1 * V0.share());
-        },
-        [] (const ParallelEval<RDPFPair> &pe, std::tuple<T,T> &accum,
-            const std::tuple<T,T> &value) {
-            accum += value;
         });
 
         // Choose a random blinding factor
@@ -443,9 +436,8 @@ typename Duoram<T>::Shape::MemRefS<U>
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         int init = 0;
-        pe.reduce(init, [&dt, &shape, &Mshift, player]
-            (const ParallelEval<RDPFTriple> &pe, int thread_num,
-            address_t i, const RDPFTriple::node &leaf) {
+        pe.reduce(init, [&dt, &shape, &Mshift, player] (int thread_num,
+                address_t i, const RDPFTriple::node &leaf) {
             // The values from the three DPFs
             auto [V0, V1, V2] = dt.scaled<T>(leaf) + dt.unit<T>(leaf) * Mshift;
             // References to the appropriate cells in our database, our
@@ -460,9 +452,6 @@ typename Duoram<T>::Shape::MemRefS<U>
                 PBD += V1-V0;
             }
             return 0;
-        },
-        // We don't need to return a value
-        [] (const ParallelEval<RDPFTriple> &pe, int &accum, int value) {
         });
     } else {
         // The server does this
@@ -485,9 +474,8 @@ typename Duoram<T>::Shape::MemRefS<U>
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         int init = 0;
-        pe.reduce(init, [&dp, &shape, &Mshift]
-            (const ParallelEval<RDPFPair> &pe, int thread_num,
-            address_t i, const RDPFPair::node &leaf) {
+        pe.reduce(init, [&dp, &shape, &Mshift] (int thread_num,
+                address_t i, const RDPFPair::node &leaf) {
             // The values from the two DPFs
             auto V = dp.scaled<T>(leaf) + dp.unit<T>(leaf) * Mshift;
             // shape.get_server(i) returns a pair of references to the
@@ -495,9 +483,6 @@ typename Duoram<T>::Shape::MemRefS<U>
             // subtract the pair directly.
             shape.get_server(i) -= V;
             return 0;
-        },
-        // We don't need to return a value
-        [] (const ParallelEval<RDPFPair> &pe, int &accum, int value) {
         });
     }
     return *this;

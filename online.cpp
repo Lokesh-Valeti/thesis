@@ -404,13 +404,9 @@ static void par_rdpfeval_timing(MPCIO &mpcio,
                 auto pe = ParallelEval(dpf, start, 0,
                     address_t(1)<<depth, num_threads, tio.aes_ops());
                 RegXS result, init;
-                result = pe.reduce(init, [&dpf] (const ParallelEval<RDPF> &pe,
-                    int thread_num, address_t i, const RDPF::node &leaf) {
+                result = pe.reduce(init, [&dpf] (int thread_num,
+                        address_t i, const RDPF::node &leaf) {
                     return dpf.scaled_xs(leaf);
-                },
-                [] (const ParallelEval<RDPF> &pe, RegXS &accum,
-                    const RegXS &value) {
-                    accum ^= value;
                 });
                 printf("%016lx\n%016lx\n", result.xshare,
                     dpf.scaled_xor.xshare);
@@ -424,13 +420,9 @@ static void par_rdpfeval_timing(MPCIO &mpcio,
                 auto pe = ParallelEval(dpf, start, 0,
                     address_t(1)<<depth, num_threads, tio.aes_ops());
                 RegXS result, init;
-                result = pe.reduce(init, [&dpf] (const ParallelEval<RDPF> &pe,
-                    int thread_num, address_t i, const RDPF::node &leaf) {
+                result = pe.reduce(init, [&dpf] (int thread_num,
+                        address_t i, const RDPF::node &leaf) {
                     return dpf.scaled_xs(leaf);
-                },
-                [] (const ParallelEval<RDPF> &pe, RegXS &accum,
-                    const RegXS &value) {
-                    accum ^= value;
                 });
                 printf("%016lx\n%016lx\n", result.xshare,
                     dpf.scaled_xor.xshare);
@@ -527,12 +519,9 @@ static void par_tupleeval_timing(MPCIO &mpcio,
                 num_threads, aes_ops);
             using V = std::tuple<RegXS,RegXS>;
             V result, init;
-            result = pe.reduce(init, [&dp] (const ParallelEval<RDPFPair> &pe,
-                int thread_num, address_t i, const RDPFPair::node &leaf) {
+            result = pe.reduce(init, [&dp] (int thread_num, address_t i,
+                    const RDPFPair::node &leaf) {
                 return dp.scaled<RegXS>(leaf);
-            },
-            [] (const ParallelEval<RDPFPair> &pe, V &accum, const V &value) {
-                accum += value;
             });
             printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
                 dp.dpf[0].scaled_xor.xshare);
@@ -546,12 +535,9 @@ static void par_tupleeval_timing(MPCIO &mpcio,
                 num_threads, aes_ops);
             using V = std::tuple<RegXS,RegXS,RegXS>;
             V result, init;
-            result = pe.reduce(init, [&dt] (const ParallelEval<RDPFTriple> &pe,
-                int thread_num, address_t i, const RDPFTriple::node &leaf) {
+            result = pe.reduce(init, [&dt] (int thread_num, address_t i,
+                    const RDPFTriple::node &leaf) {
                 return dt.scaled<RegXS>(leaf);
-            },
-            [] (const ParallelEval<RDPFTriple> &pe, V &accum, const V &value) {
-                accum += value;
             });
             printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
                 dt.dpf[0].scaled_xor.xshare);
