@@ -8,9 +8,10 @@ struct PRACOptions {
     int num_threads;
     bool expand_rdpfs;
     bool use_xor_db;
+    bool append_to_files;
 
     PRACOptions() : mode(MODE_ONLINE), num_threads(1),
-        expand_rdpfs(true), use_xor_db(false) {}
+        expand_rdpfs(true), use_xor_db(false), append_to_files(false) {}
 };
 
 #endif

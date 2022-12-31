@@ -8,8 +8,9 @@
 
 static void usage(const char *progname)
 {
-    std::cerr << "Usage: " << progname << " [-p] [-t num] player_num player_addrs args ...\n";
+    std::cerr << "Usage: " << progname << " [-p | -a | -o] [-t num] [-c] [-x] player_num player_addrs args ...\n";
     std::cerr << "-p: preprocessing mode\n";
+    std::cerr << "-a: append to files in preprocessing mode (implies -p)\n";
     std::cerr << "-o: online-only mode\n";
     std::cerr << "-t num: use num threads\n";
     std::cerr << "-c: store DPFs compressed (default is expanded)\n";
@@ -85,6 +86,10 @@ int main(int argc, char **argv)
     while (*args && *args[0] == '-') {
         if (!strcmp("-p", *args)) {
             opts.mode = MODE_PREPROCESSING;
+            ++args;
+        } else if (!strcmp("-a", *args)) {
+            opts.mode = MODE_PREPROCESSING;
+            opts.append_to_files = true;
             ++args;
         } else if (!strcmp("-o", *args)) {
             opts.mode = MODE_ONLINEONLY;

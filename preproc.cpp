@@ -8,9 +8,12 @@
 
 // Keep track of open files that coroutines might be writing into
 class Openfiles {
+    bool append_mode;
     std::vector<std::ofstream> files;
 
 public:
+    Openfiles(bool append_mode = false) : append_mode(append_mode) {}
+
     class Handle {
         Openfiles &parent;
         size_t idx;
@@ -42,7 +45,8 @@ Openfiles::Handle Openfiles::open(const char *prefix, unsigned player,
         sprintf(suffix, ".p%d.t%u", player%10, thread_num);
     }
     filename.append(suffix);
-    std::ofstream &f = files.emplace_back(filename);
+    std::ofstream &f = files.emplace_back(filename,
+        append_mode ? std::ios_base::app : std::ios_base::out);
     if (f.fail()) {
         std::cerr << "Failed to open " << filename << "\n";
         exit(1);
@@ -83,7 +87,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, &opts, thread_num] {
             MPCTIO tio(mpcio, thread_num);
-            Openfiles ofiles;
+            Openfiles ofiles(opts.append_to_files);
             std::vector<coro_t> coroutines;
             while(1) {
                 unsigned char type = 0;
