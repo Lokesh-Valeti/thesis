@@ -89,12 +89,14 @@ class Duoram<T>::Shape {
 
     // The parent class of the MemRef* classes
     class MemRef;
+
+    // When x is additively or XOR shared
+    // U is the sharing type of the indices, while T is the sharing type
+    // of the data in the database.
+    template <typename U>
+    class MemRefS;
     // When x is unshared explicit value
     class MemRefExpl;
-    // When x is additively shared
-    class MemRefAS;
-    // When x is XOR shared
-    class MemRefXS;
 
 protected:
     // A reference to the parent shape.  As with ".." in the root
@@ -183,8 +185,8 @@ public:
     inline size_t size() { return shape_size; }
 
     // Index into this Shape in various ways
-    MemRefAS operator[](const RegAS &idx) { return MemRefAS(*this, idx); }
-    MemRefXS operator[](const RegXS &idx) { return MemRefXS(*this, idx); }
+    MemRefS<RegAS> operator[](const RegAS &idx) { return MemRefS<RegAS>(*this, idx); }
+    MemRefS<RegXS> operator[](const RegXS &idx) { return MemRefS<RegXS>(*this, idx); }
     MemRefExpl operator[](address_t idx) { return MemRefExpl(*this, idx); }
 
     // Enable or disable explicit-only mode.  Only using [] with
@@ -297,45 +299,26 @@ public:
 
 };
 
-// An additively shared memory reference.  You get one of these from a
-// Shape A and an additively shared RegAS index x with A[x].  Then you
-// perform operations on this object, which do the Duoram operations.
+// An additive or XOR shared memory reference.  You get one of these
+// from a Shape A and an additively shared RegAS index x, or an XOR
+// shared RegXS index x, with A[x].  Then you perform operations on this
+// object, which do the Duoram operations.  As above, T is the sharing
+// type of the data in the database, while U is the sharing type of the
+// index used to create this memory reference.
 
-template <typename T>
-class Duoram<T>::Shape::MemRefAS : public Duoram<T>::Shape::MemRef {
-    RegAS idx;
+template <typename T> template <typename U>
+class Duoram<T>::Shape::MemRefS : public Duoram<T>::Shape::MemRef {
+    U idx;
 
 public:
-    MemRefAS(Shape &shape, const RegAS &idx) :
+    MemRefS<U>(Shape &shape, const U &idx) :
         MemRef(shape), idx(idx) {}
 
     // Oblivious read from an additively shared index of Duoram memory
     operator T() override;
 
     // Oblivious update to an additively shared index of Duoram memory
-    MemRefAS &operator+=(const T& M) override;
-};
-
-// An XOR shared memory reference.  You get one of these from a Shape A
-// and an XOR shared RegXS index x with A[x].  Then you perform
-// operations on this object, which do the Duoram operations.
-
-template <typename T>
-class Duoram<T>::Shape::MemRefXS : public Duoram<T>::Shape::MemRef {
-    RegXS idx;
-
-public:
-    MemRefXS(Shape &shape, const RegXS &idx) :
-        MemRef(shape), idx(idx) {}
-
-    // Oblivious read from an XOR shared index of Duoram memory
-    operator T() override;
-
-    // Oblivious update to an XOR shared index of Duoram memory
-    MemRefXS &operator+=(const T& M) override;
-
-    // Convenience function
-    MemRefXS &operator-=(const T& M) { *this += (-M); return *this; }
+    MemRefS<U> &operator+=(const T& M) override;
 };
 
 // An explicit memory reference.  You get one of these from a Shape A
