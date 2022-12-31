@@ -165,6 +165,18 @@ inline V ParallelEval<T>::reduce(V init, W process, X accumulate)
     return total;
 }
 
+// Additive share of the target index
+template <>
+inline RegAS RDPFTriple::target<RegAS>() const {
+    return as_target;
+}
+
+// XOR share of the target index
+template <>
+inline RegXS RDPFTriple::target<RegXS>() const {
+    return xs_target;
+}
+
 // Additive share of the scaling value M_as such that the high words
 // of the leaf values for P0 and P1 add to M_as * e_{target}
 template <>

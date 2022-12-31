@@ -153,6 +153,9 @@ struct RDPFTriple {
     // parameter
 
     template <typename T>
+    inline T target() const;
+
+    template <typename T>
     inline std::tuple<T,T,T> scaled_value() const;
 
     template <typename T>

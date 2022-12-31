@@ -286,7 +286,7 @@ Duoram<T>::Shape::MemRefAS::operator T()
         RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index offset
-        RegAS indoffset = dt.as_target;
+        RegAS indoffset = dt.target<RegAS>();
         indoffset -= idx;
 
         // We only need two of the DPFs for reading
@@ -385,7 +385,7 @@ typename Duoram<T>::Shape::MemRefAS
         RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index and message offsets
-        RegAS indoffset = dt.as_target;
+        RegAS indoffset = dt.target<RegAS>();
         indoffset -= idx;
         auto Moffset = std::make_tuple(M, M, M);
         Moffset -= dt.scaled_value<T>();
@@ -518,7 +518,7 @@ Duoram<T>::Shape::MemRefXS::operator T()
         RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index offset
-        RegXS indoffset = dt.xs_target;
+        RegXS indoffset = dt.target<RegXS>();
         indoffset -= idx;
 
         // We only need two of the DPFs for reading
@@ -615,7 +615,7 @@ typename Duoram<T>::Shape::MemRefXS
         RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index and message offsets
-        RegXS indoffset = dt.xs_target;
+        RegXS indoffset = dt.target<RegXS>();
         indoffset -= idx;
         auto Moffset = std::make_tuple(M, M, M);
         Moffset -= dt.scaled_value<T>();
