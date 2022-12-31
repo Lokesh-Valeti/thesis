@@ -312,20 +312,28 @@ MPCPeerIO::MPCPeerIO(unsigned player, ProcessingMode mode,
 void MPCPeerIO::dump_precomp_stats(std::ostream &os)
 {
     for (size_t i=0; i<triples.size(); ++i) {
+        size_t cnt;
         if (i > 0) {
             os << " ";
         }
-        os << "T" << i << " t:" << triples[i].get_stats() <<
-            " h:" << halftriples[i].get_stats();
+        os << "T" << i;
+        cnt = triples[i].get_stats();
+        if (cnt > 0) {
+            os << " t:" << cnt;
+        }
+        cnt = halftriples[i].get_stats();
+        if (cnt > 0) {
+            os << " h:" << cnt;
+        }
         for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
-            size_t cnt = rdpftriples[i][depth-1].get_stats();
+            cnt = rdpftriples[i][depth-1].get_stats();
             if (cnt > 0) {
                 os << " r" << int(depth) << ":" << cnt;
             }
         }
-        size_t ccnt = cdpfs[i].get_stats();
-        if (ccnt > 0) {
-            os << " c:" << ccnt;
+        cnt = cdpfs[i].get_stats();
+        if (cnt > 0) {
+            os << " c:" << cnt;
         }
     }
     os << "\n";
