@@ -378,6 +378,68 @@ static void rdpfeval_timing(MPCIO &mpcio,
     });
 }
 
+static void par_rdpfeval_timing(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+    address_t start=0;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        start = strtoull(*args, NULL, 16);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    MPCTIO tio(mpcio, 0, num_threads);
+    run_coroutines(tio, [&tio, depth, start, num_threads] (yield_t &yield) {
+        if (tio.player() == 2) {
+            RDPFPair dp = tio.rdpfpair(yield, depth);
+            for (int i=0;i<2;++i) {
+                RDPF &dpf = dp.dpf[i];
+                nbits_t depth = dpf.depth();
+                auto pe = ParallelEval(dpf, start, 0,
+                    address_t(1)<<depth, num_threads, tio.aes_ops());
+                RegXS result, init;
+                result = pe.reduce(init, [&dpf] (const ParallelEval<RDPF> &pe,
+                    int thread_num, address_t i, const RDPF::node &leaf) {
+                    return dpf.scaled_xs(leaf);
+                },
+                [] (const ParallelEval<RDPF> &pe, RegXS &accum,
+                    const RegXS &value) {
+                    accum ^= value;
+                });
+                printf("%016lx\n%016lx\n", result.xshare,
+                    dpf.scaled_xor.xshare);
+                printf("\n");
+            }
+        } else {
+            RDPFTriple dt = tio.rdpftriple(yield, depth);
+            for (int i=0;i<3;++i) {
+                RDPF &dpf = dt.dpf[i];
+                nbits_t depth = dpf.depth();
+                auto pe = ParallelEval(dpf, start, 0,
+                    address_t(1)<<depth, num_threads, tio.aes_ops());
+                RegXS result, init;
+                result = pe.reduce(init, [&dpf] (const ParallelEval<RDPF> &pe,
+                    int thread_num, address_t i, const RDPF::node &leaf) {
+                    return dpf.scaled_xs(leaf);
+                },
+                [] (const ParallelEval<RDPF> &pe, RegXS &accum,
+                    const RegXS &value) {
+                    accum ^= value;
+                });
+                printf("%016lx\n%016lx\n", result.xshare,
+                    dpf.scaled_xor.xshare);
+                printf("\n");
+            }
+        }
+    });
+}
+
 static void tupleeval_timing(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -434,6 +496,70 @@ static void tupleeval_timing(MPCIO &mpcio,
                 dt.dpf[1].scaled_xor.xshare);
             printf("\n");
             printf("%016lx\n%016lx\n", scaled_xor2.xshare,
+                dt.dpf[2].scaled_xor.xshare);
+            printf("\n");
+        }
+    });
+}
+
+static void par_tupleeval_timing(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+    address_t start=0;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        start = atoi(*args);
+        ++args;
+    }
+
+    int num_threads = opts.num_threads;
+    MPCTIO tio(mpcio, 0, num_threads);
+    run_coroutines(tio, [&tio, depth, start, num_threads] (yield_t &yield) {
+        size_t &aes_ops = tio.aes_ops();
+        if (tio.player() == 2) {
+            RDPFPair dp = tio.rdpfpair(yield, depth);
+            auto pe = ParallelEval(dp, start, 0, address_t(1)<<depth,
+                num_threads, aes_ops);
+            using V = std::tuple<RegXS,RegXS>;
+            V result, init;
+            result = pe.reduce(init, [&dp] (const ParallelEval<RDPFPair> &pe,
+                int thread_num, address_t i, const RDPFPair::node &leaf) {
+                return dp.scaled<RegXS>(leaf);
+            },
+            [] (const ParallelEval<RDPFPair> &pe, V &accum, const V &value) {
+                accum += value;
+            });
+            printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
+                dp.dpf[0].scaled_xor.xshare);
+            printf("\n");
+            printf("%016lx\n%016lx\n", std::get<1>(result).xshare,
+                dp.dpf[1].scaled_xor.xshare);
+            printf("\n");
+        } else {
+            RDPFTriple dt = tio.rdpftriple(yield, depth);
+            auto pe = ParallelEval(dt, start, 0, address_t(1)<<depth,
+                num_threads, aes_ops);
+            using V = std::tuple<RegXS,RegXS,RegXS>;
+            V result, init;
+            result = pe.reduce(init, [&dt] (const ParallelEval<RDPFTriple> &pe,
+                int thread_num, address_t i, const RDPFTriple::node &leaf) {
+                return dt.scaled<RegXS>(leaf);
+            },
+            [] (const ParallelEval<RDPFTriple> &pe, V &accum, const V &value) {
+                accum += value;
+            });
+            printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
+                dt.dpf[0].scaled_xor.xshare);
+            printf("\n");
+            printf("%016lx\n%016lx\n", std::get<1>(result).xshare,
+                dt.dpf[1].scaled_xor.xshare);
+            printf("\n");
+            printf("%016lx\n%016lx\n", std::get<2>(result).xshare,
                 dt.dpf[2].scaled_xor.xshare);
             printf("\n");
         }
@@ -866,9 +992,15 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "evaltime")) {
         ++args;
         rdpfeval_timing(mpcio, opts, args);
+    } else if (!strcmp(*args, "parevaltime")) {
+        ++args;
+        par_rdpfeval_timing(mpcio, opts, args);
     } else if (!strcmp(*args, "tupletime")) {
         ++args;
         tupleeval_timing(mpcio, opts, args);
+    } else if (!strcmp(*args, "partupletime")) {
+        ++args;
+        par_tupleeval_timing(mpcio, opts, args);
     } else if (!strcmp(*args, "duotest")) {
         ++args;
         if (opts.use_xor_db) {
