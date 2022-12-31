@@ -381,6 +381,13 @@ public:
     inline bool is_server() { return mpcio.player == 2; }
     inline size_t& aes_ops() { return mpcio.aes_ops[thread_num]; }
     inline size_t msgs_sent() { return mpcio.msgs_sent[thread_num]; }
+    inline int cpu_nthreads(int nthreads=0) {
+        int res = local_cpu_nthreads;
+        if (nthreads > 0) {
+            local_cpu_nthreads = nthreads;
+        }
+        return res;
+    }
     inline int comm_nthreads(int nthreads=0) {
         int res = communication_nthreads;
         if (nthreads > 0) {

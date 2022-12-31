@@ -584,69 +584,62 @@ static void duoram_test(MPCIO &mpcio,
     }
     share &= ((address_t(1)<<depth)-1);
 
-    int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, share] {
-            MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth, share] (yield_t &yield) {
-                size_t size = size_t(1)<<depth;
-                // size_t &aes_ops = tio.aes_ops();
-                Duoram<T> oram(tio.player(), size);
-                auto A = oram.flat(tio, yield);
-                RegAS aidx;
-                aidx.ashare = share;
-                T M;
-                if (tio.player() == 0) {
-                    M.set(0xbabb0000);
-                } else {
-                    M.set(0x0000a66e);
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&tio, depth, share] (yield_t &yield) {
+        size_t size = size_t(1)<<depth;
+        // size_t &aes_ops = tio.aes_ops();
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+        RegAS aidx;
+        aidx.ashare = share;
+        T M;
+        if (tio.player() == 0) {
+            M.set(0xbabb0000);
+        } else {
+            M.set(0x0000a66e);
+        }
+        RegXS xidx;
+        xidx.xshare = share;
+        T N;
+        if (tio.player() == 0) {
+            N.set(0xdead0000);
+        } else {
+            N.set(0x0000beef);
+        }
+        // Writing and reading with additively shared indices
+        printf("Updating\n");
+        A[aidx] += M;
+        printf("Reading\n");
+        T Aa = A[aidx];
+        // Writing and reading with XOR shared indices
+        printf("Updating\n");
+        A[xidx] += N;
+        printf("Reading\n");
+        T Ax = A[xidx];
+        T Ae;
+        // Writing and reading with explicit indices
+        if (depth > 2) {
+            A[5] += Aa;
+            Ae = A[6];
+        }
+        if (depth <= 10) {
+            oram.dump();
+            auto check = A.reconstruct();
+            if (tio.player() == 0) {
+                for (address_t i=0;i<size;++i) {
+                    printf("%04x %016lx\n", i, check[i].share());
                 }
-                RegXS xidx;
-                xidx.xshare = share;
-                T N;
-                if (tio.player() == 0) {
-                    N.set(0xdead0000);
-                } else {
-                    N.set(0x0000beef);
-                }
-                // Writing and reading with additively shared indices
-                printf("Updating\n");
-                A[aidx] += M;
-                printf("Reading\n");
-                T Aa = A[aidx];
-                // Writing and reading with XOR shared indices
-                printf("Updating\n");
-                A[xidx] += N;
-                printf("Reading\n");
-                T Ax = A[xidx];
-                T Ae;
-                // Writing and reading with explicit indices
-                if (depth > 2) {
-                    A[5] += Aa;
-                    Ae = A[6];
-                }
-                if (depth <= 10) {
-                    oram.dump();
-                    auto check = A.reconstruct();
-                    if (tio.player() == 0) {
-                        for (address_t i=0;i<size;++i) {
-                            printf("%04x %016lx\n", i, check[i].share());
-                        }
-                    }
-                }
-                auto checkread = A.reconstruct(Aa);
-                auto checkreade = A.reconstruct(Ae);
-                auto checkreadx = A.reconstruct(Ax);
-                if (tio.player() == 0) {
-                    printf("Read AS value = %016lx\n", checkread.share());
-                    printf("Read AX value = %016lx\n", checkreadx.share());
-                    printf("Read Ex value = %016lx\n", checkreade.share());
-                }
-            });
-        });
-    }
-    pool.join();
+            }
+        }
+        auto checkread = A.reconstruct(Aa);
+        auto checkreade = A.reconstruct(Ae);
+        auto checkreadx = A.reconstruct(Ax);
+        if (tio.player() == 0) {
+            printf("Read AS value = %016lx\n", checkread.share());
+            printf("Read AX value = %016lx\n", checkreadx.share());
+            printf("Read Ex value = %016lx\n", checkreade.share());
+        }
+    });
 }
 
 static void cdpf_test(MPCIO &mpcio,
