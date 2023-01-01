@@ -72,6 +72,7 @@ void Openfiles::closeall()
 //   0x01 to 0x30: RAM DPF of that depth
 //   0x40: Comparison DPF
 //   0x82: Counter (for testing)
+//   0x83: Set number of CPU threads for this communication thread
 //   0x00: End of preprocessing
 //
 // Four bytes: number of objects of that type (not sent for type == 0x00)
@@ -173,6 +174,8 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                                 }
                             }
                         });
+                } else if (type == 0x83) {
+                    tio.cpu_nthreads(num);
                 }
             }
             run_coroutines(tio, coroutines);
@@ -321,6 +324,14 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                             }
                         });
 
+                } else if (!strcmp(type, "p")) {
+                    unsigned char typetag = 0x83;
+                    stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&num, 4);
+                    stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&num, 4);
+
+                    stio.cpu_nthreads(num);
 		}
                 free(arg);
                 ++threadargs;
