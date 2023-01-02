@@ -307,11 +307,14 @@ protected:
 
 public:
 
-    // Oblivious read from an additively shared index of Duoram memory
+    // Oblivious read from a shared index of Duoram memory
     virtual operator T() = 0;
 
-    // Oblivious update to an additively shared index of Duoram memory
+    // Oblivious update to a shared index of Duoram memory
     virtual MemRef &operator+=(const T& M) = 0;
+
+    // Oblivious write to a shared index of Duoram memory
+    virtual MemRef &operator=(const T& M) = 0;
 
     // Convenience function
     MemRef &operator-=(const T& M) { *this += (-M); return *this; }
@@ -333,11 +336,14 @@ public:
     MemRefS<U>(Shape &shape, const U &idx) :
         MemRef(shape), idx(idx) {}
 
-    // Oblivious read from an additively shared index of Duoram memory
+    // Oblivious read from a shared index of Duoram memory
     operator T() override;
 
-    // Oblivious update to an additively shared index of Duoram memory
+    // Oblivious update to a shared index of Duoram memory
     MemRefS<U> &operator+=(const T& M) override;
+
+    // Oblivious write to a shared index of Duoram memory
+    MemRefS<U> &operator=(const T& M) override;
 };
 
 // An explicit memory reference.  You get one of these from a Shape A
@@ -358,6 +364,9 @@ public:
 
     // Explicit update to a given index of Duoram memory
     MemRefExpl &operator+=(const T& M) override;
+
+    // Explicit write to a given index of Duoram memory
+    MemRefExpl &operator=(const T& M) override;
 
     // Convenience function
     MemRefExpl &operator-=(const T& M) { *this += (-M); return *this; }
@@ -380,13 +389,18 @@ public:
     MemRefInd(Sh &shape, std::array<U,N> aindcs) :
         shape(shape) { for ( auto &i : aindcs ) { indcs.push_back(i); } }
 
-    // Explicit read from a given index of Duoram memory
+    // Independent reads from shared or explicit indices of Duoram memory
     operator std::vector<T>();
 
-    // Explicit update to a given index of Duoram memory
+    // Independent updates to shared or explicit indices of Duoram memory
     MemRefInd &operator+=(const std::vector<T>& M);
     template <size_t N>
     MemRefInd &operator+=(const std::array<T,N>& M);
+
+    // Independent writes to shared or explicit indices of Duoram memory
+    MemRefInd &operator=(const std::vector<T>& M);
+    template <size_t N>
+    MemRefInd &operator=(const std::array<T,N>& M);
 
     // Convenience function
     MemRefInd &operator-=(const std::vector<T>& M) { *this += (-M); return *this; }

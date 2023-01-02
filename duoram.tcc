@@ -392,7 +392,7 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
     return res;  // The server will always get 0
 }
 
-// Oblivious update to an additively shared index of Duoram memory
+// Oblivious update to an additively or XOR shared index of Duoram memory
 template <typename T> template <typename U>
 typename Duoram<T>::Shape::template MemRefS<U>
     &Duoram<T>::Shape::MemRefS<U>::operator+=(const T& M)
@@ -485,6 +485,17 @@ typename Duoram<T>::Shape::template MemRefS<U>
             return 0;
         });
     }
+    return *this;
+}
+
+// Oblivious write to an additively or XOR shared index of Duoram memory
+template <typename T> template <typename U>
+typename Duoram<T>::Shape::template MemRefS<U>
+    &Duoram<T>::Shape::MemRefS<U>::operator=(const T& M)
+{
+    T oldval = *this;
+    T update = M - oldval;
+    *this += update;
     return *this;
 }
 
@@ -597,6 +608,17 @@ typename Duoram<T>::Shape::MemRefExpl
     return *this;
 }
 
+// Explicit write to a given index of Duoram memory
+template <typename T>
+typename Duoram<T>::Shape::MemRefExpl
+    &Duoram<T>::Shape::MemRefExpl::operator=(const T& M)
+{
+    T oldval = *this;
+    T update = M - oldval;
+    *this += update;
+    return *this;
+}
+
 // Independent U-shared reads into a Shape of subtype Sh on a Duoram
 // with values of sharing type T
 template <typename T> template <typename U, typename Sh>
@@ -652,6 +674,48 @@ typename Duoram<T>::Shape::template MemRefInd<U,Sh>
         coroutines.emplace_back([this, &M, i] (yield_t &yield) {
             Sh Sh_coro = shape.context(yield);
             Sh_coro[indcs[i]] += M[i];
+        });
+    }
+    run_coroutines(shape.yield, coroutines);
+
+    return *this;
+}
+
+// Independent U-shared writes into a Shape of subtype Sh on a Duoram
+// with values of sharing type T (vector version)
+template <typename T> template <typename U, typename Sh>
+typename Duoram<T>::Shape::template MemRefInd<U,Sh>
+    &Duoram<T>::Shape::MemRefInd<U,Sh>::operator=(const std::vector<T>& M)
+{
+    size_t size = indcs.size();
+    assert(M.size() == size);
+
+    std::vector<coro_t> coroutines;
+    for (size_t i=0;i<size;++i) {
+        coroutines.emplace_back([this, &M, i] (yield_t &yield) {
+            Sh Sh_coro = shape.context(yield);
+            Sh_coro[indcs[i]] = M[i];
+        });
+    }
+    run_coroutines(shape.yield, coroutines);
+
+    return *this;
+}
+
+// Independent U-shared writes into a Shape of subtype Sh on a Duoram
+// with values of sharing type T (array version)
+template <typename T> template <typename U, typename Sh> template <size_t N>
+typename Duoram<T>::Shape::template MemRefInd<U,Sh>
+    &Duoram<T>::Shape::MemRefInd<U,Sh>::operator=(const std::array<T,N>& M)
+{
+    size_t size = indcs.size();
+    assert(N == size);
+
+    std::vector<coro_t> coroutines;
+    for (size_t i=0;i<size;++i) {
+        coroutines.emplace_back([this, &M, i] (yield_t &yield) {
+            Sh Sh_coro = shape.context(yield);
+            Sh_coro[indcs[i]] = M[i];
         });
     }
     run_coroutines(shape.yield, coroutines);

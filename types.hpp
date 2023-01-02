@@ -2,6 +2,8 @@
 #define __OBLIVDS_TYPES_HPP__
 
 #include <tuple>
+#include <vector>
+#include <array>
 #include <cstdint>
 #include <x86intrin.h>  // SSE and AVX intrinsics
 #include <bsd/stdlib.h> // arc4random_buf
@@ -256,7 +258,8 @@ inline value_t combine(const RegXS &A, const RegXS &B,
     return (A.xshare ^ B.xshare) & mask;
 }
 
-// Some useful operations on tuples of the above types
+// Some useful operations on tuples, vectors, and arrays of the above
+// types
 
 template <typename T>
 std::tuple<T,T> operator+=(std::tuple<T,T> &A,
@@ -433,6 +436,47 @@ std::tuple<T,T,T> operator*(const std::tuple<T,T,T> &A,
     auto res = A;
     res *= B;
     return res;
+}
+
+inline std::vector<RegAS> operator-(const std::vector<RegAS> &A)
+{
+    std::vector<RegAS> res;
+    for (const auto &v : A) {
+        res.push_back(-v);
+    }
+    return res;
+}
+
+inline std::vector<RegXS> operator-(const std::vector<RegXS> &A)
+{
+    return A;
+}
+
+inline std::vector<RegBS> operator-(const std::vector<RegBS> &A)
+{
+    return A;
+}
+
+template <size_t N>
+inline std::vector<RegAS> operator-(const std::array<RegAS,N> &A)
+{
+    std::vector<RegAS> res;
+    for (const auto &v : A) {
+        res.push_back(-v);
+    }
+    return res;
+}
+
+template <size_t N>
+inline std::array<RegXS,N> operator-(const std::array<RegXS,N> &A)
+{
+    return A;
+}
+
+template <size_t N>
+inline std::array<RegBS,N> operator-(const std::array<RegBS,N> &A)
+{
+    return A;
 }
 
 template <typename T>

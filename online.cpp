@@ -595,23 +595,26 @@ static void duoram_test(MPCIO &mpcio,
             N.set(0x0000beef);
         }
         // Writing and reading with additively shared indices
-        printf("Updating\n");
+        printf("Additive Updating\n");
         A[aidx] += M;
-        printf("Reading\n");
+        printf("Additive Reading\n");
         T Aa = A[aidx];
         // Writing and reading with XOR shared indices
-        printf("Updating\n");
+        printf("XOR Updating\n");
         A[xidx] += N;
-        printf("Reading\n");
+        printf("XOR Reading\n");
         T Ax = A[xidx];
         T Ae;
         // Writing and reading with explicit indices
         if (depth > 2) {
+            printf("Explicit Updating\n");
             A[5] += Aa;
+            printf("Explicit Reading\n");
             Ae = A[6];
         }
 
         // Simultaneous independent reads
+        printf("3 independent reading\n");
         std::vector<T> Av = A.indep(std::array {
             aidx, aidx2, aidx3
         });
@@ -621,7 +624,8 @@ static void duoram_test(MPCIO &mpcio,
         Aw1.set(0x101010101010101 * tio.player());
         Aw2.set(0x202020202020202 * tio.player());
         Aw3.set(0x303030303030303 * tio.player());
-        A.indep(std::array { aidx, aidx2, aidx3 }) +=
+        printf("3 independent updating\n");
+        A.indep(std::array { aidx, aidx2, aidx3 }) -=
             std::array { Aw1, Aw2, Aw3 };
 
         if (depth <= 10) {
