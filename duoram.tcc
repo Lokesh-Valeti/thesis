@@ -90,13 +90,17 @@ std::vector<T> Duoram<T>::Shape::reconstruct() const
     // Player 1 sends their share of the database to player 0
     if (player == 1) {
         tio.queue_peer(duoram.database.data(), duoram.size()*sizeof(T));
+        yield();
     } else if (player == 0) {
+        yield();
         tio.recv_peer(res.data(), duoram.size()*sizeof(T));
         for(size_t i=0;i<duoram.size();++i) {
             res[i] += duoram.database[i];
         }
+    } else if (player == 2) {
+        // The server (player 2) only syncs with the yield
+        yield();
     }
-    // The server (player 2) does nothing
 
     // Players 1 and 2 will get an empty vector here
     return res;
@@ -112,11 +116,15 @@ T Duoram<T>::Shape::reconstruct(const T& share) const
     // Player 1 sends their share of the value to player 0
     if (player == 1) {
         tio.queue_peer(&share, sizeof(T));
+        yield();
     } else if (player == 0) {
+        yield();
         tio.recv_peer(&res, sizeof(T));
         res += share;
+    } else if (player == 2) {
+        // The server (player 2) only syncs with the yield
+        yield();
     }
-    // The server (player 2) does nothing
 
     // Players 1 and 2 will get 0 here
     return res;
@@ -460,6 +468,8 @@ typename Duoram<T>::Shape::template MemRefS<U>
         U p0indoffset, p1indoffset;
         std::tuple<T,T> p0Moffset, p1Moffset;
 
+        shape.yield();
+
         // Receive the index and message offsets from the computational
         // players and combine them
         shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
@@ -594,6 +604,8 @@ typename Duoram<T>::Shape::MemRefExpl
         PBD += peerblinded;
     } else if (player == 2) {
         // The server does this
+
+        shape.yield();
 
         // Receive the updates to the blinds
         T p0blind, p1blind;
