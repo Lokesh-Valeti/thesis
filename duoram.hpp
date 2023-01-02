@@ -266,11 +266,13 @@ public:
     // Generate independent memory references for this Flat
     template <typename U>
     Duoram::Shape::MemRefInd<U, Flat> indep(const std::vector<U> &indcs) {
-        return typename Duoram::Shape::MemRefInd<U,Flat>(*this, indcs);
+        typename Duoram<T>::Shape::template MemRefInd<U,Flat> res(*this, indcs);
+        return res;
     }
     template <typename U, size_t N>
     Duoram::Shape::MemRefInd<U, Flat> indep(const std::array<U,N> &indcs) {
-        return typename Duoram::Shape::MemRefInd<U,Flat>(*this, indcs);
+        typename Duoram<T>::Shape::template MemRefInd<U,Flat> res(*this, indcs);
+        return res;
     }
 
     // Oblivious sort the elements indexed by the two given indices.
