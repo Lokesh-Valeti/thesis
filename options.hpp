@@ -11,7 +11,7 @@ struct PRACOptions {
     bool append_to_files;
 
     PRACOptions() : mode(MODE_ONLINE), num_threads(1),
-        expand_rdpfs(true), use_xor_db(false), append_to_files(false) {}
+        expand_rdpfs(false), use_xor_db(false), append_to_files(false) {}
 };
 
 #endif

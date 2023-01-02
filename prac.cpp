@@ -8,12 +8,12 @@
 
 static void usage(const char *progname)
 {
-    std::cerr << "Usage: " << progname << " [-p | -a | -o] [-t num] [-c] [-x] player_num player_addrs args ...\n";
+    std::cerr << "Usage: " << progname << " [-p | -a | -o] [-t num] [-e] [-x] player_num player_addrs args ...\n";
     std::cerr << "-p: preprocessing mode\n";
     std::cerr << "-a: append to files in preprocessing mode (implies -p)\n";
     std::cerr << "-o: online-only mode\n";
     std::cerr << "-t num: use num threads\n";
-    std::cerr << "-c: store DPFs compressed (default is expanded)\n";
+    std::cerr << "-e: store DPFs expanded (default is compressed)\n";
     std::cerr << "-x: use XOR-shared database (default is additive)\n";
     std::cerr << "player_num = 0 or 1 for the computational players\n";
     std::cerr << "player_num = 2 for the server player\n";
@@ -104,12 +104,15 @@ int main(int argc, char **argv)
             } else {
                 usage(argv[0]);
             }
-        } else if (!strcmp("-c", *args)) {
-            opts.expand_rdpfs = false;
+        } else if (!strcmp("-e", *args)) {
+            opts.expand_rdpfs = true;
             ++args;
         } else if (!strcmp("-x", *args)) {
             opts.use_xor_db = true;
             ++args;
+        } else {
+            printf("Unknown option %s\n", *args);
+            usage(argv[0]);
         }
     }
     if (*args == NULL) {
