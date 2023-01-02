@@ -604,7 +604,10 @@ MultTriple MPCTIO::triple(yield_t &yield)
     return val;
 }
 
-HalfTriple MPCTIO::halftriple(yield_t &yield)
+// When halftriple() is used internally to another preprocessing
+// operation, don't tally it, so that it doesn't appear sepearately in
+// the stats from the preprocessing operation that invoked it
+HalfTriple MPCTIO::halftriple(yield_t &yield, bool tally)
 {
     HalfTriple val;
     if (mpcio.player < 2) {
@@ -612,7 +615,9 @@ HalfTriple MPCTIO::halftriple(yield_t &yield)
         if (mpcpio.mode != MODE_ONLINE) {
             yield();
             recv_server(&val, sizeof(val));
-            mpcpio.halftriples[thread_num].inc();
+            if (tally) {
+                mpcpio.halftriples[thread_num].inc();
+            }
         } else {
             mpcpio.halftriples[thread_num].get(val);
         }

@@ -30,14 +30,16 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
 // P0 holds the (complete) value x, P1 holds the (complete) value y;
 // compute additive shares of z = x*y.  x, y, and z are each at most
 // nbits bits long.  The parameter is called x, but P1 will pass y
-// there.
+// there.  When called by another task during preprocessing, set tally
+// to false so that the required halftriples aren't accounted for
+// separately from the main preprocessing task.
 //
 // Cost:
 // 1 word sent in 1 message
 // consumes 1 HalfTriple
 void mpc_valuemul(MPCTIO &tio, yield_t &yield,
     RegAS &z, value_t x,
-    nbits_t nbits = VALUE_BITS);
+    nbits_t nbits = VALUE_BITS, bool tally = true);
 
 // P0 and P1 hold bit shares f0 and f1 of the single bit f, and additive
 // shares y0 and y1 of the value y; compute additive shares of
@@ -77,14 +79,16 @@ void mpc_oswap(MPCTIO &tio, yield_t &yield,
     nbits_t nbits = VALUE_BITS);
 
 // P0 and P1 hold XOR shares of x. Compute additive shares of the same
-// x. x is at most nbits bits long.
+// x. x is at most nbits bits long.  When called by another task during
+// preprocessing, set tally to false so that the required halftriples
+// aren't accounted for separately from the main preprocessing task.
 //
 // Cost:
 // nbits-1 words sent in 1 message
 // consumes nbits-1 HalfTriples
 void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     RegAS &as_x, RegXS xs_x,
-    nbits_t nbits = VALUE_BITS);
+    nbits_t nbits = VALUE_BITS, bool tally = true);
 
 // P0 and P1 hold bit shares of f, and DPFnode XOR shares x0,y0 and
 // x1,y1 of x and y.  Set z to x=x0^x1 if f=0 and to y=y0^y1 if f=1.

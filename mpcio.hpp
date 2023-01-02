@@ -362,7 +362,7 @@ public:
     // preprocessing phase, read them from the server.
 
     MultTriple triple(yield_t &yield);
-    HalfTriple halftriple(yield_t &yield);
+    HalfTriple halftriple(yield_t &yield, bool tally=true);
     SelectTriple selecttriple(yield_t &yield);
 
     // These ones only work during the online phase

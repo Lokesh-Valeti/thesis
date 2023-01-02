@@ -582,7 +582,7 @@ RDPFTriple::RDPFTriple(MPCTIO &tio, yield_t &yield,
     }
     coroutines.emplace_back(
         [this, &tio, depth](yield_t &yield) {
-            mpc_xs_to_as(tio, yield, as_target, xs_target, depth);
+            mpc_xs_to_as(tio, yield, as_target, xs_target, depth, false);
         });
     run_coroutines(yield, coroutines);
 }

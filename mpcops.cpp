@@ -54,18 +54,20 @@ void mpc_cross(MPCTIO &tio, yield_t &yield,
 // P0 holds the (complete) value x, P1 holds the (complete) value y;
 // compute additive shares of z = x*y.  x, y, and z are each at most
 // nbits bits long.  The parameter is called x, but P1 will pass y
-// there.
+// there.  When called by another task during preprocessing, set tally
+// to false so that the required halftriples aren't accounted for
+// separately from the main preprocessing task.
 //
 // Cost:
 // 1 word sent in 1 message
 // consumes 1 HalfTriple
 void mpc_valuemul(MPCTIO &tio, yield_t &yield,
     RegAS &z, value_t x,
-    nbits_t nbits)
+    nbits_t nbits, bool tally)
 {
     const value_t mask = MASKBITS(nbits);
     size_t nbytes = BITBYTES(nbits);
-    auto [X, Z] = tio.halftriple(yield);
+    auto [X, Z] = tio.halftriple(yield, tally);
 
     // Send x+X
     value_t blind_x = (x + X) & mask;
@@ -157,14 +159,16 @@ void mpc_oswap(MPCTIO &tio, yield_t &yield,
 }
 
 // P0 and P1 hold XOR shares of x. Compute additive shares of the same
-// x. x is at most nbits bits long.
+// x. x is at most nbits bits long.  When called by another task during
+// preprocessing, set tally to false so that the required halftriples
+// aren't accounted for separately from the main preprocessing task.
 //
 // Cost:
 // nbits-1 words sent in 1 message
 // consumes nbits-1 HalfTriples
 void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     RegAS &as_x, RegXS xs_x,
-    nbits_t nbits)
+    nbits_t nbits, bool tally)
 {
     const value_t mask = MASKBITS(nbits);
 
@@ -190,8 +194,9 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     std::vector<coro_t> coroutines;
     for (nbits_t i=0; i<nbits-1; ++i) {
         coroutines.emplace_back(
-            [&tio, &as_bitand, &xs_x, i, nbits](yield_t &yield) {
-                mpc_valuemul(tio, yield, as_bitand[i], (xs_x.xshare>>i)&1, nbits);
+            [&tio, &as_bitand, &xs_x, i, nbits, tally](yield_t &yield) {
+                mpc_valuemul(tio, yield, as_bitand[i],
+                    (xs_x.xshare>>i)&1, nbits, tally);
             });
     }
     run_coroutines(yield, coroutines);
