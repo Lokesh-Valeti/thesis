@@ -467,6 +467,17 @@ void MPCTIO::sync_lamport()
     thread_lamport = new_lamport;
 }
 
+// Only call this if you can be sure that there are no outstanding
+// messages in flight, you can call it on all existing MPCTIOs, and
+// you really want to reset the Lamport clock in the midding of a
+// run.
+void MPCTIO::reset_lamport()
+{
+    // Reset both our own Lamport clock and the parent MPCIO's
+    thread_lamport = 0;
+    mpcio.lamport = 0;
+}
+
 // Queue up data to the peer or to the server
 
 void MPCTIO::queue_peer(const void *data, size_t len)

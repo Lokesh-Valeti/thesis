@@ -309,13 +309,22 @@ public:
     // outlives your thread (in which case call it after the join), or
     // if your threads do interthread communication amongst themselves
     // (in which case call it in the sending thread before the send, and
-    // call it in the receiving thread after the receive).
+    // call it in the receiving thread after the receive).  If you want
+    // to call MPCIO::dump_stats() in the middle of a run (while the
+    // MPCTIO is still alive), call this as well.
     void sync_lamport();
+
+    // Only call this if you can be sure that there are no outstanding
+    // messages in flight, you can call it on all existing MPCTIOs, and
+    // you really want to reset the Lamport clock in the midding of a
+    // run.
+    void reset_lamport();
 
     // The normal case, where the MPCIO is created inside the thread,
     // and so destructed when the thread ends, is handled automatically
     // here.
     ~MPCTIO() {
+        send();
         sync_lamport();
     }
 
