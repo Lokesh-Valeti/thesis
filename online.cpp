@@ -576,9 +576,10 @@ static void duoram_test(MPCIO &mpcio,
         // size_t &aes_ops = tio.aes_ops();
         Duoram<T> oram(tio.player(), size);
         auto A = oram.flat(tio, yield);
-        RegAS aidx, aidx2;
+        RegAS aidx, aidx2, aidx3;
         aidx.ashare = share;
         aidx2.ashare = share + tio.player();
+        aidx3.ashare = share + 1;
         T M;
         if (tio.player() == 0) {
             M.set(0xbabb0000);
@@ -612,20 +613,20 @@ static void duoram_test(MPCIO &mpcio,
 
         // Simultaneous independent reads
         std::vector<T> Av;
-        Av.resize(2);
+        Av.resize(3);
         std::vector<coro_t> coroutines;
         run_coroutines(yield,
             [&A, &Av, &aidx] (yield_t &yield) {
                 auto Acoro = A.context(yield);
-                printf("About to read 0\n");
                 Av[0] = Acoro[aidx];
-                printf("read 0\n");
             },
             [&A, &Av, &aidx2] (yield_t &yield) {
                 auto Acoro = A.context(yield);
-                printf("About to read 1\n");
                 Av[1] = Acoro[aidx2];
-                printf("read 1\n");
+            },
+            [&A, &Av, &aidx3] (yield_t &yield) {
+                auto Acoro = A.context(yield);
+                Av[2] = Acoro[aidx3];
             });
 
         if (depth <= 10) {
