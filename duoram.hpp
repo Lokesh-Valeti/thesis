@@ -98,6 +98,12 @@ class Duoram<T>::Shape {
     class MemRefS;
     // When x is unshared explicit value
     class MemRefExpl;
+    // When x is a vector or array of values of type U, used to denote a
+    // collection of independent memory operations that can be performed
+    // simultaneously.  Sh is the specific Shape subtype used to create
+    // the MemRefInd.
+    template <typename U, typename Sh>
+    class MemRefInd;
 
 protected:
     // A reference to the parent shape.  As with ".." in the root
@@ -257,6 +263,16 @@ public:
         return Flat(*this, this->tio, new_yield);
     }
 
+    // Generate independent memory references for this Flat
+    template <typename U>
+    Duoram::Shape::MemRefInd<U, Flat> indep(const std::vector<U> &indcs) {
+        return typename Duoram::Shape::MemRefInd<U,Flat>(*this, indcs);
+    }
+    template <typename U, size_t N>
+    Duoram::Shape::MemRefInd<U, Flat> indep(const std::array<U,N> &indcs) {
+        return typename Duoram::Shape::MemRefInd<U,Flat>(*this, indcs);
+    }
+
     // Oblivious sort the elements indexed by the two given indices.
     // Without reconstructing the values, if dir=0, this[idx1] will
     // become a share of the smaller of the reconstructed values, and
@@ -345,6 +361,37 @@ public:
 
     // Convenience function
     MemRefExpl &operator-=(const T& M) { *this += (-M); return *this; }
+};
+
+// A collection of independent memory references that can be processed
+// simultaneously.  You get one of these from a Shape A (of specific
+// subclass Sh) and a vector or array of indices v with each element of
+// type U.
+
+template <typename T> template <typename U, typename Sh>
+class Duoram<T>::Shape::MemRefInd {
+    Sh &shape;
+    std::vector<U> indcs;
+
+public:
+    MemRefInd(Sh &shape, std::vector<U> indcs) :
+        shape(shape), indcs(indcs) {}
+    template <size_t N>
+    MemRefInd(Sh &shape, std::array<U,N> aindcs) :
+        shape(shape) { for ( auto &i : aindcs ) { indcs.push_back(i); } }
+
+    // Explicit read from a given index of Duoram memory
+    operator std::vector<T>();
+
+    // Explicit update to a given index of Duoram memory
+    MemRefInd &operator+=(const std::vector<T>& M);
+    template <size_t N>
+    MemRefInd &operator+=(const std::array<T,N>& M);
+
+    // Convenience function
+    MemRefInd &operator-=(const std::vector<T>& M) { *this += (-M); return *this; }
+    template <size_t N>
+    MemRefInd &operator-=(const std::array<T,N>& M) { *this += (-M); return *this; }
 };
 
 #include "duoram.tcc"

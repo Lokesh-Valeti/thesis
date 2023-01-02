@@ -596,3 +596,65 @@ typename Duoram<T>::Shape::MemRefExpl
     }
     return *this;
 }
+
+// Independent U-shared reads into a Shape of subtype Sh on a Duoram
+// with values of sharing type T
+template <typename T> template <typename U, typename Sh>
+Duoram<T>::Shape::MemRefInd<U,Sh>::operator std::vector<T>()
+{
+    std::vector<T> res;
+    size_t size = indcs.size();
+    res.resize(size);
+    std::vector<coro_t> coroutines;
+    for (size_t i=0;i<size;++i) {
+        coroutines.emplace_back([this, &res, i] (yield_t &yield) {
+            Sh Sh_coro = shape.context(yield);
+            res[i] = Sh_coro[indcs[i]];
+        });
+    }
+    run_coroutines(shape.yield, coroutines);
+
+    return res;
+}
+
+// Independent U-shared updates into a Shape of subtype Sh on a Duoram
+// with values of sharing type T (vector version)
+template <typename T> template <typename U, typename Sh>
+typename Duoram<T>::Shape::template MemRefInd<U,Sh>
+    &Duoram<T>::Shape::MemRefInd<U,Sh>::operator+=(const std::vector<T>& M)
+{
+    size_t size = indcs.size();
+    assert(M.size() == size);
+
+    std::vector<coro_t> coroutines;
+    for (size_t i=0;i<size;++i) {
+        coroutines.emplace_back([this, &M, i] (yield_t &yield) {
+            Sh Sh_coro = shape.context(yield);
+            Sh_coro[indcs[i]] += M[i];
+        });
+    }
+    run_coroutines(shape.yield, coroutines);
+
+    return *this;
+}
+
+// Independent U-shared updates into a Shape of subtype Sh on a Duoram
+// with values of sharing type T (array version)
+template <typename T> template <typename U, typename Sh> template <size_t N>
+typename Duoram<T>::Shape::template MemRefInd<U,Sh>
+    &Duoram<T>::Shape::MemRefInd<U,Sh>::operator+=(const std::array<T,N>& M)
+{
+    size_t size = indcs.size();
+    assert(N == size);
+
+    std::vector<coro_t> coroutines;
+    for (size_t i=0;i<size;++i) {
+        coroutines.emplace_back([this, &M, i] (yield_t &yield) {
+            Sh Sh_coro = shape.context(yield);
+            Sh_coro[indcs[i]] += M[i];
+        });
+    }
+    run_coroutines(shape.yield, coroutines);
+
+    return *this;
+}

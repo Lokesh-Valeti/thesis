@@ -612,22 +612,17 @@ static void duoram_test(MPCIO &mpcio,
         }
 
         // Simultaneous independent reads
-        std::vector<T> Av;
-        Av.resize(3);
-        std::vector<coro_t> coroutines;
-        run_coroutines(yield,
-            [&A, &Av, &aidx] (yield_t &yield) {
-                auto Acoro = A.context(yield);
-                Av[0] = Acoro[aidx];
-            },
-            [&A, &Av, &aidx2] (yield_t &yield) {
-                auto Acoro = A.context(yield);
-                Av[1] = Acoro[aidx2];
-            },
-            [&A, &Av, &aidx3] (yield_t &yield) {
-                auto Acoro = A.context(yield);
-                Av[2] = Acoro[aidx3];
-            });
+        std::vector<T> Av = A.indep(std::array {
+            aidx, aidx2, aidx3
+        });
+
+        // Simultaneous independent updates
+        T Aw1, Aw2, Aw3;
+        Aw1.set(0x101010101010101 * tio.player());
+        Aw2.set(0x202020202020202 * tio.player());
+        Aw3.set(0x303030303030303 * tio.player());
+        A.indep(std::array { aidx, aidx2, aidx3 }) +=
+            std::array { Aw1, Aw2, Aw3 };
 
         if (depth <= 10) {
             oram.dump();
