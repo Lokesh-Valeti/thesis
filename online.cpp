@@ -654,6 +654,138 @@ static void duoram_test(MPCIO &mpcio,
     });
 }
 
+// This measures the same things as the Duoram paper: dependent and
+// independent reads, updates, writes, and interleaves
+// T is RegAS or RegXS for additive or XOR shared database respectively
+template <typename T>
+static void duoram(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth = 6;
+    int items = 4;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        items = atoi(*args);
+        ++args;
+    }
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, items] (yield_t &yield) {
+        size_t size = size_t(1)<<depth;
+        address_t mask = (depth < ADDRESS_MAX_BITS ?
+            ((address_t(1)<<depth) - 1) : ~0);
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+
+        std::cout << "===== DEPENDENT UPDATES =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        // Make a linked list of length items
+        std::vector<T> list_indices;
+        T prev_index, next_index;
+        prev_index.randomize(depth);
+        for (int i=0;i<items;++i) {
+            next_index.randomize(depth);
+            A[next_index] += prev_index;
+            list_indices.push_back(next_index);
+            prev_index = next_index;
+        }
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== DEPENDENT READS =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        // Read the linked list starting with prev_index
+        T cur_index = prev_index;
+        for (int i=0;i<items;++i) {
+            cur_index = A[cur_index];
+        }
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== INDEPENDENT READS =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        // Read all the entries in the list at once
+        std::vector<T> read_outputs = A.indep(list_indices);
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== INDEPENDENT UPDATES =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        // Make a vector of indices 1 larger than those in list_indices,
+        // and a vector of values 1 larger than those in outputs
+        std::vector<T> indep_indices, indep_values;
+        T one;
+        one.set(tio.player());  // Sets the shared value to 1
+        for (int i=0;i<items;++i) {
+            indep_indices.push_back(list_indices[i]+one);
+            indep_values.push_back(read_outputs[i]+one);
+        }
+        // Update all the indices at once
+        A.indep(indep_indices) += indep_values;
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== DEPENDENT WRITES =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        T two;
+        two.set(2*tio.player());  // Sets the shared value to 2
+        // For each address addr that's number i from the end of the
+        // linked list, write i+1 into location addr+2
+        for (int i=0;i<items;++i) {
+            T val;
+            val.set((i+1)*tio.player());
+            A[list_indices[i]+two] = val;
+        }
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== DEPENDENT INTERLEAVED =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        T three;
+        three.set(3*tio.player());  // Sets the shared value to 3
+        // Follow the linked list and whenever A[addr]=val, set
+        // A[addr+3]=val+3
+        cur_index = prev_index;
+        for (int i=0;i<items;++i) {
+            T next_index = A[cur_index];
+            A[cur_index+three] = next_index+three;
+            cur_index = next_index;
+        }
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+
+        std::cout << "\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+
+        if (depth <= 30) {
+            auto check = A.reconstruct();
+            auto head = A.reconstruct(prev_index);
+            if (tio.player() == 0) {
+                int width = (depth+3)/4;
+                printf("Head of linked list: %0*lx\n\n", width,
+                    head.share() & mask);
+                std::cout << "Non-zero reconstructed database entries:\n";
+                for (address_t i=0;i<size;++i) {
+                    value_t share = check[i].share() & mask;
+                    if (share) printf("%0*x: %0*lx\n", width, i, width, share);
+                }
+            }
+        }
+    });
+}
+
 static void cdpf_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -1025,6 +1157,13 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "bsearch")) {
         ++args;
         bsearch_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "duoram")) {
+        ++args;
+        if (opts.use_xor_db) {
+            duoram<RegXS>(mpcio, opts, args);
+        } else {
+            duoram<RegAS>(mpcio, opts, args);
+        }
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
