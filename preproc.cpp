@@ -193,7 +193,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
         boost::asio::post(pool, [&mpcsrvio, &opts, thread_num, args] {
             char **threadargs = args;
             MPCTIO stio(mpcsrvio, thread_num);
-            Openfiles ofiles;
+            Openfiles ofiles(opts.append_to_files);
             std::vector<coro_t> coroutines;
             if (*threadargs && threadargs[0][0] == 'T') {
                 // Per-thread initialization.  The args look like:
