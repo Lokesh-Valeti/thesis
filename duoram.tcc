@@ -394,7 +394,7 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
 
 // Oblivious update to an additively shared index of Duoram memory
 template <typename T> template <typename U>
-typename Duoram<T>::Shape::MemRefS<U>
+typename Duoram<T>::Shape::template MemRefS<U>
     &Duoram<T>::Shape::MemRefS<U>::operator+=(const T& M)
 {
     Shape &shape = this->shape;
