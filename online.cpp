@@ -576,8 +576,9 @@ static void duoram_test(MPCIO &mpcio,
         // size_t &aes_ops = tio.aes_ops();
         Duoram<T> oram(tio.player(), size);
         auto A = oram.flat(tio, yield);
-        RegAS aidx;
+        RegAS aidx, aidx2;
         aidx.ashare = share;
+        aidx2.ashare = share + tio.player();
         T M;
         if (tio.player() == 0) {
             M.set(0xbabb0000);
@@ -608,6 +609,25 @@ static void duoram_test(MPCIO &mpcio,
             A[5] += Aa;
             Ae = A[6];
         }
+
+        // Simultaneous independent reads
+        std::vector<T> Av;
+        Av.resize(2);
+        std::vector<coro_t> coroutines;
+        run_coroutines(yield,
+            [&A, &Av, &aidx] (yield_t &yield) {
+                auto Acoro = A.context(yield);
+                printf("About to read 0\n");
+                Av[0] = Acoro[aidx];
+                printf("read 0\n");
+            },
+            [&A, &Av, &aidx2] (yield_t &yield) {
+                auto Acoro = A.context(yield);
+                printf("About to read 1\n");
+                Av[1] = Acoro[aidx2];
+                printf("read 1\n");
+            });
+
         if (depth <= 10) {
             oram.dump();
             auto check = A.reconstruct();
@@ -624,6 +644,12 @@ static void duoram_test(MPCIO &mpcio,
             printf("Read AS value = %016lx\n", checkread.share());
             printf("Read AX value = %016lx\n", checkreadx.share());
             printf("Read Ex value = %016lx\n", checkreade.share());
+        }
+        for (auto &v : Av) {
+            auto checkv = A.reconstruct(v);
+            if (tio.player() == 0) {
+                printf("Read Av value = %016lx\n", checkv.share());
+            }
         }
     });
 }

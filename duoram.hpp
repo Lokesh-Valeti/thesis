@@ -87,7 +87,8 @@ class Duoram<T>::Shape {
     // additive-shared index (x) into an XOR-shared database (T), for
     // example.
 
-    // The parent class of the MemRef* classes
+    // The parent class of the MemRef* classes, used when deferencing a
+    // Shape with A[x]
     class MemRef;
 
     // When x is additively or XOR shared
@@ -143,7 +144,9 @@ protected:
     // Copy the given Shape except for the tio and yield
     Shape(const Shape &copy_from, MPCTIO &tio, yield_t &yield) :
         parent(copy_from.parent), duoram(copy_from.duoram),
-        shape_size(copy_from.shape_size), tio(tio), yield(yield),
+        shape_size(copy_from.shape_size),
+        addr_size(copy_from.addr_size), addr_mask(copy_from.addr_mask),
+        tio(tio), yield(yield),
         explicitmode(copy_from.explicitmode) {}
 
     // The index-mapping function. Input the index relative to this
