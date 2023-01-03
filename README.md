@@ -28,7 +28,7 @@ Currently, all of the interesting multithreading (except for some unit tests) ar
 ## Non-docker instructions:
 
 Build with `make`.  The build has been tested on Ubuntu 20.04 and Ubuntu
-22.04.
+22.04.  You'll need libbsd-dev and libboost-all-dev.
 
 You'll need three terminals with the built binary, either on the same machine, or different machines.  If it's on the same machine, it's OK for them all to be in the very same directory; the saved resources for the different parties won't clobber each other.
 
@@ -80,12 +80,37 @@ The args in online mode specify what computation to do.  These are currently mos
 
   - <code>duoram _depth_ _items_</code>: in a memory of size 2<sup>_depth_</sup>, do _items_ dependent updates, _items_ dependent reads, _items_ independent reads, _items_ independent updates, _items_ dependent writes, and _items_ dependent interleaved reads and writes.  Each batch is timed and measured independently.
 
+It is vital that all three players are told the same computation to run!
+
 The output of online mode (for each player) includes timings (real and CPU time), the number of messages sent, the number of message bytes sent in total, the Lamport clock (the number of network latencies experienced), and the number of local AES operations performed (each AES operation is an encryption of a single block), as well as the list of the number of precomputed resources used in each communication thread.
 
+Example: In three terminals on the same host, run:
+
+  - `./prac -p 0`
+  - `./prac -p 1 localhost`
+  - `./prac -p 2 localhost localhost r20:90 p:8`
+
+to complete the preprocessing required for the following computation,
+using 8 threads, and then:
+
+  - `./prac -t 8 0 duoram 20 10`
+  - `./prac -t 8 1 localhost duoram 20 10`
+  - `./prac -t 8 2 localhost localhost duoram 20 10`
+
+to do the online portion of the computation, also using 8 threads (which
+will be local processing threads for the duoram computation).
 
 For online-only mode:
 
 The options and arguments are the same as for online mode, only you also add the `-o` option, and you don't have to have run preprocessing mode first.  At the end of the run, PRAC will output the number of resources of each type created, in a format suitable for passing as the arguments to preprocessing mode.
+
+Example: In three terminals on the same host, run:
+
+  - `./prac -o -t 8 0 duoram 20 10`
+  - `./prac -o -t 8 1 localhost duoram 20 10`
+  - `./prac -o -t 8 2 localhost localhost duoram 20 10`
+
+No separate preprocessing step is needed.
 
 ## Docker instructions:
 
