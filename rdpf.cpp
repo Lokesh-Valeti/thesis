@@ -144,13 +144,15 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
 
     // Construct each intermediate level
     while(level < depth) {
-        delete[] curlevel;
-        curlevel = nextlevel;
-        if (save_expansion && level == depth-1) {
-            expansion.resize(1<<depth);
-            nextlevel = expansion.data();
-        } else {
-            nextlevel = new DPFnode[1<<(level+1)];
+        if (player < 2) {
+            delete[] curlevel;
+            curlevel = nextlevel;
+            if (save_expansion && level == depth-1) {
+                expansion.resize(1<<depth);
+                nextlevel = expansion.data();
+            } else {
+                nextlevel = new DPFnode[1<<(level+1)];
+            }
         }
         // Invariant: curlevel has 2^level elements; nextlevel has
         // 2^{level+1} elements
@@ -495,7 +497,7 @@ RDPF::RDPF(MPCTIO &tio, yield_t &yield,
     }
 
     delete[] curlevel;
-    if (!save_expansion) {
+    if (!save_expansion || player == 2) {
         delete[] nextlevel;
     }
 }
