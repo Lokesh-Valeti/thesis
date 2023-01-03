@@ -1,0 +1,6 @@
+#!/bin/bash
+
+docker run -d --cap-add SYS_NICE --rm --name prac_p0 -h prac_p0 -t prac
+docker run -d --cap-add SYS_NICE --rm --name prac_p1 -h prac_p1 -t prac
+docker run -d --cap-add SYS_NICE --rm --name prac_p2 -h prac_p2 -t prac
+echo "All dockers launched"

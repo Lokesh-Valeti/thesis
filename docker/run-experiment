@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Get the IP addresses
+p0addr=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' prac_p0)
+p1addr=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' prac_p1)
+
+# Gather options and arguments
+opts=""
+while getopts paot:ex arg; do
+    opts+=" -${arg} ${OPTARG}"
+done
+shift $((OPTIND-1))
+
+echo ===== Running prac $opts -- $*
+date "+===== %s %F %T"
+
+# Run, saving the output
+savefile0=$$.p0.out
+savefile1=$$.p1.out
+savefile2=$$.p2.out
+docker exec -w /root/prac prac_p0 bash -c "$PRAC_NUMA_P0 ./prac $opts 0 $* > $savefile0" &
+docker exec -w /root/prac prac_p1 bash -c "$PRAC_NUMA_P1 ./prac $opts 1 $p0addr $* > $savefile1" &
+docker exec -w /root/prac prac_p2 bash -c "$PRAC_NUMA_P2 ./prac $opts 2 $p0addr $p1addr $* > $savefile2" &
+wait
+echo ===== P0 output
+docker exec -w /root/prac prac_p0 cat $savefile0
+docker exec -w /root/prac prac_p0 rm -f $savefile0
+echo ===== P1 output
+docker exec -w /root/prac prac_p1 cat $savefile1
+docker exec -w /root/prac prac_p1 rm -f $savefile1
+echo ===== P2 output
+docker exec -w /root/prac prac_p2 cat $savefile2
+docker exec -w /root/prac prac_p2 rm -f $savefile2
