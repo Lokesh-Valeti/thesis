@@ -48,6 +48,9 @@ using nbits_t = uint8_t;
 struct RegAS {
     value_t ashare;
 
+    // The basic types just have one value
+    static const size_t WIDTH = 1;
+
     RegAS() : ashare(0) {}
 
     inline value_t share() const { return ashare; }
@@ -109,6 +112,22 @@ struct RegAS {
         res &= mask;
         return res;
     }
+
+    // Multiply by the local share of the argument, not multiplcation of
+    // two shared values (two versions)
+    inline RegAS &mulshareeq(const RegAS &rhs) {
+        *this *= rhs.ashare;
+        return *this;
+    }
+    inline RegAS mulshare(const RegAS &rhs) const {
+        RegAS res = *this;
+        res *= rhs.ashare;
+        return res;
+    }
+
+    inline void dump() const {
+        printf("%016lx", ashare);
+    }
 };
 
 inline value_t combine(const RegAS &A, const RegAS &B,
@@ -162,6 +181,9 @@ struct RegBS {
 // The type of a register holding an XOR share of a value
 struct RegXS {
     value_t xshare;
+
+    // The basic types just have one value
+    static const size_t WIDTH = 1;
 
     RegXS() : xshare(0) {}
     RegXS(const RegBS &b) { xshare = b.bshare ? ~0 : 0; }
@@ -241,6 +263,22 @@ struct RegXS {
         return res;
     }
 
+    // Multiply by the local share of the argument, not multiplcation of
+    // two shared values (two versions)
+    inline RegXS &mulshareeq(const RegXS &rhs) {
+        *this *= rhs.xshare;
+        return *this;
+    }
+    inline RegXS mulshare(const RegXS &rhs) const {
+        RegXS res = *this;
+        res *= rhs.xshare;
+        return res;
+    }
+
+    inline void dump() const {
+        printf("%016lx", xshare);
+    }
+
     // Extract a bit share of bit bitnum of the XOR-shared register
     inline RegBS bit(nbits_t bitnum) const {
         RegBS bs;
@@ -257,6 +295,29 @@ inline value_t combine(const RegXS &A, const RegXS &B,
     }
     return (A.xshare ^ B.xshare) & mask;
 }
+
+// Enable templates to specialize on just the basic types RegAS and
+// RegXS.  Technique from
+// https://stackoverflow.com/questions/2430039/one-template-specialization-for-multiple-classes
+
+template <bool B> struct prac_template_bool_type {};
+using prac_template_true = prac_template_bool_type<true>;
+using prac_template_false = prac_template_bool_type<false>;
+template <typename T>
+struct prac_basic_Reg_S : prac_template_false
+{
+    static const bool value = false;
+};
+template<>
+struct prac_basic_Reg_S<RegAS>: prac_template_true
+{
+    static const bool value = true;
+};
+template<>
+struct prac_basic_Reg_S<RegXS>: prac_template_true
+{
+    static const bool value = true;
+};
 
 // Some useful operations on tuples, vectors, and arrays of the above
 // types

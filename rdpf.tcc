@@ -207,6 +207,17 @@ inline std::tuple<RegAS,RegAS,RegAS> RDPFTriple::unit<RegAS>(node leaf) const {
         dpf[2].unit_as(std::get<2>(leaf)));
 }
 
+// For any more complex entry type, that type will handle the conversion
+// for each DPF
+template <typename T>
+inline std::tuple<T,T,T> RDPFTriple::unit(node leaf) const {
+    T v0, v1, v2;
+    v0.unit(dpf[0], std::get<0>(leaf));
+    v1.unit(dpf[1], std::get<1>(leaf));
+    v2.unit(dpf[2], std::get<2>(leaf));
+    return std::make_tuple(v0,v1,v2);
+}
+
 // Get the XOR-shared scaled vector entry from the leaf ndoe
 template <>
 inline std::tuple<RegXS,RegXS,RegXS> RDPFTriple::scaled<RegXS>(node leaf) const {
@@ -253,6 +264,16 @@ inline std::tuple<RegAS,RegAS> RDPFPair::unit<RegAS>(node leaf) const {
     return std::make_tuple(
         dpf[0].unit_as(std::get<0>(leaf)),
         dpf[1].unit_as(std::get<1>(leaf)));
+}
+
+// For any more complex entry type, that type will handle the conversion
+// for each DPF
+template <typename T>
+inline std::tuple<T,T> RDPFPair::unit(node leaf) const {
+    T v0, v1;
+    v0.unit(dpf[0], std::get<0>(leaf));
+    v1.unit(dpf[1], std::get<1>(leaf));
+    return std::make_tuple(v0,v1);
 }
 
 // Get the XOR-shared scaled vector entry from the leaf ndoe

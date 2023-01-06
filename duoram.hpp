@@ -2,6 +2,8 @@
 #define __DUORAM_HPP__
 
 #include "types.hpp"
+#include "mpcio.hpp"
+#include "coroutine.hpp"
 
 // Implementation of the 3-party protocols described in:
 // Adithya Vadapalli, Ryan Henry, Ian Goldberg, "Duoram: A
@@ -333,6 +335,12 @@ public:
 template <typename T> template <typename U>
 class Duoram<T>::Shape::MemRefS : public Duoram<T>::Shape::MemRef {
     U idx;
+
+private:
+    // Oblivious update to a shared index of Duoram memory, only for
+    // T = RegAS or RegXS
+    MemRefS<U> &oram_update(const T& M, const prac_template_true&);
+    MemRefS<U> &oram_update(const T& M, const prac_template_false&);
 
 public:
     MemRefS<U>(Shape &shape, const U &idx) :

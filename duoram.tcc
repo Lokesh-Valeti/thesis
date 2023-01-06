@@ -2,7 +2,9 @@
 
 #include <stdio.h>
 
+#include "mpcops.hpp"
 #include "cdpf.hpp"
+#include "rdpf.hpp"
 
 // Pass the player number and desired size
 template <typename T>
@@ -24,12 +26,19 @@ void Duoram<T>::dump() const
 {
     for (size_t i=0; i<oram_size; ++i) {
         if (player < 2) {
-            printf("%04lx %016lx %016lx %016lx\n",
-                i, database[i].share(), blind[i].share(),
-                peer_blinded_db[i].share());
+            printf("%04lx ", i);
+            database[i].dump();
+            printf(" ");
+            blind[i].dump();
+            printf(" ");
+            peer_blinded_db[i].dump();
+            printf("\n");
         } else {
-            printf("%04lx %016lx %016lx\n",
-                i, p0_blind[i].share(), p1_blind[i].share());
+            printf("%04lx ", i);
+            p0_blind[i].dump();
+            printf(" ");
+            p1_blind[i].dump();
+            printf("\n");
         }
     }
     printf("\n");
@@ -227,59 +236,6 @@ void Duoram<T>::Flat::butterfly(address_t start, nbits_t depth, bool dir)
         });
 }
 
-// Assuming the memory is already sorted, do an oblivious binary
-// search for the largest index containing the value at most the
-// given one.  (The answer will be 0 if all of the memory elements
-// are greate than the target.) This Flat must be a power of 2 size.
-// Only available for additive shared databases for now.
-template <>
-RegAS Duoram<RegAS>::Flat::obliv_binary_search(RegAS &target)
-{
-    nbits_t depth = this->addr_size;
-    // Start in the middle
-    RegAS index;
-    index.set(this->tio.player() ? 0 : 1<<(depth-1));
-    // Invariant: index points to the first element of the right half of
-    // the remaining possible range
-    while (depth > 0) {
-        // Obliviously read the value there
-        RegAS val = operator[](index);
-        // Compare it to the target
-        CDPF cdpf = tio.cdpf(this->yield);
-        auto [lt, eq, gt] = cdpf.compare(this->tio, this->yield,
-            val-target, tio.aes_ops());
-        if (depth > 1) {
-            // If val > target, the answer is strictly to the left
-            // and we should subtract 2^{depth-2} from index
-            // If val <= target, the answer is here or to the right
-            // and we should add 2^{depth-2} to index
-            // So we unconditionally subtract 2^{depth-2} from index, and
-            // add (lt+eq)*2^{depth-1}.
-            RegAS uncond;
-            uncond.set(tio.player() ? 0 : address_t(1)<<(depth-2));
-            RegAS cond;
-            cond.set(tio.player() ? 0 : address_t(1)<<(depth-1));
-            RegAS condprod;
-            RegBS le = lt ^ eq;
-            mpc_flagmult(this->tio, this->yield, condprod, le, cond);
-            index -= uncond;
-            index += condprod;
-        } else {
-            // If val > target, the answer is strictly to the left
-            // If val <= target, the answer is here or to the right
-            // so subtract gt from index
-            RegAS cond;
-            cond.set(tio.player() ? 0 : 1);
-            RegAS condprod;
-            mpc_flagmult(this->tio, this->yield, condprod, gt, cond);
-            index -= condprod;
-        }
-        --depth;
-    }
-
-    return index;
-}
-
 // Helper functions to specialize the read and update operations for
 // RegAS and RegXS shared indices
 template <typename U>
@@ -340,12 +296,12 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
         T init;
         res = pe.reduce(init, [&dp, &shape] (int thread_num, address_t i,
                 const RDPFPair::node &leaf) {
-            // The values from the two DPFs
+            // The values from the two DPFs, which will each be of type T
             auto [V0, V1] = dp.unit<T>(leaf);
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i);
-            return (DB + PBD) * V0.share() - BL * (V1-V0).share();
+            return (DB + PBD).mulshare(V0) - BL.mulshare(V1-V0);
         });
 
         shape.yield();
@@ -375,13 +331,13 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
             shape.tio.aes_ops());
         gamma = pe.reduce(init, [&dp, &shape] (int thread_num, address_t i,
                 const RDPFPair::node &leaf) {
-            // The values from the two DPFs
+            // The values from the two DPFs, each of type T
             auto [V0, V1] = dp.unit<T>(leaf);
 
             // shape.get_server(i) returns a pair of references to the
             // appropriate cells in the two blinded databases
             auto [BL0, BL1] = shape.get_server(i);
-            return std::make_tuple(-BL0 * V1.share(), -BL1 * V0.share());
+            return std::make_tuple(-BL0.mulshare(V1), -BL1.mulshare(V0));
         });
 
         // Choose a random blinding factor
@@ -400,10 +356,12 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
     return res;  // The server will always get 0
 }
 
-// Oblivious update to an additively or XOR shared index of Duoram memory
+// Oblivious update to a shared index of Duoram memory, only for
+// T = RegAS or RegXS
 template <typename T> template <typename U>
 typename Duoram<T>::Shape::template MemRefS<U>
-    &Duoram<T>::Shape::MemRefS<U>::operator+=(const T& M)
+    &Duoram<T>::Shape::MemRefS<U>::oram_update(const T& M,
+        const prac_template_true &)
 {
     Shape &shape = this->shape;
     shape.explicitonly(false);
@@ -496,6 +454,24 @@ typename Duoram<T>::Shape::template MemRefS<U>
         });
     }
     return *this;
+}
+
+// Oblivious update to a shared index of Duoram memory, only for
+// T not equal to RegAS or RegXS
+template <typename T> template <typename U>
+typename Duoram<T>::Shape::template MemRefS<U>
+    &Duoram<T>::Shape::MemRefS<U>::oram_update(const T& M,
+        const prac_template_false &)
+{
+    return *this;
+}
+
+// Oblivious update to an additively or XOR shared index of Duoram memory
+template <typename T> template <typename U>
+typename Duoram<T>::Shape::template MemRefS<U>
+    &Duoram<T>::Shape::MemRefS<U>::operator+=(const T& M)
+{
+    return oram_update(M, prac_basic_Reg_S<T>());
 }
 
 // Oblivious write to an additively or XOR shared index of Duoram memory
