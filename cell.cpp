@@ -6,7 +6,12 @@
 
 // This file demonstrates how to implement custom ORAM wide cell types.
 // Such types can be structures of arbitrary numbers of RegAS and RegXS
-// fields.
+// fields.  The example here imagines a cell of a binary search tree,
+// where you would want the key to be additively shared (so that you can
+// easily do comparisons), the pointers field to be XOR shared (so that
+// you do easily do bit operations to pack two pointers and maybe some
+// tree balancing information into one field) and the value doesn't
+// really matter, but XOR shared is usually slightly more efficient.
 
 struct Cell {
     RegAS key;
