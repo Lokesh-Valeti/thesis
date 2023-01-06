@@ -9,9 +9,6 @@ struct Cell {
     RegXS pointers;
     RegXS value;
 
-    // The width (the number of RegAS and RegXS entries) of this type
-    static const size_t WIDTH = 3;
-
     void dump() const {
         printf("[%016lx %016lx %016lx]", key.share(), pointers.share(),
             value.share());

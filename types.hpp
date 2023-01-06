@@ -48,9 +48,6 @@ using nbits_t = uint8_t;
 struct RegAS {
     value_t ashare;
 
-    // The basic types just have one value
-    static const size_t WIDTH = 1;
-
     RegAS() : ashare(0) {}
 
     inline value_t share() const { return ashare; }
@@ -181,9 +178,6 @@ struct RegBS {
 // The type of a register holding an XOR share of a value
 struct RegXS {
     value_t xshare;
-
-    // The basic types just have one value
-    static const size_t WIDTH = 1;
 
     RegXS() : xshare(0) {}
     RegXS(const RegBS &b) { xshare = b.bshare ? ~0 : 0; }
