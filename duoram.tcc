@@ -557,7 +557,7 @@ Duoram<T>::Shape::MemRefExpl<FT,FST>::operator FT()
 
 // Explicit update to a given index of Duoram memory
 template <typename T> template <typename FT, typename FST>
-typename Duoram<T>::Shape::MemRefExpl<FT,FST>
+typename Duoram<T>::Shape::template MemRefExpl<FT,FST>
     &Duoram<T>::Shape::MemRefExpl<FT,FST>::operator+=(const FT& M)
 {
     Shape &shape = this->shape;
@@ -614,7 +614,7 @@ typename Duoram<T>::Shape::MemRefExpl<FT,FST>
 
 // Explicit write to a given index of Duoram memory
 template <typename T> template <typename FT, typename FST>
-typename Duoram<T>::Shape::MemRefExpl<FT,FST>
+typename Duoram<T>::Shape::template MemRefExpl<FT,FST>
     &Duoram<T>::Shape::MemRefExpl<FT,FST>::operator=(const FT& M)
 {
     FT oldval = *this;
