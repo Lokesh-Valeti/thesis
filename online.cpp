@@ -5,7 +5,7 @@
 #include "rdpf.hpp"
 #include "duoram.hpp"
 #include "cdpf.hpp"
-#include "baltree.hpp"
+#include "cell.hpp"
 
 
 static void online_test(MPCIO &mpcio,
@@ -1165,9 +1165,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
         } else {
             duoram<RegAS>(mpcio, opts, args);
         }
-    } else if (!strcmp(*args, "baltree")) {
+    } else if (!strcmp(*args, "cell")) {
         ++args;
-        baltree(mpcio, opts, args);
+        cell(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }

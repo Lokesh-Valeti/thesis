@@ -9,7 +9,7 @@ LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthr
 
 BIN=prac
 SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp rdpf.cpp \
-    cdpf.cpp duoram.cpp baltree.cpp
+    cdpf.cpp duoram.cpp cell.cpp
 OBJS=$(SRCS:.cpp=.o)
 ASMS=$(SRCS:.cpp=.s)
 
@@ -39,7 +39,7 @@ preproc.o: options.hpp rdpf.hpp bitutils.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc
 preproc.o: cdpf.hpp cdpf.tcc
 online.o: online.hpp mpcio.hpp types.hpp corotypes.hpp options.hpp mpcops.hpp
 online.o: coroutine.hpp rdpf.hpp bitutils.hpp dpf.hpp prg.hpp aes.hpp
-online.o: rdpf.tcc duoram.hpp duoram.tcc cdpf.hpp cdpf.tcc baltree.hpp
+online.o: rdpf.tcc duoram.hpp duoram.tcc cdpf.hpp cdpf.tcc cell.hpp
 mpcops.o: mpcops.hpp types.hpp mpcio.hpp corotypes.hpp coroutine.hpp
 mpcops.o: bitutils.hpp
 rdpf.o: rdpf.hpp mpcio.hpp types.hpp corotypes.hpp coroutine.hpp bitutils.hpp
@@ -49,6 +49,6 @@ cdpf.o: dpf.hpp prg.hpp aes.hpp cdpf.tcc
 duoram.o: duoram.hpp types.hpp mpcio.hpp corotypes.hpp coroutine.hpp
 duoram.o: duoram.tcc mpcops.hpp cdpf.hpp dpf.hpp prg.hpp bitutils.hpp aes.hpp
 duoram.o: cdpf.tcc rdpf.hpp rdpf.tcc
-baltree.o: types.hpp duoram.hpp mpcio.hpp corotypes.hpp coroutine.hpp
-baltree.o: duoram.tcc mpcops.hpp cdpf.hpp dpf.hpp prg.hpp bitutils.hpp
-baltree.o: aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc baltree.hpp options.hpp
+cell.o: types.hpp duoram.hpp mpcio.hpp corotypes.hpp coroutine.hpp duoram.tcc
+cell.o: mpcops.hpp cdpf.hpp dpf.hpp prg.hpp bitutils.hpp aes.hpp cdpf.tcc
+cell.o: rdpf.hpp rdpf.tcc cell.hpp options.hpp

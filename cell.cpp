@@ -2,7 +2,7 @@
 
 #include "types.hpp"
 #include "duoram.hpp"
-#include "baltree.hpp"
+#include "cell.hpp"
 
 struct Cell {
     RegAS key;
@@ -120,7 +120,7 @@ T& operator<<(T& os, const Cell &x)
 
 DEFAULT_TUPLE_IO(Cell)
 
-void baltree (MPCIO &mpcio,
+void cell(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=4;
