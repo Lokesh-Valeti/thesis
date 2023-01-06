@@ -89,16 +89,19 @@ class Duoram<T>::Shape {
     // additive-shared index (x) into an XOR-shared database (T), for
     // example.
 
-    // The parent class of the MemRef* classes, used when deferencing a
-    // Shape with A[x]
-    class MemRef;
-
     // When x is additively or XOR shared
     // U is the sharing type of the indices, while T is the sharing type
-    // of the data in the database.
-    template <typename U>
+    // of the data in the database.  If we are referencing an entire
+    // entry of type T, then the field type FT will equal T, and the
+    // field selector type FST will be nullopt_t.  If we are referencing
+    // a particular field of T, then FT will be the type of the field
+    // (RegAS or RegXS) and FST will be a pointer-to-member T::* type
+    // pointing to that field.  Sh is the specific Shape subtype used to
+    // create the MemRefS.
+    template <typename U, typename FT, typename FST, typename Sh>
     class MemRefS;
-    // When x is unshared explicit value
+    // When x is unshared explicit value.  FT and FST are as above.
+    template <typename FT, typename FST>
     class MemRefExpl;
     // When x is a vector or array of values of type U, used to denote a
     // collection of independent memory operations that can be performed
@@ -173,7 +176,8 @@ protected:
     // Get a pair (for the server) of references to the underlying
     // Duoram entries at share virtual index idx.  (That is, it gets
     // duoram.p0_blind[indexmap(idx)], etc.)
-    inline std::tuple<T&,T&> get_server(size_t idx) const {
+    inline std::tuple<T&,T&> get_server(size_t idx,
+        std::nullopt_t null = std::nullopt) const {
         size_t physaddr = indexmap(idx);
         return std::tie(
             duoram.p0_blind[physaddr],
@@ -183,7 +187,8 @@ protected:
     // Get a triple (for the computational players) of references to the
     // underlying Duoram entries at share virtual index idx.  (That is,
     // it gets duoram.database[indexmap(idx)], etc.)
-    inline std::tuple<T&,T&,T&> get_comp(size_t idx) const {
+    inline std::tuple<T&,T&,T&> get_comp(size_t idx,
+        std::nullopt_t null = std::nullopt) const {
         size_t physaddr = indexmap(idx);
         return std::tie(
             duoram.database[physaddr],
@@ -191,14 +196,33 @@ protected:
             duoram.peer_blinded_db[physaddr]);
     }
 
+    // Get a pair (for the server) of references to a particular field
+    // of the underlying Duoram entries at share virtual index idx.
+    // (That is, it gets duoram.p0_blind[indexmap(idx)].field, etc.)
+    template <typename FT>
+    inline std::tuple<FT&,FT&> get_server(size_t idx, FT T::*field) const {
+        size_t physaddr = indexmap(idx);
+        return std::tie(
+            duoram.p0_blind[physaddr].*field,
+            duoram.p1_blind[physaddr].*field);
+    }
+
+    // Get a triple (for the computational players) of references to a
+    // particular field to the underlying Duoram entries at share
+    // virtual index idx.  (That is, it gets
+    // duoram.database[indexmap(idx)].field, etc.)
+    template <typename FT>
+    inline std::tuple<FT&,FT&,FT&> get_comp(size_t idx, FT T::*field) const {
+        size_t physaddr = indexmap(idx);
+        return std::tie(
+            duoram.database[physaddr].*field,
+            duoram.blind[physaddr].*field,
+            duoram.peer_blinded_db[physaddr].*field);
+    }
+
 public:
     // Get the size
     inline size_t size() { return shape_size; }
-
-    // Index into this Shape in various ways
-    MemRefS<RegAS> operator[](const RegAS &idx) { return MemRefS<RegAS>(*this, idx); }
-    MemRefS<RegXS> operator[](const RegXS &idx) { return MemRefS<RegXS>(*this, idx); }
-    MemRefExpl operator[](address_t idx) { return MemRefExpl(*this, idx); }
 
     // Enable or disable explicit-only mode.  Only using [] with
     // explicit (address_t) indices are allowed in this mode.  Using []
@@ -265,15 +289,42 @@ public:
         return Flat(*this, this->tio, new_yield);
     }
 
-    // Generate independent memory references for this Flat
+    // Index into this Flat in various ways
+    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Flat>
+            operator[](const RegAS &idx) {
+        typename Duoram<T>::Shape::
+            template MemRefS<RegAS,T,std::nullopt_t,Flat>
+            res(*this, idx, std::nullopt);
+        return res;
+    }
+    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Flat>
+            operator[](const RegXS &idx) {
+        typename Duoram<T>::Shape::
+            template MemRefS<RegXS,T,std::nullopt_t,Flat>
+            res(*this, idx, std::nullopt);
+        return res;
+    }
+    typename Duoram::Shape::template MemRefExpl<T,std::nullopt_t>
+            operator[](address_t idx) {
+        typename Duoram<T>::Shape::
+            template MemRefExpl<T,std::nullopt_t>
+            res(*this, idx, std::nullopt);
+        return res;
+    }
     template <typename U>
-    Duoram::Shape::MemRefInd<U, Flat> indep(const std::vector<U> &indcs) {
-        typename Duoram<T>::Shape::template MemRefInd<U,Flat> res(*this, indcs);
+    Duoram::Shape::MemRefInd<U, Flat>
+            operator[](const std::vector<U> &indcs) {
+        typename Duoram<T>::Shape::
+            template MemRefInd<U,Flat>
+            res(*this, indcs);
         return res;
     }
     template <typename U, size_t N>
-    Duoram::Shape::MemRefInd<U, Flat> indep(const std::array<U,N> &indcs) {
-        typename Duoram<T>::Shape::template MemRefInd<U,Flat> res(*this, indcs);
+    Duoram::Shape::MemRefInd<U, Flat>
+            operator[](const std::array<U,N> &indcs) {
+        typename Duoram<T>::Shape::
+            template MemRefInd<U,Flat>
+            res(*this, indcs);
         return res;
     }
 
@@ -301,89 +352,92 @@ public:
     RegAS obliv_binary_search(RegAS &target);
 };
 
-// The parent class of shared memory references
-template <typename T>
-class Duoram<T>::Shape::MemRef {
-protected:
-    Shape &shape;
-
-    MemRef(Shape &shape): shape(shape) {}
-
-public:
-
-    // Oblivious read from a shared index of Duoram memory
-    virtual operator T() = 0;
-
-    // Oblivious update to a shared index of Duoram memory
-    virtual MemRef &operator+=(const T& M) = 0;
-
-    // Oblivious write to a shared index of Duoram memory
-    virtual MemRef &operator=(const T& M) = 0;
-
-    // Convenience function
-    MemRef &operator-=(const T& M) { *this += (-M); return *this; }
-
-};
-
 // An additive or XOR shared memory reference.  You get one of these
 // from a Shape A and an additively shared RegAS index x, or an XOR
 // shared RegXS index x, with A[x].  Then you perform operations on this
 // object, which do the Duoram operations.  As above, T is the sharing
 // type of the data in the database, while U is the sharing type of the
-// index used to create this memory reference.
+// index used to create this memory reference.  If we are referencing an
+// entire entry of type T, then the field type FT will equal T, and the
+// field selector type FST will be nullopt_t.  If we are referencing a
+// particular field of T, then FT will be the type of the field (RegAS
+// or RegXS) and FST will be a pointer-to-member T::* type pointing to
+// that field.  Sh is the specific Shape subtype used to create the
+// MemRefS.
 
-template <typename T> template <typename U>
-class Duoram<T>::Shape::MemRefS : public Duoram<T>::Shape::MemRef {
+template <typename T>
+template <typename U, typename FT, typename FST, typename Sh>
+class Duoram<T>::Shape::MemRefS {
+    Sh &shape;
     U idx;
+    FST fieldsel;
 
 private:
     // Oblivious update to a shared index of Duoram memory, only for
-    // ST = RegAS or RegXS
-    template <typename ST>
-    MemRefS<U> &oram_update(const ST& M, const prac_template_true&);
+    // FT = RegAS or RegXS
+    MemRefS<U,FT,FST,Sh> &oram_update(const FT& M, const prac_template_true&);
     // Oblivious update to a shared index of Duoram memory, for
-    // ST not RegAS or RegXS
-    template <typename ST>
-    MemRefS<U> &oram_update(const ST& M, const prac_template_false&);
+    // FT not RegAS or RegXS
+    MemRefS<U,FT,FST,Sh> &oram_update(const FT& M, const prac_template_false&);
 
 public:
-    MemRefS<U>(Shape &shape, const U &idx) :
-        MemRef(shape), idx(idx) {}
+    MemRefS<U,FT,FST,Sh>(Sh &shape, const U &idx, FST fieldsel) :
+        shape(shape), idx(idx), fieldsel(fieldsel) {}
+
+    // Create a MemRefExpl for accessing a partcular field of T
+    template <typename SFT>
+    MemRefS<U,SFT,SFT T::*,Sh> field(SFT T::*subfieldsel) {
+        auto res = MemRefS<U,SFT,SFT T::*,Sh>(this->shape, idx, subfieldsel);
+        return res;
+    }
 
     // Oblivious read from a shared index of Duoram memory
-    operator T() override;
+    operator FT();
 
     // Oblivious update to a shared index of Duoram memory
-    MemRefS<U> &operator+=(const T& M) override;
+    MemRefS<U,FT,FST,Sh> &operator+=(const FT& M);
 
     // Oblivious write to a shared index of Duoram memory
-    MemRefS<U> &operator=(const T& M) override;
+    MemRefS<U,FT,FST,Sh> &operator=(const FT& M);
 };
 
 // An explicit memory reference.  You get one of these from a Shape A
 // and an address_t index x with A[x].  Then you perform operations on
 // this object, which update the Duoram state without performing Duoram
-// operations.
+// operations.  If we are referencing an entire entry of type T, then
+// the field type FT will equal T, and the field selector type FST will
+// be nullopt_t.  If we are referencing a particular field of T, then FT
+// will be the type of the field (RegAS or RegXS) and FST will be a
+// pointer-to-member T::* type pointing to that field.
 
-template <typename T>
-class Duoram<T>::Shape::MemRefExpl : public Duoram<T>::Shape::MemRef {
+template <typename T> template <typename FT, typename FST>
+class Duoram<T>::Shape::MemRefExpl {
+    Shape &shape;
     address_t idx;
+    FST fieldsel;
 
 public:
-    MemRefExpl(Shape &shape, address_t idx) :
-        MemRef(shape), idx(idx) {}
+    MemRefExpl(Shape &shape, address_t idx, FST fieldsel) :
+        shape(shape), idx(idx), fieldsel(fieldsel) {}
+
+    // Create a MemRefExpl for accessing a partcular field of T
+    template <typename SFT>
+    MemRefExpl<SFT,SFT T::*> field(SFT T::*subfieldsel) {
+        auto res = MemRefExpl<SFT,SFT T::*>(this->shape, idx, subfieldsel);
+        return res;
+    }
 
     // Explicit read from a given index of Duoram memory
-    operator T() override;
+    operator FT();
 
     // Explicit update to a given index of Duoram memory
-    MemRefExpl &operator+=(const T& M) override;
+    MemRefExpl &operator+=(const FT& M);
 
     // Explicit write to a given index of Duoram memory
-    MemRefExpl &operator=(const T& M) override;
+    MemRefExpl &operator=(const FT& M);
 
     // Convenience function
-    MemRefExpl &operator-=(const T& M) { *this += (-M); return *this; }
+    MemRefExpl &operator-=(const FT& M) { *this += (-M); return *this; }
 };
 
 // A collection of independent memory references that can be processed

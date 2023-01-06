@@ -616,9 +616,9 @@ static void duoram_test(MPCIO &mpcio,
 
         // Simultaneous independent reads
         printf("3 independent reading\n");
-        std::vector<T> Av = A.indep(std::array {
+        std::vector<T> Av = A[std::array {
             aidx, aidx2, aidx3
-        });
+        }];
 
         // Simultaneous independent updates
         T Aw1, Aw2, Aw3;
@@ -626,7 +626,7 @@ static void duoram_test(MPCIO &mpcio,
         Aw2.set(0x202020202020202 * tio.player());
         Aw3.set(0x303030303030303 * tio.player());
         printf("3 independent updating\n");
-        A.indep(std::array { aidx, aidx2, aidx3 }) -=
+        A[std::array { aidx, aidx2, aidx3 }] -=
             std::array { Aw1, Aw2, Aw3 };
 
         if (depth <= 10) {
@@ -713,7 +713,7 @@ static void duoram(MPCIO &mpcio,
         mpcio.reset_stats();
         tio.reset_lamport();
         // Read all the entries in the list at once
-        std::vector<T> read_outputs = A.indep(list_indices);
+        std::vector<T> read_outputs = A[list_indices];
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
 
@@ -730,7 +730,7 @@ static void duoram(MPCIO &mpcio,
             indep_values.push_back(read_outputs[i]+one);
         }
         // Update all the indices at once
-        A.indep(indep_indices) += indep_values;
+        A[indep_indices] += indep_values;
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
 

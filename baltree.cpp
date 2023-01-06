@@ -83,16 +83,24 @@ struct Cell {
         value = dpf.unit_bs(leaf);
     }
 
-    // You need a method to turn WIDTH DPFs into an element of your
-    // type, using each DPF's scaled_sum or scaled_xor value as
-    // appropriate for each field.  We need WIDTH of them because
-    // reusing a scaled value from a DPF leaks information.  The dpfs
-    // argument is a function that given 0 <= f < WIDTH, returns a
-    // reference to DPF number f.
-    inline void scaled_value(std::function<const RDPF &(size_t)> dpfs) {
-        key = dpfs(0).scaled_sum;
-        pointers = dpfs(1).scaled_xor;
-        value = dpfs(2).scaled_xor;
+    // Perform an update on each of the fields, using field-specific
+    // MemRefs constructed from the Shape shape and the index idx
+    template <typename Sh, typename U>
+    inline static void update(Sh &shape, yield_t &shyield, U idx,
+            const Cell &M) {
+        run_coroutines(shyield,
+            [&shape, &idx, &M] (yield_t &yield) {
+                Sh Sh_coro = shape.context(yield);
+                Sh_coro[idx].field(&Cell::key) += M.key;
+            },
+            [&shape, &idx, &M] (yield_t &yield) {
+                Sh Sh_coro = shape.context(yield);
+                Sh_coro[idx].field(&Cell::pointers) += M.pointers;
+            },
+            [&shape, &idx, &M] (yield_t &yield) {
+                Sh Sh_coro = shape.context(yield);
+                Sh_coro[idx].field(&Cell::value) += M.value;
+            });
     }
 };
 
@@ -138,11 +146,50 @@ void baltree (MPCIO &mpcio,
         expl_read_c.dump();
         printf("\n");
         Cell oram_read_c = A[idx];
-        printf ("oram_read_c = ");
+        printf("oram_read_c = ");
         oram_read_c.dump();
         printf("\n");
 
+        RegXS valueupdate;
+        valueupdate.set(0x4040404040404040 * tio.player());
+        RegXS pointersset;
+        pointersset.set(0x123456789abcdef0 * tio.player());
+        A[1].field(&Cell::value) += valueupdate;
+        A[3].field(&Cell::pointers) = pointersset;
+        RegXS pointval = A[0].field(&Cell::pointers);
+        printf("pointval = ");
+        pointval.dump();
         printf("\n");
-        oram.dump();
+
+        idx.set(1 * tio.player());
+        RegXS oram_value_read = A[idx].field(&Cell::value);
+        printf("oram_value_read = ");
+        oram_value_read.dump();
+        printf("\n");
+        valueupdate.set(0x8080808080808080 * tio.player());
+        A[idx].field(&Cell::value) += valueupdate;
+        idx.set(2 * tio.player());
+        A[idx].field(&Cell::value) = valueupdate;
+
+        c.key.set(0x0102030405060708 * tio.player());
+        c.pointers.set(0x1112131415161718 * tio.player());
+        c.value.set(0x2122232425262728 * tio.player());
+        A[idx] += c;
+        idx.set(3 * tio.player());
+        A[idx] = c;
+
+        printf("\n");
+
+        if (depth < 10) {
+            oram.dump();
+            auto R = A.reconstruct();
+            if (tio.player() == 0) {
+                for(size_t i=0;i<R.size();++i) {
+                    printf("\n%04lx ", i);
+                    R[i].dump();
+                }
+                printf("\n");
+            }
+        }
     });
 }
