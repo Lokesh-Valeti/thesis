@@ -4,11 +4,16 @@
 #include "duoram.hpp"
 #include "cell.hpp"
 
+// This file demonstrates how to implement custom ORAM wide cell types.
+// Such types can be structures of arbitrary numbers of RegAS and RegXS
+// fields.
+
 struct Cell {
     RegAS key;
     RegXS pointers;
     RegXS value;
 
+    // For debugging and checking answers
     void dump() const {
         printf("[%016lx %016lx %016lx]", key.share(), pointers.share(),
             value.share());
@@ -101,6 +106,8 @@ struct Cell {
     }
 };
 
+// I/O operations (for sending over the network)
+
 template <typename T>
 T& operator>>(T& is, Cell &x)
 {
@@ -115,7 +122,13 @@ T& operator<<(T& os, const Cell &x)
     return os;
 }
 
+// This macro will define I/O on tuples of two or three of the cell type
+
 DEFAULT_TUPLE_IO(Cell)
+
+
+// Now we use the cell in various ways.  This function is called by
+// online.cpp.
 
 void cell(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
@@ -136,12 +149,15 @@ void cell(MPCIO &mpcio,
         c.key.set(0x0102030405060708);
         c.pointers.set(0x1112131415161718);
         c.value.set(0x2122232425262728);
+        // Explicit write
         A[0] = c;
         RegAS idx;
+        // Explicit read
         Cell expl_read_c = A[0];
         printf("expl_read_c = ");
         expl_read_c.dump();
         printf("\n");
+        // ORAM read
         Cell oram_read_c = A[idx];
         printf("oram_read_c = ");
         oram_read_c.dump();
@@ -151,28 +167,35 @@ void cell(MPCIO &mpcio,
         valueupdate.set(0x4040404040404040 * tio.player());
         RegXS pointersset;
         pointersset.set(0x123456789abcdef0 * tio.player());
+        // Explicit update and write of individual fields
         A[1].field(&Cell::value) += valueupdate;
         A[3].field(&Cell::pointers) = pointersset;
+        // Explicit read of individual field
         RegXS pointval = A[0].field(&Cell::pointers);
         printf("pointval = ");
         pointval.dump();
         printf("\n");
 
         idx.set(1 * tio.player());
+        // ORAM read of individual field
         RegXS oram_value_read = A[idx].field(&Cell::value);
         printf("oram_value_read = ");
         oram_value_read.dump();
         printf("\n");
         valueupdate.set(0x8080808080808080 * tio.player());
+        // ORAM update of individual field
         A[idx].field(&Cell::value) += valueupdate;
         idx.set(2 * tio.player());
+        // ORAM write of individual field
         A[idx].field(&Cell::value) = valueupdate;
 
         c.key.set(0x0102030405060708 * tio.player());
         c.pointers.set(0x1112131415161718 * tio.player());
         c.value.set(0x2122232425262728 * tio.player());
+        // ORAM update of full Cell
         A[idx] += c;
         idx.set(3 * tio.player());
+        // ORAM write of full Cell
         A[idx] = c;
 
         printf("\n");
