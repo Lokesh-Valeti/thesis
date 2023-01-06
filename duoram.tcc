@@ -357,10 +357,10 @@ Duoram<T>::Shape::MemRefS<U>::operator T()
 }
 
 // Oblivious update to a shared index of Duoram memory, only for
-// T = RegAS or RegXS
-template <typename T> template <typename U>
+// ST = RegAS or RegXS
+template <typename T> template <typename U> template <typename ST>
 typename Duoram<T>::Shape::template MemRefS<U>
-    &Duoram<T>::Shape::MemRefS<U>::oram_update(const T& M,
+    &Duoram<T>::Shape::MemRefS<U>::oram_update(const ST& M,
         const prac_template_true &)
 {
     Shape &shape = this->shape;
@@ -375,7 +375,7 @@ typename Duoram<T>::Shape::template MemRefS<U>
         U indoffset = dt.target<U>();
         indoffset -= idx;
         auto Moffset = std::make_tuple(M, M, M);
-        Moffset -= dt.scaled_value<T>();
+        Moffset -= dt.scaled_value<ST>();
 
         // Send them to the peer, and everything except the first offset
         // to the server
@@ -389,7 +389,7 @@ typename Duoram<T>::Shape::template MemRefS<U>
 
         // Receive the above from the peer
         U peerindoffset;
-        std::tuple<T,T,T> peerMoffset;
+        std::tuple<ST,ST,ST> peerMoffset;
         shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
         shape.tio.iostream_peer() >> peerMoffset;
 
@@ -405,7 +405,7 @@ typename Duoram<T>::Shape::template MemRefS<U>
         pe.reduce(init, [&dt, &shape, &Mshift, player] (int thread_num,
                 address_t i, const RDPFTriple::node &leaf) {
             // The values from the three DPFs
-            auto [V0, V1, V2] = dt.scaled<T>(leaf) + dt.unit<T>(leaf) * Mshift;
+            auto [V0, V1, V2] = dt.scaled<ST>(leaf) + dt.unit<ST>(leaf) * Mshift;
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i);
@@ -424,7 +424,7 @@ typename Duoram<T>::Shape::template MemRefS<U>
 
         RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         U p0indoffset, p1indoffset;
-        std::tuple<T,T> p0Moffset, p1Moffset;
+        std::tuple<ST,ST> p0Moffset, p1Moffset;
 
         shape.yield();
 
@@ -445,7 +445,7 @@ typename Duoram<T>::Shape::template MemRefS<U>
         pe.reduce(init, [&dp, &shape, &Mshift] (int thread_num,
                 address_t i, const RDPFPair::node &leaf) {
             // The values from the two DPFs
-            auto V = dp.scaled<T>(leaf) + dp.unit<T>(leaf) * Mshift;
+            auto V = dp.scaled<ST>(leaf) + dp.unit<ST>(leaf) * Mshift;
             // shape.get_server(i) returns a pair of references to the
             // appropriate cells in the two blinded databases, so we can
             // subtract the pair directly.
@@ -457,10 +457,10 @@ typename Duoram<T>::Shape::template MemRefS<U>
 }
 
 // Oblivious update to a shared index of Duoram memory, only for
-// T not equal to RegAS or RegXS
-template <typename T> template <typename U>
+// ST not RegAS or RegXS
+template <typename T> template <typename U> template <typename ST>
 typename Duoram<T>::Shape::template MemRefS<U>
-    &Duoram<T>::Shape::MemRefS<U>::oram_update(const T& M,
+    &Duoram<T>::Shape::MemRefS<U>::oram_update(const ST& M,
         const prac_template_false &)
 {
     return *this;

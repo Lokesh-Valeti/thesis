@@ -338,9 +338,13 @@ class Duoram<T>::Shape::MemRefS : public Duoram<T>::Shape::MemRef {
 
 private:
     // Oblivious update to a shared index of Duoram memory, only for
-    // T = RegAS or RegXS
-    MemRefS<U> &oram_update(const T& M, const prac_template_true&);
-    MemRefS<U> &oram_update(const T& M, const prac_template_false&);
+    // ST = RegAS or RegXS
+    template <typename ST>
+    MemRefS<U> &oram_update(const ST& M, const prac_template_true&);
+    // Oblivious update to a shared index of Duoram memory, for
+    // ST not RegAS or RegXS
+    template <typename ST>
+    MemRefS<U> &oram_update(const ST& M, const prac_template_false&);
 
 public:
     MemRefS<U>(Shape &shape, const U &idx) :
