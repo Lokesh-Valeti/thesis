@@ -296,3 +296,49 @@ std::tuple<RegBS,RegBS,RegBS> CDPF::compare(value_t S, size_t &aes_ops)
 
     return std::make_tuple(lt, eq, gt);
 }
+
+// You can call this version directly if you already have S = target-x
+// reconstructed.  This routine is entirely local; no communication
+// is needed.  This function is identical to compare, above, except that
+// it only computes what's needed for the eq output.
+//
+// Cost:
+// VALUE_BITS - 7 = 57 local AES operations
+RegBS CDPF::is_zero(value_t S, size_t &aes_ops)
+{
+    RegBS eq;
+
+    // We' descend the DPF tree for the values S.
+
+    // Invariant: Snode is the node on level curlevel on the path to
+    // S.
+    nbits_t curlevel = 0;
+    const nbits_t depth = VALUE_BITS - 7;
+    DPFnode Snode = seed;
+
+    bool Sdir = !!(S & (value_t(1)<<63));
+    Snode = descend(Snode, curlevel, Sdir, aes_ops);
+    curlevel = 1;
+
+    // The last level is special
+    while(curlevel < depth-1) {
+        Sdir = !!(S & (value_t(1)<<((depth+7)-curlevel-1)));
+        Snode = descend(Snode, curlevel, Sdir, aes_ops);
+        ++curlevel;
+    }
+    // Now we're at the level just above the leaves.  If we go left,
+    // include *all* the bits (not just the low bit) of the right
+    // child of Snode, and if we go right, include all the bits of
+    // the left child of Tnode.
+    Sdir = !!(S & (value_t(1)<<((depth+7)-curlevel-1)));
+    Snode = descend_to_leaf(Snode, Sdir, aes_ops);
+    ++curlevel;
+
+    // Now Snode is the leaf containing S.  Pull out the bit in Snode
+    // for S itself into eq.
+
+    nbits_t Spos = S & 0x7f;
+    eq.bshare = bit_at(Snode, Spos);
+
+    return eq;
+}

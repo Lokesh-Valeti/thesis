@@ -866,26 +866,30 @@ static int compare_test_one(MPCTIO &tio, yield_t &yield,
         RegAS xsh;
         tio.iostream_server() >> dpf >> xsh;
         auto [lt, eq, gt] = dpf.compare(tio, yield, xsh, aes_ops);
-        printf("%016lx %016lx %d %d %d ", target, x, lt.bshare,
-            eq.bshare, gt.bshare);
+        RegBS eeq = dpf.is_zero(tio, yield, xsh, aes_ops);
+        printf("%016lx %016lx %d %d %d %d ", target, x, lt.bshare,
+            eq.bshare, gt.bshare, eeq.bshare);
         // Check the answer
         if (player == 1) {
-            tio.iostream_peer() << xsh << lt << eq << gt;
+            tio.iostream_peer() << xsh << lt << eq << gt << eeq;
         } else {
             RegAS peer_xsh;
-            RegBS peer_lt, peer_eq, peer_gt;
-            tio.iostream_peer() >> peer_xsh >> peer_lt >> peer_eq >> peer_gt;
+            RegBS peer_lt, peer_eq, peer_gt, peer_eeq;
+            tio.iostream_peer() >> peer_xsh >> peer_lt >> peer_eq >>
+                peer_gt >> peer_eeq;
             lt ^= peer_lt;
             eq ^= peer_eq;
             gt ^= peer_gt;
+            eeq ^= peer_eeq;
             xsh += peer_xsh;
             int lti = int(lt.bshare);
             int eqi = int(eq.bshare);
             int gti = int(gt.bshare);
+            int eeqi = int(eeq.bshare);
             x = xsh.share();
-            printf(": %d %d %d ", lti, eqi, gti);
+            printf(": %d %d %d %d ", lti, eqi, gti, eeqi);
             bool signbit = (x >> 63);
-            if (lti + eqi + gti != 1) {
+            if (lti + eqi + gti != 1 || eqi != eeqi) {
                 printf("INCONSISTENT");
                 res = 0;
             } else if (x == 0 && eqi) {

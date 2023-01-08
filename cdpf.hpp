@@ -138,6 +138,26 @@ struct CDPF : public DPF {
     // 3*VALUE_BITS - 22 = 170 local AES operations
     std::tuple<RegBS,RegBS,RegBS> compare(value_t S, size_t &aes_ops);
 
+    // Determine whether the given additively or XOR shared element is 0.
+    // The output is a bit share, which is a share of 1 iff the passed
+    // element is a share of 0.  Note also that you can compare two RegAS or
+    // RegXS values A and B for equality by passing A-B here.
+    //
+    // Cost:
+    // 1 word sent in 1 message
+    // VALUE_BITS - 7 = 57 local AES operations
+    template <typename T>
+    RegBS is_zero(MPCTIO &tio, yield_t &yield,
+        const T &x, size_t &aes_ops);
+
+    // You can call this version directly if you already have S = target-x
+    // reconstructed.  This routine is entirely local; no communication
+    // is needed.  This function is identical to compare, above, except that
+    // it only computes what's needed for the eq output.
+    //
+    // Cost:
+    // VALUE_BITS - 7 = 57 local AES operations
+    RegBS is_zero(value_t S, size_t &aes_ops);
 };
 
 // Descend from the parent of a leaf node to the leaf node
