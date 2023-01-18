@@ -433,6 +433,7 @@ MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num, int num_threads) :
 #ifdef VERBOSE_COMMS
         , round_num(0)
 #endif
+        , last_andtriple_bits_remaining(0)
 {
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
@@ -780,6 +781,22 @@ SelectTriple<value_t> MPCTIO::valselecttriple(yield_t &yield)
         queue_p1(&Z1, sizeof(Z1));
         yield();
     }
+    return val;
+}
+
+SelectTriple<bit_t> MPCTIO::bitselecttriple(yield_t &yield)
+{
+    // Do we need to fetch a new AND triple?
+    if (last_andtriple_bits_remaining == 0) {
+        last_andtriple = andtriple(yield);
+        last_andtriple_bits_remaining = 8*sizeof(value_t);
+    }
+    --last_andtriple_bits_remaining;
+    value_t mask = value_t(1) << last_andtriple_bits_remaining;
+    SelectTriple<bit_t> val;
+    val.X = !!(std::get<0>(last_andtriple) & mask);
+    val.Y = !!(std::get<1>(last_andtriple) & mask);
+    val.Z = !!(std::get<2>(last_andtriple) & mask);
     return val;
 }
 

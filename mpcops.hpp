@@ -110,4 +110,20 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
 void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
     DPFnode &z, RegBS f, DPFnode x, DPFnode y);
 
+// P0 and P1 hold bit shares of x and y.  Set z to bit shares of x & y.
+//
+// Cost:
+// 1 byte sent in 1 message
+// consumes 1/64 AndTriple
+void mpc_and(MPCTIO &tio, yield_t &yield,
+    RegBS &z, RegBS x, RegBS y);
+
+// P0 and P1 hold bit shares of x and y.  Set z to bit shares of x | y.
+//
+// Cost:
+// 1 byte sent in 1 message
+// consumes 1/64 AndTriple
+void mpc_or(MPCTIO &tio, yield_t &yield,
+    RegBS &z, RegBS x, RegBS y);
+
 #endif

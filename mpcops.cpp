@@ -174,11 +174,8 @@ void mpc_select(MPCTIO &tio, yield_t &yield,
 
     // Compute our share of f ? x : y = (f * (x ^ y))^x
     value_t peer_blind_fext = -value_t(peer_blind_f);
-    value_t zshare =
-            (fext & peer_blind_d) ^ (Y & peer_blind_fext) ^
-            (fext & d) ^ (Z ^ x.xshare);
-
-    z.set(zshare & mask);
+    z.xshare = ((fext & peer_blind_d) ^ (Y & peer_blind_fext) ^
+            (fext & d) ^ (Z ^ x.xshare)) & mask;
 }
 
 // P0 and P1 hold bit shares f0 and f1 of the single bit f, and additive
@@ -299,4 +296,54 @@ void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
     tio.recv_peer(&peer_zshare, sizeof(peer_zshare));
 
     z = zshare ^ peer_zshare;
+}
+
+// P0 and P1 hold bit shares of x and y.  Set z to bit shares of x & y.
+//
+// Cost:
+// 1 byte sent in 1 message
+// consumes 1/64 AndTriple
+void mpc_and(MPCTIO &tio, yield_t &yield,
+    RegBS &z, RegBS x, RegBS y)
+{
+    // Compute XOR shares of x & y
+    auto T = tio.bitselecttriple(yield);
+    bit_t blind_x = x.bshare ^ T.X;
+    bit_t blind_y = y.bshare ^ T.Y;
+
+    // Send the blinded values
+    uint8_t v = (blind_x << 1) | blind_y;
+    tio.queue_peer(&v, sizeof(v));
+
+    yield();
+
+    // Read the peer's values
+    bit_t peer_blind_x = 0;
+    bit_t peer_blind_y = 0;
+    uint8_t peer_v = 0;
+    tio.recv_peer(&peer_v, sizeof(peer_v));
+    peer_blind_x = (peer_v >> 1) & 1;
+    peer_blind_y = peer_v & 1;
+
+    // Compute our share of x & y
+    z.bshare = (x.bshare & peer_blind_y) ^ (T.Y & peer_blind_x) ^
+        (x.bshare & y.bshare) ^ T.Z;
+}
+
+// P0 and P1 hold bit shares of x and y.  Set z to bit shares of x | y.
+//
+// Cost:
+// 1 byte sent in 1 message
+// consumes 1/64 AndTriple
+void mpc_or(MPCTIO &tio, yield_t &yield,
+    RegBS &z, RegBS x, RegBS y)
+{
+    if (tio.player() == 0) {
+        x.bshare = !x.bshare;
+        y.bshare = !y.bshare;
+    }
+    mpc_and(tio, yield, z, x, y);
+    if (tio.player() == 0) {
+        z.bshare = !z.bshare;
+    }
 }

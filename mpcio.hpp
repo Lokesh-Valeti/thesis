@@ -304,6 +304,11 @@ class MPCTIO {
     size_t round_num;
 #endif
 
+    // We implement SelectTriple<bit_t> by fetching a single AndTriple
+    // and using it for producing 64 bitwise SelectTriple<bit_t>s.
+    AndTriple last_andtriple;
+    nbits_t last_andtriple_bits_remaining;
+
 public:
     MPCTIO(MPCIO &mpcio, int thread_num, int num_threads = 1);
 
@@ -378,6 +383,7 @@ public:
     AndTriple andtriple(yield_t &yield);
     SelectTriple<DPFnode> nodeselecttriple(yield_t &yield);
     SelectTriple<value_t> valselecttriple(yield_t &yield);
+    SelectTriple<bit_t> bitselecttriple(yield_t &yield);
 
     // These ones only work during the online phase
     // Computational peers call:
