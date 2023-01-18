@@ -257,6 +257,36 @@ struct RegXS {
         return res;
     }
 
+    // Bit shifting and bit extraction
+
+    inline RegXS &operator<<=(nbits_t shift) {
+        this->xshare <<= shift;
+        return *this;
+    }
+
+    inline RegXS operator<<(nbits_t shift) const {
+        RegXS res = *this;
+        res <<= shift;
+        return res;
+    }
+
+    inline RegXS &operator>>=(nbits_t shift) {
+        this->xshare >>= shift;
+        return *this;
+    }
+
+    inline RegXS operator>>(nbits_t shift) const {
+        RegXS res = *this;
+        res >>= shift;
+        return res;
+    }
+
+    inline RegBS bitat(nbits_t pos) const {
+        RegBS bs;
+        bs.set(!!(this->xshare & (value_t(1)<<pos)));
+        return bs;
+    }
+
     // Multiply by the local share of the argument, not multiplcation of
     // two shared values (two versions)
     inline RegXS &mulshareeq(const RegXS &rhs) {
