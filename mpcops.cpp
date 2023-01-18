@@ -135,6 +135,52 @@ void mpc_select(MPCTIO &tio, yield_t &yield,
     z.ashare = (z.ashare + x.ashare) & mask;
 }
 
+// P0 and P1 hold bit shares f0 and f1 of the single bit f, and XOR
+// shares of the values x and y; compute XOR shares of z, where z = x if
+// f=0 and z = y if f=1.  x, y, and z are each at most nbits bits long.
+//
+// Cost:
+// 2 words sent in 1 message
+// consumes 1 SelectTriple
+void mpc_select(MPCTIO &tio, yield_t &yield,
+    RegXS &z, RegBS f, RegXS x, RegXS y,
+    nbits_t nbits)
+{
+    const value_t mask = MASKBITS(nbits);
+    size_t nbytes = BITBYTES(nbits);
+    // Sign-extend f (so 0 -> 0000...0; 1 -> 1111...1)
+    value_t fext = (-value_t(f.bshare)) & mask;
+
+    // Compute XOR shares of f & (x ^ y)
+    auto [X, Y, Z] = tio.valselecttriple(yield);
+
+    bit_t blind_f = f.bshare ^ X;
+    value_t d = (x.xshare ^ y.xshare) & mask;
+    value_t blind_d = (d ^ Y) & mask;
+
+    // Send the blinded values
+    tio.queue_peer(&blind_f, sizeof(blind_f));
+    tio.queue_peer(&blind_d, nbytes);
+
+    yield();
+
+    // Read the peer's values
+    bit_t peer_blind_f = 0;
+    value_t peer_blind_d;
+    tio.recv_peer(&peer_blind_f, sizeof(peer_blind_f));
+    peer_blind_f &= 1;
+    tio.recv_peer(&peer_blind_d, nbytes);
+    peer_blind_d &= mask;
+
+    // Compute our share of f ? x : y = (f * (x ^ y))^x
+    value_t peer_blind_fext = -value_t(peer_blind_f);
+    value_t zshare =
+            (fext & peer_blind_d) ^ (Y & peer_blind_fext) ^
+            (fext & d) ^ (Z ^ x.xshare);
+
+    z.set(zshare & mask);
+}
+
 // P0 and P1 hold bit shares f0 and f1 of the single bit f, and additive
 // shares of the values x and y. Obliviously swap x and y; that is,
 // replace x and y with new additive sharings of x and y respectively

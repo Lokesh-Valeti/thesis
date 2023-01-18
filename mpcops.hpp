@@ -65,6 +65,17 @@ void mpc_select(MPCTIO &tio, yield_t &yield,
     RegAS &z, RegBS f, RegAS x, RegAS y,
     nbits_t nbits = VALUE_BITS);
 
+// P0 and P1 hold bit shares f0 and f1 of the single bit f, and XOR
+// shares of the values x and y; compute XOR shares of z, where z = x if
+// f=0 and z = y if f=1.  x, y, and z are each at most nbits bits long.
+//
+// Cost:
+// 2 words sent in 1 message
+// consumes 1 SelectTriple
+void mpc_select(MPCTIO &tio, yield_t &yield,
+    RegXS &z, RegBS f, RegXS x, RegXS y,
+    nbits_t nbits = VALUE_BITS);
+
 // P0 and P1 hold bit shares f0 and f1 of the single bit f, and additive
 // shares of the values x and y. Obliviously swap x and y; that is,
 // replace x and y with new additive sharings of x and y respectively
