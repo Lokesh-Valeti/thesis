@@ -620,17 +620,19 @@ struct HalfTripleName { static constexpr const char *name = "h"; };
 
 using DPFnode = __m128i;
 
-// A Select triple is a triple of (X0,Y0,Z0) where X0 is a bit and Y0
-// and Z0 are DPFnodes held by P0 (and correspondingly (X1,Y1,Z1) held
-// by P1), with all values random, but subject to the relation that
-// (X0*Y1) ^ (Y0*X1) = Z0^Z1.  These are only used while creating RDPFs
-// in the preprocessing phase, so we never need to store them.  This is
-// a struct instead of a tuple for alignment reasons.
+// A Select triple for type V (V is DPFnode, value_t, or bit_t) is a
+// triple of (X0,Y0,Z0) where X0 is a bit and Y0 and Z0 are Vs held by
+// P0 (and correspondingly (X1,Y1,Z1) held by P1), with all values
+// random, but subject to the relation that (X0*Y1) ^ (Y0*X1) = Z0^Z1.
+// This is a struct instead of a tuple for alignment reasons.
 
+template <typename V>
 struct SelectTriple {
     bit_t X;
-    DPFnode Y, Z;
+    V Y, Z;
 };
+// Of the three options for V, we only ever store V = value_t
+struct ValSelectTripleName { static constexpr const char *name = "s"; };
 
 // These are defined in rdpf.hpp, but declared here to avoid cyclic
 // header dependencies.

@@ -650,9 +650,9 @@ HalfTriple MPCTIO::halftriple(yield_t &yield, bool tally)
     return val;
 }
 
-SelectTriple MPCTIO::nodeselecttriple(yield_t &yield)
+SelectTriple<DPFnode> MPCTIO::nodeselecttriple(yield_t &yield)
 {
-    SelectTriple val;
+    SelectTriple<DPFnode> val;
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
         if (mpcpio.mode != MODE_ONLINE) {
@@ -663,7 +663,7 @@ SelectTriple MPCTIO::nodeselecttriple(yield_t &yield)
             recv_server(&val.Y, sizeof(val.Y));
             recv_server(&val.Z, sizeof(val.Z));
         } else {
-            std::cerr << "Attempted to read SelectTriple in online phase\n";
+            std::cerr << "Attempted to read SelectTriple<DPFnode> in online phase\n";
         }
     } else if (mpcio.mode != MODE_ONLINE) {
         // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that

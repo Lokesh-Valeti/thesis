@@ -372,7 +372,7 @@ public:
 
     MultTriple multtriple(yield_t &yield);
     HalfTriple halftriple(yield_t &yield, bool tally=true);
-    SelectTriple nodeselecttriple(yield_t &yield);
+    SelectTriple<DPFnode> nodeselecttriple(yield_t &yield);
 
     // These ones only work during the online phase
     // Computational peers call:
