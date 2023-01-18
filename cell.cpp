@@ -18,6 +18,13 @@ struct Cell {
     RegXS pointers;
     RegXS value;
 
+// Field-access macros so we can write A[i].CELL_KEY instead of
+// A[i].field(&Cell::key)
+
+#define CELL_KEY field(&Cell::key)
+#define CELL_POINTERS field(&Cell::pointers)
+#define CELL_VALUE field(&Cell::value)
+
     // For debugging and checking answers
     void dump() const {
         printf("[%016lx %016lx %016lx]", key.share(), pointers.share(),
@@ -98,15 +105,15 @@ struct Cell {
         run_coroutines(shyield,
             [&shape, &idx, &M] (yield_t &yield) {
                 Sh Sh_coro = shape.context(yield);
-                Sh_coro[idx].field(&Cell::key) += M.key;
+                Sh_coro[idx].CELL_KEY += M.key;
             },
             [&shape, &idx, &M] (yield_t &yield) {
                 Sh Sh_coro = shape.context(yield);
-                Sh_coro[idx].field(&Cell::pointers) += M.pointers;
+                Sh_coro[idx].CELL_POINTERS += M.pointers;
             },
             [&shape, &idx, &M] (yield_t &yield) {
                 Sh Sh_coro = shape.context(yield);
-                Sh_coro[idx].field(&Cell::value) += M.value;
+                Sh_coro[idx].CELL_VALUE += M.value;
             });
     }
 };
@@ -173,26 +180,26 @@ void cell(MPCIO &mpcio,
         RegXS pointersset;
         pointersset.set(0x123456789abcdef0 * tio.player());
         // Explicit update and write of individual fields
-        A[1].field(&Cell::value) += valueupdate;
-        A[3].field(&Cell::pointers) = pointersset;
+        A[1].CELL_VALUE += valueupdate;
+        A[3].CELL_POINTERS = pointersset;
         // Explicit read of individual field
-        RegXS pointval = A[0].field(&Cell::pointers);
+        RegXS pointval = A[0].CELL_POINTERS;
         printf("pointval = ");
         pointval.dump();
         printf("\n");
 
         idx.set(1 * tio.player());
         // ORAM read of individual field
-        RegXS oram_value_read = A[idx].field(&Cell::value);
+        RegXS oram_value_read = A[idx].CELL_VALUE;
         printf("oram_value_read = ");
         oram_value_read.dump();
         printf("\n");
         valueupdate.set(0x8080808080808080 * tio.player());
         // ORAM update of individual field
-        A[idx].field(&Cell::value) += valueupdate;
+        A[idx].CELL_VALUE += valueupdate;
         idx.set(2 * tio.player());
         // ORAM write of individual field
-        A[idx].field(&Cell::value) = valueupdate;
+        A[idx].CELL_VALUE = valueupdate;
 
         c.key.set(0x0102030405060708 * tio.player());
         c.pointers.set(0x1112131415161718 * tio.player());
