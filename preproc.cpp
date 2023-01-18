@@ -98,14 +98,14 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                 tio.recv_server(&num, 4);
                 if (type == 0x80) {
                     // Multiplication triples
-                    auto tripfile = ofiles.open("triples",
+                    auto tripfile = ofiles.open("mults",
                         mpcio.player, thread_num);
 
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
                             [&tio, tripfile](yield_t &yield) {
                                 yield();
-                                MultTriple T = tio.triple(yield);
+                                MultTriple T = tio.multtriple(yield);
                                 tripfile.os() << T;
                             });
                     }
@@ -224,7 +224,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                 unsigned num = atoi(colon+1);
                 *colon = '\0';
                 char *type = arg;
-                if (!strcmp(type, "t")) {
+                if (!strcmp(type, "m")) {
                     unsigned char typetag = 0x80;
                     stio.queue_p0(&typetag, 1);
                     stio.queue_p0(&num, 4);
@@ -235,7 +235,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                         coroutines.emplace_back(
                             [&stio](yield_t &yield) {
                                 yield();
-                                stio.triple(yield);
+                                stio.multtriple(yield);
                             });
                     }
                 } else if (!strcmp(type, "h")) {

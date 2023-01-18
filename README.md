@@ -52,7 +52,7 @@ Then the <code>_args_</code> specify what resources to compute.  You actually on
 
 The args in preprocessing mode are each of the form <code>_type_:_num_</code> to indicate to create <code>_num_</code> resources of the given type.  The available types include:
 
-  - `t`: a multiplication triple
+  - `m`: a multiplication triple
   - `h`: a multiplication half-triple
   - <code>r*d*</code>: A DPF of depth <code>_d_</code> for random accesses to memory (RDPF).  A DPF of depth _d_ can be used to process 2<sup>_d_</sup> memory locations.
   - `c`: a DPF for comparisons (CDPF)

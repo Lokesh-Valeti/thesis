@@ -286,7 +286,7 @@ MPCPeerIO::MPCPeerIO(unsigned player, ProcessingMode mode,
 {
     unsigned num_threads = unsigned(peersocks.size());
     for (unsigned i=0; i<num_threads; ++i) {
-        triples.emplace_back(player, mode, "triples", i);
+        multtriples.emplace_back(player, mode, "mults", i);
     }
     for (unsigned i=0; i<num_threads; ++i) {
         halftriples.emplace_back(player, mode, "halves", i);
@@ -311,15 +311,15 @@ MPCPeerIO::MPCPeerIO(unsigned player, ProcessingMode mode,
 
 void MPCPeerIO::dump_precomp_stats(std::ostream &os)
 {
-    for (size_t i=0; i<triples.size(); ++i) {
+    for (size_t i=0; i<multtriples.size(); ++i) {
         size_t cnt;
         if (i > 0) {
             os << " ";
         }
         os << "T" << i;
-        cnt = triples[i].get_stats();
+        cnt = multtriples[i].get_stats();
         if (cnt > 0) {
-            os << " t:" << cnt;
+            os << " m:" << cnt;
         }
         cnt = halftriples[i].get_stats();
         if (cnt > 0) {
@@ -341,8 +341,8 @@ void MPCPeerIO::dump_precomp_stats(std::ostream &os)
 
 void MPCPeerIO::reset_precomp_stats()
 {
-    for (size_t i=0; i<triples.size(); ++i) {
-        triples[i].reset_stats();
+    for (size_t i=0; i<multtriples.size(); ++i) {
+        multtriples[i].reset_stats();
         halftriples[i].reset_stats();
         for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
             rdpftriples[i][depth-1].reset_stats();
@@ -583,7 +583,7 @@ void MPCTIO::send()
 // Functions to get precomputed values.  If we're in the online
 // phase, get them from PreCompStorage.  If we're in the
 // preprocessing or online-only phase, read them from the server.
-MultTriple MPCTIO::triple(yield_t &yield)
+MultTriple MPCTIO::multtriple(yield_t &yield)
 {
     MultTriple val;
     if (mpcio.player < 2) {
@@ -591,12 +591,12 @@ MultTriple MPCTIO::triple(yield_t &yield)
         if (mpcpio.mode != MODE_ONLINE) {
             yield();
             recv_server(&val, sizeof(val));
-            mpcpio.triples[thread_num].inc();
+            mpcpio.multtriples[thread_num].inc();
         } else {
-            mpcpio.triples[thread_num].get(val);
+            mpcpio.multtriples[thread_num].get(val);
         }
     } else if (mpcio.mode != MODE_ONLINE) {
-        // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
+        // Create multiplication triples (X0,Y0,Z0),(X1,Y1,Z1) such that
         // (X0*Y1 + Y0*X1) = (Z0+Z1)
         value_t X0, Y0, Z0, X1, Y1, Z1;
         arc4random_buf(&X0, sizeof(X0));
@@ -650,7 +650,7 @@ HalfTriple MPCTIO::halftriple(yield_t &yield, bool tally)
     return val;
 }
 
-SelectTriple MPCTIO::selecttriple(yield_t &yield)
+SelectTriple MPCTIO::nodeselecttriple(yield_t &yield)
 {
     SelectTriple val;
     if (mpcio.player < 2) {

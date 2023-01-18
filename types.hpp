@@ -606,7 +606,7 @@ using MultTriple = std::tuple<value_t, value_t, value_t>;
 // The *Name structs are a way to get strings representing the names of
 // the types as would be given to preprocessing to create them in
 // advance.
-struct MultTripleName { static constexpr const char *name = "t"; };
+struct MultTripleName { static constexpr const char *name = "m"; };
 
 // A half-triple is (X0,Z0) held by P0 (and correspondingly (Y1,Z1) held
 // by P1), with all values random, but subject to the relation that

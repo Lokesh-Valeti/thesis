@@ -207,7 +207,7 @@ struct MPCPeerIO : public MPCIO {
     // culprit), but you can have a deque of those for some reason.
     std::deque<MPCSingleIO> peerios;
     std::deque<MPCSingleIO> serverios;
-    std::vector<PreCompStorage<MultTriple, MultTripleName>> triples;
+    std::vector<PreCompStorage<MultTriple, MultTripleName>> multtriples;
     std::vector<PreCompStorage<HalfTriple, HalfTripleName>> halftriples;
     std::vector<PreCompStorage<CDPF, CDPFName>> cdpfs;
     // The outer vector is (like above) one item per thread
@@ -370,9 +370,9 @@ public:
     // phase, get them from PreCompStorage.  If we're in the
     // preprocessing phase, read them from the server.
 
-    MultTriple triple(yield_t &yield);
+    MultTriple multtriple(yield_t &yield);
     HalfTriple halftriple(yield_t &yield, bool tally=true);
-    SelectTriple selecttriple(yield_t &yield);
+    SelectTriple nodeselecttriple(yield_t &yield);
 
     // These ones only work during the online phase
     // Computational peers call:
