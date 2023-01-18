@@ -291,6 +291,12 @@ MPCPeerIO::MPCPeerIO(unsigned player, ProcessingMode mode,
     for (unsigned i=0; i<num_threads; ++i) {
         halftriples.emplace_back(player, mode, "halves", i);
     }
+    for (unsigned i=0; i<num_threads; ++i) {
+        andtriples.emplace_back(player, mode, "ands", i);
+    }
+    for (unsigned i=0; i<num_threads; ++i) {
+        valselecttriples.emplace_back(player, mode, "selects", i);
+    }
     rdpftriples.resize(num_threads);
     for (unsigned i=0; i<num_threads; ++i) {
         for (unsigned depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
@@ -325,6 +331,14 @@ void MPCPeerIO::dump_precomp_stats(std::ostream &os)
         if (cnt > 0) {
             os << " h:" << cnt;
         }
+        cnt = andtriples[i].get_stats();
+        if (cnt > 0) {
+            os << " a:" << cnt;
+        }
+        cnt = valselecttriples[i].get_stats();
+        if (cnt > 0) {
+            os << " s:" << cnt;
+        }
         for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
             cnt = rdpftriples[i][depth-1].get_stats();
             if (cnt > 0) {
@@ -344,6 +358,8 @@ void MPCPeerIO::reset_precomp_stats()
     for (size_t i=0; i<multtriples.size(); ++i) {
         multtriples[i].reset_stats();
         halftriples[i].reset_stats();
+        andtriples[i].reset_stats();
+        valselecttriples[i].reset_stats();
         for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
             rdpftriples[i][depth-1].reset_stats();
         }
@@ -650,6 +666,38 @@ HalfTriple MPCTIO::halftriple(yield_t &yield, bool tally)
     return val;
 }
 
+MultTriple MPCTIO::andtriple(yield_t &yield)
+{
+    AndTriple val;
+    if (mpcio.player < 2) {
+        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+        if (mpcpio.mode != MODE_ONLINE) {
+            yield();
+            recv_server(&val, sizeof(val));
+            mpcpio.andtriples[thread_num].inc();
+        } else {
+            mpcpio.andtriples[thread_num].get(val);
+        }
+    } else if (mpcio.mode != MODE_ONLINE) {
+        // Create AND triples (X0,Y0,Z0),(X1,Y1,Z1) such that
+        // (X0&Y1 ^ Y0&X1) = (Z0^Z1)
+        value_t X0, Y0, Z0, X1, Y1, Z1;
+        arc4random_buf(&X0, sizeof(X0));
+        arc4random_buf(&Y0, sizeof(Y0));
+        arc4random_buf(&Z0, sizeof(Z0));
+        arc4random_buf(&X1, sizeof(X1));
+        arc4random_buf(&Y1, sizeof(Y1));
+        Z1 = (X0 & Y1) ^ (X1 & Y0) ^ Z0;
+        AndTriple T0, T1;
+        T0 = std::make_tuple(X0, Y0, Z0);
+        T1 = std::make_tuple(X1, Y1, Z1);
+        queue_p0(&T0, sizeof(T0));
+        queue_p1(&T1, sizeof(T1));
+        yield();
+    }
+    return val;
+}
+
 SelectTriple<DPFnode> MPCTIO::nodeselecttriple(yield_t &yield)
 {
     SelectTriple<DPFnode> val;
@@ -680,6 +728,49 @@ SelectTriple<DPFnode> MPCTIO::nodeselecttriple(yield_t &yield)
         // 1 -> 1111...1)
         X0ext = if128_mask[X0];
         X1ext = if128_mask[X1];
+        Z1 = ((X0ext & Y1) ^ (X1ext & Y0)) ^ Z0;
+        queue_p0(&X0, sizeof(X0));
+        queue_p0(&Y0, sizeof(Y0));
+        queue_p0(&Z0, sizeof(Z0));
+        queue_p1(&X1, sizeof(X1));
+        queue_p1(&Y1, sizeof(Y1));
+        queue_p1(&Z1, sizeof(Z1));
+        yield();
+    }
+    return val;
+}
+
+SelectTriple<value_t> MPCTIO::valselecttriple(yield_t &yield)
+{
+    SelectTriple<value_t> val;
+    if (mpcio.player < 2) {
+        MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
+        if (mpcpio.mode != MODE_ONLINE) {
+            uint8_t Xbyte;
+            yield();
+            recv_server(&Xbyte, sizeof(Xbyte));
+            val.X = Xbyte & 1;
+            recv_server(&val.Y, sizeof(val.Y));
+            recv_server(&val.Z, sizeof(val.Z));
+            mpcpio.valselecttriples[thread_num].inc();
+        } else {
+            mpcpio.valselecttriples[thread_num].get(val);
+        }
+    } else if (mpcio.mode != MODE_ONLINE) {
+        // Create triples (X0,Y0,Z0),(X1,Y1,Z1) such that
+        // (X0*Y1 ^ Y0*X1) = (Z0^Z1)
+        bit_t X0, X1;
+        value_t Y0, Z0, Y1, Z1;
+        X0 = arc4random() & 1;
+        arc4random_buf(&Y0, sizeof(Y0));
+        arc4random_buf(&Z0, sizeof(Z0));
+        X1 = arc4random() & 1;
+        arc4random_buf(&Y1, sizeof(Y1));
+        value_t X0ext, X1ext;
+        // Sign-extend X0 and X1 (so that 0 -> 0000...0 and
+        // 1 -> 1111...1)
+        X0ext = -value_t(X0);
+        X1ext = -value_t(X1);
         Z1 = ((X0ext & Y1) ^ (X1ext & Y0)) ^ Z0;
         queue_p0(&X0, sizeof(X0));
         queue_p0(&Y0, sizeof(Y0));

@@ -54,6 +54,8 @@ The args in preprocessing mode are each of the form <code>_type_:_num_</code> to
 
   - `m`: a multiplication triple
   - `h`: a multiplication half-triple
+  - `a`: an AND triple
+  - `s`: a select triple
   - <code>r*d*</code>: A DPF of depth <code>_d_</code> for random accesses to memory (RDPF).  A DPF of depth _d_ can be used to process 2<sup>_d_</sup> memory locations.
   - `c`: a DPF for comparisons (CDPF)
 

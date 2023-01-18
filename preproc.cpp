@@ -67,12 +67,14 @@ void Openfiles::closeall()
 // data is:
 //
 // One byte: type
-//   0x80: Multiplication triple
-//   0x81: Multiplication half-triple
 //   0x01 to 0x30: RAM DPF of that depth
 //   0x40: Comparison DPF
-//   0x82: Counter (for testing)
-//   0x83: Set number of CPU threads for this communication thread
+//   0x80: Multiplication triple
+//   0x81: Multiplication half-triple
+//   0x82: AND triple
+//   0x83: Select triple
+//   0x8e: Counter (for testing)
+//   0x8f: Set number of CPU threads for this communication thread
 //   0x00: End of preprocessing
 //
 // Four bytes: number of objects of that type (not sent for type == 0x00)
@@ -122,6 +124,33 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                                 halffile.os() << H;
                             });
                     }
+                } else if (type == 0x82) {
+                    // AND triples
+                    auto andfile = ofiles.open("ands",
+                        mpcio.player, thread_num);
+
+                    for (unsigned int i=0; i<num; ++i) {
+                        coroutines.emplace_back(
+                            [&tio, andfile](yield_t &yield) {
+                                yield();
+                                AndTriple A = tio.andtriple(yield);
+                                andfile.os() << A;
+                            });
+                    }
+                } else if (type == 0x83) {
+                    // Select triples
+                    auto selfile = ofiles.open("selects",
+                        mpcio.player, thread_num);
+
+                    for (unsigned int i=0; i<num; ++i) {
+                        coroutines.emplace_back(
+                            [&tio, selfile](yield_t &yield) {
+                                yield();
+                                SelectTriple<value_t> S =
+                                    tio.valselecttriple(yield);
+                                selfile.os() << S;
+                            });
+                    }
                 } else if (type >= 0x01 && type <= 0x30) {
                     // RAM DPFs
                     auto tripfile = ofiles.open("rdpf",
@@ -155,7 +184,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                                 cdpffile.os() << C;
                             });
                     }
-                } else if (type == 0x82) {
+                } else if (type == 0x8e) {
                     coroutines.emplace_back(
                         [&tio, num](yield_t &yield) {
                             yield();
@@ -174,7 +203,7 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                                 }
                             }
                         });
-                } else if (type == 0x83) {
+                } else if (type == 0x8f) {
                     tio.cpu_nthreads(num);
                 }
             }
@@ -252,6 +281,34 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                                 stio.halftriple(yield);
                             });
                     }
+                } else if (!strcmp(type, "a")) {
+                    unsigned char typetag = 0x82;
+                    stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&num, 4);
+                    stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&num, 4);
+
+                    for (unsigned int i=0; i<num; ++i) {
+                        coroutines.emplace_back(
+                            [&stio](yield_t &yield) {
+                                yield();
+                                stio.andtriple(yield);
+                            });
+                    }
+                } else if (!strcmp(type, "s")) {
+                    unsigned char typetag = 0x83;
+                    stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&num, 4);
+                    stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&num, 4);
+
+                    for (unsigned int i=0; i<num; ++i) {
+                        coroutines.emplace_back(
+                            [&stio](yield_t &yield) {
+                                yield();
+                                stio.valselecttriple(yield);
+                            });
+                    }
                 } else if (type[0] == 'r') {
                     int depth = atoi(type+1);
                     if (depth < 1 || depth > 48) {
@@ -299,7 +356,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                             });
                     }
                 } else if (!strcmp(type, "i")) {
-                    unsigned char typetag = 0x82;
+                    unsigned char typetag = 0x8e;
                     stio.queue_p0(&typetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
@@ -325,7 +382,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                         });
 
                 } else if (!strcmp(type, "p")) {
-                    unsigned char typetag = 0x83;
+                    unsigned char typetag = 0x8f;
                     stio.queue_p0(&typetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);

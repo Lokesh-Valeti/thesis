@@ -209,6 +209,9 @@ struct MPCPeerIO : public MPCIO {
     std::deque<MPCSingleIO> serverios;
     std::vector<PreCompStorage<MultTriple, MultTripleName>> multtriples;
     std::vector<PreCompStorage<HalfTriple, HalfTripleName>> halftriples;
+    std::vector<PreCompStorage<AndTriple, AndTripleName>> andtriples;
+    std::vector<PreCompStorage<
+        SelectTriple<value_t>, ValSelectTripleName>> valselecttriples;
     std::vector<PreCompStorage<CDPF, CDPFName>> cdpfs;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
@@ -372,7 +375,9 @@ public:
 
     MultTriple multtriple(yield_t &yield);
     HalfTriple halftriple(yield_t &yield, bool tally=true);
+    AndTriple andtriple(yield_t &yield);
     SelectTriple<DPFnode> nodeselecttriple(yield_t &yield);
+    SelectTriple<value_t> valselecttriple(yield_t &yield);
 
     // These ones only work during the online phase
     // Computational peers call:

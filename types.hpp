@@ -615,6 +615,13 @@ struct MultTripleName { static constexpr const char *name = "m"; };
 using HalfTriple = std::tuple<value_t, value_t>;
 struct HalfTripleName { static constexpr const char *name = "h"; };
 
+// An AND triple is a triple (X0,Y0,Z0) held by P0 (and correspondingly
+// (X1,Y1,Z1) held by P1), with all values random, but subject to the
+// relation that X0&Y1 ^ Y0&X1 = Z0^Z1
+
+using AndTriple = std::tuple<value_t, value_t, value_t>;
+struct AndTripleName { static constexpr const char *name = "a"; };
+
 // The type of nodes in a DPF.  This must be at least as many bits as
 // the security parameter, and at least twice as many bits as value_t.
 
@@ -670,6 +677,27 @@ DEFAULT_IO(RegAS)
 DEFAULT_IO(RegXS)
 DEFAULT_IO(MultTriple)
 DEFAULT_IO(HalfTriple)
+// We don't need one for AndTriple because it's exactly the same type as
+// MultTriple
+
+// I/O for SelectTriples
+template <typename T, typename V>
+T& operator>>(T& is, SelectTriple<V> &x)
+{
+    is.read((char *)&x.X, sizeof(x.X));
+    is.read((char *)&x.Y, sizeof(x.Y));
+    is.read((char *)&x.Z, sizeof(x.Z));
+    return is;
+}
+
+template <typename T, typename V>
+T& operator<<(T& os, const SelectTriple<V> &x)
+{
+    os.write((const char *)&x.X, sizeof(x.X));
+    os.write((const char *)&x.Y, sizeof(x.Y));
+    os.write((const char *)&x.Z, sizeof(x.Z));
+    return os;
+}
 
 // And for pairs and triples
 
