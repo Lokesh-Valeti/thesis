@@ -429,11 +429,11 @@ void MPCServerIO::dump_stats(std::ostream &os)
 MPCTIO::MPCTIO(MPCIO &mpcio, int thread_num, int num_threads) :
         thread_num(thread_num), local_cpu_nthreads(num_threads),
         communication_nthreads(num_threads),
-        thread_lamport(mpcio.lamport), mpcio(mpcio)
+        thread_lamport(mpcio.lamport), mpcio(mpcio),
 #ifdef VERBOSE_COMMS
-        , round_num(0)
+        round_num(0),
 #endif
-        , last_andtriple_bits_remaining(0)
+        last_andtriple_bits_remaining(0)
 {
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
