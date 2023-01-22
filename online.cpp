@@ -6,7 +6,7 @@
 #include "duoram.hpp"
 #include "cdpf.hpp"
 #include "cell.hpp"
-#include "node.hpp"
+#include "bst.hpp"
 
 static void online_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
