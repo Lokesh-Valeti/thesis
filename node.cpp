@@ -184,7 +184,7 @@ inline void setRightPtr(RegXS &pointer, RegXS new_ptr){
   pointer+=(new_ptr);
 }
 
-std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS &ptr, Node &new_node, Duoram<Node>::Flat A, int TTL, RegBS isDummy) {
+std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new_node, Duoram<Node>::Flat A, int TTL, RegBS isDummy) {
   if(TTL==0) {
     RegBS zero;
     return {ptr, zero};
@@ -229,7 +229,7 @@ std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS &ptr, Node &n
 
 
 // Insert(root, ptr, key, TTL, isDummy) -> (new_ptr, wptr, wnode, f_p)
-void insert(MPCTIO &tio, yield_t &yield, RegXS &root, Node &node, Duoram<Node>::Flat A, size_t num_items) {
+void insert(MPCTIO &tio, yield_t &yield, RegXS &root, Node node, Duoram<Node>::Flat A, size_t &num_items) {
   if(num_items==0) {
     Node zero;
     A[0] = zero;
