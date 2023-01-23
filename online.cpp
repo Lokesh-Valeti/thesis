@@ -8,7 +8,6 @@
 #include "cell.hpp"
 #include "shapes.hpp"
 
-
 static void online_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -1616,6 +1615,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "cell")) {
         ++args;
         cell(mpcio, opts, args);
+    } else if (!strcmp(*args, "bst")) {
+        ++args;
+        bst(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
