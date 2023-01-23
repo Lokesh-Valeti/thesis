@@ -6,7 +6,7 @@
 
 // This file demonstrates how to implement custom ORAM wide cell types.
 // Such types can be structures of arbitrary numbers of RegAS and RegXS
-// fields.  The example here imagines a cell of a binary search tree,
+// fields.  The example here imagines a node of a binary search tree,
 // where you would want the key to be additively shared (so that you can
 // easily do comparisons), the pointers field to be XOR shared (so that
 // you can easily do bit operations to pack two pointers and maybe some
@@ -34,19 +34,6 @@ struct Node {
     // You'll need to be able to create a random element, and do the
     // operations +=, +, -=, - (binary and unary).  Note that for
     // XOR-shared fields, + and - are both really XOR.
-
-
-    inline void zeronode() {
-        key.set(0);
-        pointers.set(0);
-        value.set(0);
-    }
-
-    inline void newnode() {
-        key.randomize(8);
-        pointers.set(0);
-        value.randomize();
-    }
 
     inline void randomize() {
         key.randomize();
@@ -151,9 +138,6 @@ T& operator<<(T& os, const Node &x)
 
 DEFAULT_TUPLE_IO(Node)
 
-int num_items = 0;
-RegAS root;
-
 std::tuple<RegBS, RegBS> compare_keys(Node n1, Node n2, MPCTIO tio, yield_t &yield) {
   CDPF cdpf = tio.cdpf(yield);
   auto [lt, eq, gt] = cdpf.compare(tio, yield, n2.key - n1.key, tio.aes_ops());
@@ -200,7 +184,7 @@ inline void setRightPtr(RegXS &pointer, RegXS new_ptr){
   pointer+=(new_ptr);
 }
 
-std::tuple<RegAS, RegBS> insert(RegAS &ptr, Node &new_node, auto A, int TTL, RegBS isDummy, MPCTIO &tio, yield_t &yield) {
+std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS &ptr, Node &new_node, Duoram<Node>::Flat A, int TTL, RegBS isDummy) {
   if(TTL==0) {
     RegBS zero;
     return {ptr, zero};
@@ -230,12 +214,10 @@ std::tuple<RegAS, RegBS> insert(RegAS &ptr, Node &new_node, auto A, int TTL, Reg
     isDummy^=1;
   }
    
-  RegAS next_ptr_as;
-  mpc_xs_to_as(tio, yield, next_ptr_as, next_ptr, 32);
   isDummy^=F_i;
-  auto [wptr, direction] = insert(next_ptr_as, new_node, A, TTL-1, isDummy, tio, yield);
+  auto [wptr, direction] = insert(tio, yield, next_ptr, new_node, A, TTL-1, isDummy);
   
-  RegAS ret_ptr;
+  RegXS ret_ptr;
   RegBS ret_direction;
   mpc_select(tio, yield, ret_ptr, F_i, wptr, ptr);
   //ret_direction = direction + F_p(direction - gt)
@@ -247,10 +229,9 @@ std::tuple<RegAS, RegBS> insert(RegAS &ptr, Node &new_node, auto A, int TTL, Reg
 
 
 // Insert(root, ptr, key, TTL, isDummy) -> (new_ptr, wptr, wnode, f_p)
-void insert(RegAS &root, Node &node, auto A, MPCTIO &tio, yield_t &yield) {
+void insert(MPCTIO &tio, yield_t &yield, RegXS &root, Node &node, Duoram<Node>::Flat A, size_t num_items) {
   if(num_items==0) {
     Node zero;
-    zero.zeronode();
     A[0] = zero;
     A[1] = node;
     (root).set(1*tio.player());
@@ -265,10 +246,9 @@ void insert(RegAS &root, Node &node, auto A, MPCTIO &tio, yield_t &yield) {
     RegXS new_addr;
     new_addr.set(new_id * tio.player());
     RegBS isDummy;
-    isDummy.set(0);
 
     //Do a recursive insert
-    auto [wptr, direction] = insert(root, node, A, TTL, isDummy, tio, yield);
+    auto [wptr, direction] = insert(tio, yield, root, node, A, TTL, isDummy);
 
     //Complete the insertion by reading wptr and updating its pointers
     RegXS pointers = A[wptr].NODE_POINTERS;
@@ -287,9 +267,14 @@ void insert(RegAS &root, Node &node, auto A, MPCTIO &tio, yield_t &yield) {
   
 }
 
-// Now we use the cell in various ways.  This function is called by
-// online.cpp.
+void newnode(Node &a) {
+  a.key.randomize(8);
+  a.pointers.set(0);
+  a.value.randomize();
+}
 
+// Now we use the node in various ways.  This function is called by
+// online.cpp.
 void bst(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -306,13 +291,15 @@ void bst(MPCIO &mpcio,
         Duoram<Node> oram(tio.player(), size);
         auto A = oram.flat(tio, yield);
 
+        size_t num_items = 0;
+        RegXS root;
+
         Node c; 
         for(int i = 0; i<30; i++) {
-          c.newnode();
-          insert(root, c, A, tio, yield);
+          newnode(c);
+          insert(tio, yield, root, c, A, num_items);
         }
         
-
         if (depth < 10) {
             oram.dump();
             auto R = A.reconstruct();
