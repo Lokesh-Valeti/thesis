@@ -145,13 +145,6 @@ std::tuple<RegBS, RegBS> compare_keys(Node n1, Node n2, MPCTIO tio, yield_t &yie
   return {lteq, gt};
 }
 
-RegBS check_key_zero(Node n1, MPCTIO tio, yield_t &yield) {
-  CDPF cdpf = tio.cdpf(yield);
-  RegAS zero;
-  auto [lt, eq, gt] = cdpf.compare(tio, yield, n1.key - zero, tio.aes_ops());
-  return eq;
-}
-
 RegBS check_ptr_zero(RegXS ptr, MPCTIO tio, yield_t &yield) {
   CDPF cdpf = tio.cdpf(yield);
   RegAS ptr_as;
@@ -203,7 +196,12 @@ std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new
   RegXS next_ptr;
   mpc_select(tio, yield, next_ptr, gt, left, right, 32);
 
-  RegBS F_z = check_ptr_zero(next_ptr, tio, yield); 
+  //RegBS F_z = check_ptr_zero(next_ptr, tio, yield);
+  CDPF dpf;
+  size_t &aes_ops = tio.aes_ops();
+  //RegAS next_ptr_as;
+  //mpc_xs_to_as(tio, yield, next_ptr_as, next_ptr);
+  //RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops); 
   RegBS F_i;
 
   if(tio.player()==0) {
