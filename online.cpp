@@ -8,7 +8,6 @@
 #include "cell.hpp"
 #include "bst.hpp"
 
-
 static void online_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
