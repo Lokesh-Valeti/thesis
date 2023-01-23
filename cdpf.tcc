@@ -59,7 +59,9 @@ RegBS CDPF::is_zero(MPCTIO &tio, yield_t &yield,
     // Reconstruct S = target-x
     // The server does nothing in this protocol
     if (tio.player() < 2) {
-        T S_share = as_target - x;
+        T S_share;
+        get_target(S_share);
+        S_share -= x;
         tio.iostream_peer() << S_share;
         yield();
         T peer_S_share;

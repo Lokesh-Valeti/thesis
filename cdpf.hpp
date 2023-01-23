@@ -114,6 +114,10 @@ struct CDPF : public DPF {
     // this in the protocol, but it's useful for testing.
     DPFnode leaf(value_t input, size_t &aes_ops) const;
 
+    // Get the appropriate (RegXS or RegAS) target
+    inline void get_target(RegAS &target) const { target = as_target; }
+    inline void get_target(RegXS &target) const { target = xs_target; }
+
     // Compare the given additively shared element to 0.  The output is
     // a triple of bit shares; the first is a share of 1 iff the
     // reconstruction of the element is negative; the second iff it is
