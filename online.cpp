@@ -6,6 +6,7 @@
 #include "duoram.hpp"
 #include "cdpf.hpp"
 #include "cell.hpp"
+#include "node.hpp"
 
 
 static void online_test(MPCIO &mpcio,
@@ -1247,6 +1248,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "cell")) {
         ++args;
         cell(mpcio, opts, args);
+    } else if (!strcmp(*args, "bst")) {
+        ++args;
+        bst(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
