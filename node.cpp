@@ -226,7 +226,11 @@ std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new
 
 
 // Insert(root, ptr, key, TTL, isDummy) -> (new_ptr, wptr, wnode, f_p)
+<<<<<<< HEAD:bst.cpp
 void insert(MPCTIO &tio, yield_t &yield, RegXS &root, Node node, Duoram<Node>::Flat A, size_t &num_items) {
+=======
+void insert(MPCTIO &tio, yield_t &yield, RegXS &root, Node &node, Duoram<Node>::Flat A, size_t num_items) {
+>>>>>>> Incorporating changes from Ian's review:node.cpp
   if(num_items==0) {
     Node zero;
     A[0] = zero;
@@ -269,10 +273,15 @@ void newnode(Node &a) {
   a.pointers.set(0);
   a.value.randomize();
 }
+<<<<<<< HEAD:bst.cpp
 
 // Now we use the node in various ways.  This function is called by
 // online.cpp.
+=======
+>>>>>>> Incorporating changes from Ian's review:node.cpp
 
+// Now we use the node in various ways.  This function is called by
+// online.cpp.
 void bst(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
