@@ -2,6 +2,7 @@
 
 #include "types.hpp"
 #include "duoram.hpp"
+#include "cdpf.hpp"
 #include "bst.hpp"
 
 // This file demonstrates how to implement custom ORAM wide cell types.
@@ -145,7 +146,7 @@ std::tuple<RegBS, RegBS> compare_keys(Node n1, Node n2, MPCTIO tio, yield_t &yie
   return {lteq, gt};
 }
 
-RegBS check_ptr_zero(RegXS ptr, MPCTIO tio, yield_t &yield) {
+RegBS check_ptr_zero(MPCTIO tio, yield_t &yield, RegXS ptr) {
   CDPF cdpf = tio.cdpf(yield);
   RegAS ptr_as;
   mpc_xs_to_as(tio, yield, ptr_as, ptr);
@@ -196,11 +197,20 @@ std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new
   RegXS next_ptr;
   mpc_select(tio, yield, next_ptr, gt, left, right, 32);
 
+<<<<<<< HEAD
   CDPF dpf = tio.cdpf(yield);
   size_t &aes_ops = tio.aes_ops();
   //RegAS next_ptr_as;
   //mpc_xs_to_as(tio, yield, next_ptr_as, next_ptr);
   RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops); 
+=======
+  //CDPF dpf;
+  //size_t &aes_ops = tio.aes_ops();
+  //RegAS next_ptr_as;
+  //mpc_xs_to_as(tio, yield, next_ptr_as, next_ptr);
+  //RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops);
+  RegBS F_z = check_ptr_zero(tio, yield, next_ptr); 
+>>>>>>> More tweaks to AVL-style BST
   RegBS F_i;
 
   if(tio.player()==0) {
@@ -292,7 +302,7 @@ void bst(MPCIO &mpcio,
         RegXS root;
 
         Node c; 
-        for(int i = 0; i<30; i++) {
+        for(size_t i = 0; i<size-1; i++) {
           newnode(c);
           insert(tio, yield, root, c, A, num_items);
         }
