@@ -264,6 +264,49 @@ void insert(MPCTIO &tio, yield_t &yield, RegXS &root, const Node &node, Duoram<N
   
 }
 
+// Pretty-print a reconstructed BST, rooted at node. is_left_child and
+// is_right_child indicate whether node is a left or right child of its
+// parent.  They cannot both be true, but the root of the tree has both
+// of them false.
+void pretty_print(const std::vector<Node> &R, value_t node,
+    const std::string &prefix, bool is_left_child, bool is_right_child)
+{
+    if (node == 0) {
+        // NULL pointer
+        if (is_left_child) {
+            printf("%s\xE2\x95\xA7\n", prefix.c_str()); // ╧
+        } else if (is_right_child) {
+            printf("%s\xE2\x95\xA4\n", prefix.c_str()); // ╤
+        } else {
+            printf("%s\xE2\x95\xA2\n", prefix.c_str()); // ╢
+        }
+        return;
+    }
+    const Node &n = R[node];
+    value_t left_ptr = extractLeftPtr(n.pointers).xshare;
+    value_t right_ptr = extractRightPtr(n.pointers).xshare;
+    std::string rightprefix(prefix), leftprefix(prefix),
+        nodeprefix(prefix);
+    if (is_left_child) {
+        rightprefix.append("\xE2\x94\x82"); // │
+        leftprefix.append(" ");
+        nodeprefix.append("\xE2\x94\x94"); // └
+    } else if (is_right_child) {
+        rightprefix.append(" ");
+        leftprefix.append("\xE2\x94\x82"); // │
+        nodeprefix.append("\xE2\x94\x8C"); // ┌
+    } else {
+        rightprefix.append(" ");
+        leftprefix.append(" ");
+        nodeprefix.append("\xE2\x94\x80"); // ─
+    }
+    pretty_print(R, right_ptr, rightprefix, false, true);
+    printf("%s\xE2\x94\xA4", nodeprefix.c_str()); // ┤
+    n.dump();
+    printf("\n");
+    pretty_print(R, left_ptr, leftprefix, true, false);
+}
+
 void newnode(Node &a) {
   a.key.randomize(8);
   a.pointers.set(0);
@@ -281,9 +324,14 @@ void bst(MPCIO &mpcio,
         depth = atoi(*args);
         ++args;
     }
+    size_t items = (size_t(1)<<depth)-1;
+    if (*args) {
+        items = atoi(*args);
+        ++args;
+    }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, depth] (yield_t &yield) {
+    run_coroutines(tio, [&tio, depth, items] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         Duoram<Node> oram(tio.player(), size);
         auto A = oram.flat(tio, yield);
@@ -292,7 +340,7 @@ void bst(MPCIO &mpcio,
         RegXS root;
 
         Node c; 
-        for(size_t i = 0; i<size-1; i++) {
+        for(size_t i = 0; i<items; i++) {
           newnode(c);
           insert(tio, yield, root, c, A, num_items);
         }
@@ -300,12 +348,21 @@ void bst(MPCIO &mpcio,
         if (depth < 10) {
             oram.dump();
             auto R = A.reconstruct();
+            // Reconstruct the root
+            if (tio.player() == 1) {
+                tio.queue_peer(&root, sizeof(root));
+            } else {
+                RegXS peer_root;
+                tio.recv_peer(&peer_root, sizeof(peer_root));
+                root += peer_root;
+            }
             if (tio.player() == 0) {
                 for(size_t i=0;i<R.size();++i) {
                     printf("\n%04lx ", i);
                     R[i].dump();
                 }
                 printf("\n");
+                pretty_print(R, root.xshare, "", false, false);
             }
         }
         
