@@ -4,15 +4,6 @@
 #include "mpcio.hpp"
 #include "options.hpp"
 
-// This file demonstrates how to implement custom ORAM wide cell types.
-// Such types can be structures of arbitrary numbers of RegAS and RegXS
-// fields.  The example here imagines a cell of a binary search tree,
-// where you would want the key to be additively shared (so that you can
-// easily do comparisons), the pointers field to be XOR shared (so that
-// you can easily do bit operations to pack two pointers and maybe some
-// tree balancing information into one field) and the value doesn't
-// really matter, but XOR shared is usually slightly more efficient.
-
 struct Cell {
     RegAS key;
     RegXS pointers;
@@ -91,9 +82,7 @@ struct Cell {
     // Note that RegXS will extend a RegBS of 1 to the all-1s word, not
     // the word with value 1.  This is used for ORAM reads, where the
     // same DPF is used for all the fields.
-    template <nbits_t WIDTH>
-    inline void unit(const RDPF<WIDTH> &dpf,
-        typename RDPF<WIDTH>::LeafNode leaf) {
+    inline void unit(const RDPF &dpf, DPFnode leaf) {
         key = dpf.unit_as(leaf);
         pointers = dpf.unit_bs(leaf);
         value = dpf.unit_bs(leaf);
@@ -119,26 +108,6 @@ struct Cell {
             });
     }
 };
-
-// I/O operations (for sending over the network)
-
-template <typename T>
-T& operator>>(T& is, Cell &x)
-{
-    is >> x.key >> x.pointers >> x.value;
-    return is;
-}
-
-template <typename T>
-T& operator<<(T& os, const Cell &x)
-{
-    os << x.key << x.pointers << x.value;
-    return os;
-}
-
-// This macro will define I/O on tuples of two or three of the cell type
-
-DEFAULT_TUPLE_IO(Cell)
 
 void cell(MPCIO &mpcio,
     const PRACOptions &opts, char **args);

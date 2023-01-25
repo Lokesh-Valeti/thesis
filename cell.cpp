@@ -4,7 +4,37 @@
 #include "duoram.hpp"
 #include "cell.hpp"
 
-// We use the cell in various ways.  This function is called by
+// This file demonstrates how to implement custom ORAM wide cell types.
+// Such types can be structures of arbitrary numbers of RegAS and RegXS
+// fields.  The example here imagines a cell of a binary search tree,
+// where you would want the key to be additively shared (so that you can
+// easily do comparisons), the pointers field to be XOR shared (so that
+// you can easily do bit operations to pack two pointers and maybe some
+// tree balancing information into one field) and the value doesn't
+// really matter, but XOR shared is usually slightly more efficient.
+
+// I/O operations (for sending over the network)
+
+template <typename T>
+T& operator>>(T& is, Cell &x)
+{
+    is >> x.key >> x.pointers >> x.value;
+    return is;
+}
+
+template <typename T>
+T& operator<<(T& os, const Cell &x)
+{
+    os << x.key << x.pointers << x.value;
+    return os;
+}
+
+// This macro will define I/O on tuples of two or three of the cell type
+
+DEFAULT_TUPLE_IO(Cell)
+
+
+// Now we use the cell in various ways.  This function is called by
 // online.cpp.
 
 void cell(MPCIO &mpcio,
