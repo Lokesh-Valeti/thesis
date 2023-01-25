@@ -197,20 +197,11 @@ std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new
   RegXS next_ptr;
   mpc_select(tio, yield, next_ptr, gt, left, right, 32);
 
-<<<<<<< HEAD
   CDPF dpf = tio.cdpf(yield);
   size_t &aes_ops = tio.aes_ops();
   //RegAS next_ptr_as;
   //mpc_xs_to_as(tio, yield, next_ptr_as, next_ptr);
   RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops); 
-=======
-  //CDPF dpf;
-  //size_t &aes_ops = tio.aes_ops();
-  //RegAS next_ptr_as;
-  //mpc_xs_to_as(tio, yield, next_ptr_as, next_ptr);
-  //RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops);
-  RegBS F_z = check_ptr_zero(tio, yield, next_ptr); 
->>>>>>> More tweaks to AVL-style BST
   RegBS F_i;
 
   if(tio.player()==0) {
