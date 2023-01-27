@@ -178,14 +178,15 @@ inline void setRightPtr(RegXS &pointer, RegXS new_ptr){
   pointer+=(new_ptr);
 }
 
-std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new_node, Duoram<Node>::Flat A, int TTL, RegBS isDummy) {
+std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, const Node &new_node, Duoram<Node>::Flat &A, int TTL, RegBS isDummy) {
   if(TTL==0) {
     RegBS zero;
     return {ptr, zero};
   }
 
+  RegBS isNotDummy = isDummy ^ (tio.player());
   Node cnode = A[ptr];
-  //Compare key
+  // Compare key
   auto [lteq, gt] = compare_keys(cnode, new_node, tio, yield);
 
   // Depending on [lteq, gt] select the next ptr/index as
@@ -199,24 +200,20 @@ std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new
 
   CDPF dpf = tio.cdpf(yield);
   size_t &aes_ops = tio.aes_ops();
-  //RegAS next_ptr_as;
-  //mpc_xs_to_as(tio, yield, next_ptr_as, next_ptr);
-  RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops); 
+  // F_z: Check if this is last node on path
+  RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops);
   RegBS F_i;
 
-  if(tio.player()==0) {
-    isDummy^=1;
-  }
-  mpc_and(tio, yield, F_i, (isDummy), F_z);
-  if(tio.player()==0) {
-    isDummy^=1;
-  }
+  // F_i: If this was last node on path (F_z), and isNotDummy insert.
+  mpc_and(tio, yield, F_i, (isNotDummy), F_z);
    
   isDummy^=F_i;
   auto [wptr, direction] = insert(tio, yield, next_ptr, new_node, A, TTL-1, isDummy);
   
   RegXS ret_ptr;
   RegBS ret_direction;
+  // If we insert here (F_i), return the ptr to this node as wptr
+  // and update direction to the direction taken by compare_keys
   mpc_select(tio, yield, ret_ptr, F_i, wptr, ptr);
   //ret_direction = direction + F_p(direction - gt)
   mpc_and(tio, yield, ret_direction, F_i, direction^gt);
@@ -227,7 +224,9 @@ std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, Node new
 
 
 // Insert(root, ptr, key, TTL, isDummy) -> (new_ptr, wptr, wnode, f_p)
-void insert(MPCTIO &tio, yield_t &yield, RegXS &root, Node node, Duoram<Node>::Flat A, size_t &num_items) {
+void insert(MPCTIO &tio, yield_t &yield, RegXS &root, const Node &node, Duoram<Node>::Flat &A, size_t &num_items) {
+  bool player0 = tio.player()==0;
+  // If there are no items in tree. Make this new item the root.
   if(num_items==0) {
     Node zero;
     A[0] = zero;
@@ -254,7 +253,7 @@ void insert(MPCTIO &tio, yield_t &yield, RegXS &root, Node node, Duoram<Node>::F
     RegXS right_ptr = extractRightPtr(pointers);
     RegXS new_right_ptr, new_left_ptr;
     mpc_select(tio, yield, new_right_ptr, direction, right_ptr, new_addr);
-    if(tio.player()==0) {
+    if(player0) {
       direction^=1;
     }
     mpc_select(tio, yield, new_left_ptr, direction, left_ptr, new_addr);
