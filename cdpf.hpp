@@ -13,6 +13,7 @@
 //
 // Kyle Storrier, Adithya Vadapalli, Allan Lyons, Ryan Henry.
 // Grotto: Screaming fast (2 + 1)-PC for Z_{2^n} via (2, 2)-DPFs
+// https://eprint.iacr.org/2023/108
 //
 // The idea is that we have a pair of DPFs with 64-bit inputs and a
 // single-bit output.  The outputs of these DPFs are the same for all
@@ -65,7 +66,7 @@
 // of the DPF.
 //
 // So at the end, we've computed a bit sharing of [x>0] with local
-// computation linear in the depth of the DPF (concretely, 170 AES
+// computation linear in the depth of the DPF (concretely, 114 AES
 // operations), and only a *single word* of communication in each
 // direction (exchanging the target{i}-x{i} values).  Of course, this
 // assumes you have one pair of these DPFs lying around, and you have to
@@ -130,7 +131,7 @@ struct CDPF : public DPF {
     //
     // Cost:
     // 1 word sent in 1 message
-    // 3*VALUE_BITS - 22 = 170 local AES operations
+    // 2*VALUE_BITS - 14 = 114 local AES operations
     std::tuple<RegBS,RegBS,RegBS> compare(MPCTIO &tio, yield_t &yield,
         RegAS x, size_t &aes_ops);
 
@@ -139,7 +140,7 @@ struct CDPF : public DPF {
     // is needed.
     //
     // Cost:
-    // 3*VALUE_BITS - 22 = 170 local AES operations
+    // 2*VALUE_BITS - 14 = 114 local AES operations
     std::tuple<RegBS,RegBS,RegBS> compare(value_t S, size_t &aes_ops);
 
     // Determine whether the given additively or XOR shared element is 0.

@@ -171,7 +171,7 @@ DPFnode CDPF::leaf(value_t input, size_t &aes_ops) const
 //
 // Cost:
 // 1 word sent in 1 message
-// 3*VALUE_BITS - 22 = 170 local AES operations
+// 2*VALUE_BITS - 14 = 114 local AES operations
 std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
     RegAS x, size_t &aes_ops)
 {
@@ -202,82 +202,87 @@ std::tuple<RegBS,RegBS,RegBS> CDPF::compare(MPCTIO &tio, yield_t &yield,
 // is needed.
 //
 // Cost:
-// 3*VALUE_BITS - 22 = 170 local AES operations
+// 2*VALUE_BITS - 14 = 114 local AES operations
 std::tuple<RegBS,RegBS,RegBS> CDPF::compare(value_t S, size_t &aes_ops)
 {
     RegBS gt, eq;
 
-    // Now we're going to simultaneously descend the DPF tree for
-    // the values S and T = S + 2^63.  Note that the 1 values of V
-    // (see the explanation of the algorithm in cdpf.hpp) are those
-    // values _strictly_ larger than S and smaller than T (noting
-    // they can "wrap around" 2^64).  In level 1 of the tree, the
-    // paths to S and T will necessarily be at the two different
-    // children of the root seed, but they could be in either order.
-    // From then on, they will proceed in lockstep, either both
-    // going left, or both going right.  If they both go left, we
-    // also compute the right sibling on the S path, and add it to
-    // the gt flag.  If they both go right, we also compute the left
-    // sibling on the T path, and add it to the gt flag.  When we
-    // hit the leaves, the gt flag will account for all of the
-    // complete leaf nodes strictly greater than S and strictly less
-    // than T.  Then we just have to pull out the parity of the
-    // appropriate bits in the two leaf nodes containing S and T
-    // respectively to complete the computation of gt, and also to
-    // get the single bit eq.
+    // Now we're going to simultaneously descend the DPF tree for the
+    // values S and T = S + 2^63.  Note that the 1 values of V (see the
+    // explanation of the algorithm in cdpf.hpp) are those values
+    // _strictly_ larger than S and smaller than T (noting they can
+    // "wrap around" 2^64).  In level 1 of the tree, the paths to S and
+    // T will necessarily be at the two different children of the root
+    // seed, but they could be in either order.  From then on, they will
+    // proceed in lockstep, either both going left, or both going right.
+    // If they both go left, we also compute the flag for the right
+    // sibling on the S path (which will be the XOR of the left sibling
+    // and the parent), and add it to the gt flag.  If they both go
+    // right, we also include the left sibling on the T path (which will
+    // be the XOR of the right sibling and the parent), and add it to
+    // the gt flag.  When we hit the leaves, the gt flag will account
+    // for all of the complete leaf nodes strictly greater than S and
+    // strictly less than T.  Then we just have to pull out the parity
+    // of the appropriate bits in the two leaf nodes containing S and T
+    // respectively to complete the computation of gt, and also to get
+    // the single bit eq.
 
-    // Invariant: Snode is the node on level curlevel on the path to
-    // S, and Tnode is the node on level curlevel on the path to
-    // T = S + 2^63.
     nbits_t curlevel = 0;
     const nbits_t depth = VALUE_BITS - 7;
-    DPFnode Snode = seed;
-    DPFnode Tnode = seed;
+    DPFnode Sparent = seed;
+    DPFnode Tparent = seed;
 
     // The top level is the only place where the paths to S and T go
     // in different directions.
     bool Sdir = !!(S & (value_t(1)<<63));
-    Snode = descend(Snode, curlevel, Sdir, aes_ops);
-    Tnode = descend(Tnode, curlevel, !Sdir, aes_ops);
+    DPFnode Snode = descend(Sparent, curlevel, Sdir, aes_ops);
+    DPFnode Tnode = descend(Tparent, curlevel, !Sdir, aes_ops);
     curlevel = 1;
 
-    // The last level is special
+    // Invariant: Snode is the node on level curlevel on the path to
+    // S, and Tnode is the node on level curlevel on the path to
+    // T = S + 2^63.  Sparent and Tparent are the parents of Snode and
+    // Tnode respectively.
+
+    // The last level is special, so terminate the loop 1 before the end
     while(curlevel < depth-1) {
         Sdir = !!(S & (value_t(1)<<((depth+7)-curlevel-1)));
-        if (Sdir == 0) {
-            // They're both going left; include the right child of
-            // Snode in the gt computation
-            DPFnode gtnode = descend(Snode, curlevel, 1, aes_ops);
-            gt ^= get_lsb(gtnode);
-        } else {
-            // They're both going right; include the left child of
-            // Tnode in the gt computation
-            DPFnode gtnode = descend(Tnode, curlevel, 0, aes_ops);
-            gt ^= get_lsb(gtnode);
-        }
-        Snode = descend(Snode, curlevel, Sdir, aes_ops);
-        Tnode = descend(Tnode, curlevel, Sdir, aes_ops);
+        Sparent = Snode;
+        Tparent = Tnode;
+        Snode = descend(Sparent, curlevel, Sdir, aes_ops);
+        Tnode = descend(Tparent, curlevel, Sdir, aes_ops);
         ++curlevel;
+        if (Sdir == 0) {
+            // They both went left; include the right child of
+            // Sparent in the gt computation
+            gt ^= get_lsb(Sparent) ^ get_lsb(Snode);
+        } else {
+            // Theye both went right; include the left child of
+            // Tparent in the gt computation
+            gt ^= get_lsb(Tparent) ^ get_lsb(Tnode);
+        }
     }
     // Now we're at the level just above the leaves.  If we go left,
-    // include *all* the bits (not just the low bit) of the right
-    // child of Snode, and if we go right, include all the bits of
-    // the left child of Tnode.
+    // include *all* the bits (not just the low bit) of the right child
+    // of Sparent (which will be the flag bit of Sparent XORed with the
+    // parity of all the bits of Snode), and if we go right, include all
+    // the bits of the left child of Tnode (which will be the flag bit
+    // of Tparent XORed with the parity of all the bits of Tnode).
     Sdir = !!(S & (value_t(1)<<((depth+7)-curlevel-1)));
+    Sparent = Snode;
+    Tparent = Tnode;
+    Snode = descend_to_leaf(Sparent, Sdir, aes_ops);
+    Tnode = descend_to_leaf(Tparent, Sdir, aes_ops);
+    ++curlevel;
     if (Sdir == 0) {
-        // They're both going left; include the right child of
+        // They both went left; include the right child of
         // Snode in the gt computation
-        DPFnode gtnode = descend_to_leaf(Snode, 1, aes_ops);
-        gt ^= parity(gtnode);
+        gt ^= get_lsb(Sparent) ^ parity(Snode);
     } else {
         // They're both going right; include the left child of
         // Tnode in the gt computation
-        DPFnode gtnode = descend_to_leaf(Tnode, 0, aes_ops);
-        gt ^= parity(gtnode);
+        gt ^= get_lsb(Tparent) ^ parity(Tnode);
     }
-    Snode = descend_to_leaf(Snode, Sdir, aes_ops);
-    Tnode = descend_to_leaf(Tnode, Sdir, aes_ops);
-    ++curlevel;
 
     // Now Snode and Tnode are the leaves containing S and T
     // respectively.  Pull out the bit in Snode for S itself into eq,
