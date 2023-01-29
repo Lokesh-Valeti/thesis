@@ -52,6 +52,9 @@ struct RDPF : public DPF {
         return expansion[index];
     }
 
+    // The depth
+    inline nbits_t depth() const { return cw.size(); }
+
     // Get the leaf node for the given input
     //
     // Cost: depth AES operations

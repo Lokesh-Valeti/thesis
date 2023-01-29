@@ -42,14 +42,10 @@ struct DPF {
     DPFnode seed;
     // Which half of the DPF are we?
     bit_t whichhalf;
-    // correction words; the depth of the DPF is the length of this
-    // vector
+    // correction words
     std::vector<DPFnode> cw;
     // correction flag bits: the one for level i is bit i of this word
     value_t cfbits;
-
-    // The depth
-    inline nbits_t depth() const { return cw.size(); }
 
     // The seed
     inline node get_seed() const { return seed; }
