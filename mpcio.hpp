@@ -215,7 +215,7 @@ struct MPCPeerIO : public MPCIO {
     std::vector<PreCompStorage<CDPF, CDPFName>> cdpfs;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
-    std::vector<std::array<PreCompStorage<RDPFTriple, RDPFTripleName>,ADDRESS_MAX_BITS>> rdpftriples;
+    std::vector<std::array<PreCompStorage<RDPFTriple<1>, RDPFTripleName>,ADDRESS_MAX_BITS>> rdpftriples;
 
     MPCPeerIO(unsigned player, ProcessingMode mode,
             std::deque<tcp::socket> &peersocks,
@@ -236,7 +236,7 @@ struct MPCServerIO : public MPCIO {
     std::deque<MPCSingleIO> p1ios;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
-    std::vector<std::array<PreCompStorage<RDPFPair, RDPFPairName>,ADDRESS_MAX_BITS>> rdpfpairs;
+    std::vector<std::array<PreCompStorage<RDPFPair<1>, RDPFPairName>,ADDRESS_MAX_BITS>> rdpfpairs;
 
     MPCServerIO(ProcessingMode mode,
             std::deque<tcp::socket> &p0socks,
@@ -387,10 +387,10 @@ public:
 
     // These ones only work during the online phase
     // Computational peers call:
-    RDPFTriple rdpftriple(yield_t &yield, nbits_t depth,
+    RDPFTriple<1> rdpftriple(yield_t &yield, nbits_t depth,
         bool keep_expansion = true);
     // The server calls:
-    RDPFPair rdpfpair(yield_t &yield, nbits_t depth);
+    RDPFPair<1> rdpfpair(yield_t &yield, nbits_t depth);
     // Anyone can call:
     CDPF cdpf(yield_t &yield);
 

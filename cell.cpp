@@ -91,7 +91,8 @@ struct Cell {
     // Note that RegXS will extend a RegBS of 1 to the all-1s word, not
     // the word with value 1.  This is used for ORAM reads, where the
     // same DPF is used for all the fields.
-    inline void unit(const RDPF &dpf, DPFnode leaf) {
+    template <nbits_t WIDTH>
+    inline void unit(const RDPF<WIDTH> &dpf, DPFnode leaf) {
         key = dpf.unit_as(leaf);
         pointers = dpf.unit_bs(leaf);
         value = dpf.unit_bs(leaf);

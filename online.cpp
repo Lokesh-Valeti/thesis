@@ -216,9 +216,9 @@ static void rdpf_test(MPCIO &mpcio,
                 size_t &aes_ops = tio.aes_ops();
                 for (size_t iter=0; iter < num_iters; ++iter) {
                     if (tio.player() == 2) {
-                        RDPFPair dp = tio.rdpfpair(yield, depth);
+                        RDPFPair<1> dp = tio.rdpfpair(yield, depth);
                         for (int i=0;i<2;++i) {
-                            const RDPF &dpf = dp.dpf[i];
+                            const RDPF<1> &dpf = dp.dpf[i];
                             for (address_t x=0;x<(address_t(1)<<depth);++x) {
                                 DPFnode leaf = dpf.leaf(x, aes_ops);
                                 RegBS ub = dpf.unit_bs(leaf);
@@ -231,9 +231,9 @@ static void rdpf_test(MPCIO &mpcio,
                             printf("\n");
                         }
                     } else {
-                        RDPFTriple dt = tio.rdpftriple(yield, depth);
+                        RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
                         for (int i=0;i<3;++i) {
-                            const RDPF &dpf = dt.dpf[i];
+                            const RDPF<1> &dpf = dt.dpf[i];
                             RegXS peer_scaled_xor;
                             RegAS peer_scaled_sum;
                             if (tio.player() == 1) {
@@ -300,9 +300,9 @@ static void rdpf_timing(MPCIO &mpcio,
             run_coroutines(tio, [&tio, depth] (yield_t &yield) {
                 size_t &aes_ops = tio.aes_ops();
                 if (tio.player() == 2) {
-                    RDPFPair dp = tio.rdpfpair(yield, depth);
+                    RDPFPair<1> dp = tio.rdpfpair(yield, depth);
                     for (int i=0;i<2;++i) {
-                        RDPF &dpf = dp.dpf[i];
+                        RDPF<1> &dpf = dp.dpf[i];
                         dpf.expand(aes_ops);
                         RegXS scaled_xor;
                         for (address_t x=0;x<(address_t(1)<<depth);++x) {
@@ -315,9 +315,9 @@ static void rdpf_timing(MPCIO &mpcio,
                         printf("\n");
                     }
                 } else {
-                    RDPFTriple dt = tio.rdpftriple(yield, depth);
+                    RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
                     for (int i=0;i<3;++i) {
-                        RDPF &dpf = dt.dpf[i];
+                        RDPF<1> &dpf = dt.dpf[i];
                         dpf.expand(aes_ops);
                         RegXS scaled_xor;
                         for (address_t x=0;x<(address_t(1)<<depth);++x) {
@@ -336,7 +336,7 @@ static void rdpf_timing(MPCIO &mpcio,
     pool.join();
 }
 
-static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF &dpf,
+static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
     address_t start, int num_threads)
 {
     RegXS scaled_xor[num_threads];
@@ -392,9 +392,9 @@ static void rdpfeval_timing(MPCIO &mpcio,
     MPCTIO tio(mpcio, 0, num_threads);
     run_coroutines(tio, [&mpcio, &tio, depth, start, num_threads] (yield_t &yield) {
         if (tio.player() == 2) {
-            RDPFPair dp = tio.rdpfpair(yield, depth);
+            RDPFPair<1> dp = tio.rdpfpair(yield, depth);
             for (int i=0;i<2;++i) {
-                RDPF &dpf = dp.dpf[i];
+                RDPF<1> &dpf = dp.dpf[i];
                 value_t scaled_xor =
                     parallel_streameval_rdpf(mpcio, dpf, start, num_threads);
                 printf("%016lx\n%016lx\n", scaled_xor,
@@ -402,9 +402,9 @@ static void rdpfeval_timing(MPCIO &mpcio,
                 printf("\n");
             }
         } else {
-            RDPFTriple dt = tio.rdpftriple(yield, depth);
+            RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
             for (int i=0;i<3;++i) {
-                RDPF &dpf = dt.dpf[i];
+                RDPF<1> &dpf = dt.dpf[i];
                 value_t scaled_xor =
                     parallel_streameval_rdpf(mpcio, dpf, start, num_threads);
                 printf("%016lx\n%016lx\n", scaled_xor,
@@ -434,15 +434,15 @@ static void par_rdpfeval_timing(MPCIO &mpcio,
     MPCTIO tio(mpcio, 0, num_threads);
     run_coroutines(tio, [&tio, depth, start, num_threads] (yield_t &yield) {
         if (tio.player() == 2) {
-            RDPFPair dp = tio.rdpfpair(yield, depth);
+            RDPFPair<1> dp = tio.rdpfpair(yield, depth);
             for (int i=0;i<2;++i) {
-                RDPF &dpf = dp.dpf[i];
+                RDPF<1> &dpf = dp.dpf[i];
                 nbits_t depth = dpf.depth();
                 auto pe = ParallelEval(dpf, start, 0,
                     address_t(1)<<depth, num_threads, tio.aes_ops());
                 RegXS result, init;
                 result = pe.reduce(init, [&dpf] (int thread_num,
-                        address_t i, const RDPF::node &leaf) {
+                        address_t i, const RDPF<1>::node &leaf) {
                     return dpf.scaled_xs(leaf);
                 });
                 printf("%016lx\n%016lx\n", result.xshare,
@@ -450,15 +450,15 @@ static void par_rdpfeval_timing(MPCIO &mpcio,
                 printf("\n");
             }
         } else {
-            RDPFTriple dt = tio.rdpftriple(yield, depth);
+            RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
             for (int i=0;i<3;++i) {
-                RDPF &dpf = dt.dpf[i];
+                RDPF<1> &dpf = dt.dpf[i];
                 nbits_t depth = dpf.depth();
                 auto pe = ParallelEval(dpf, start, 0,
                     address_t(1)<<depth, num_threads, tio.aes_ops());
                 RegXS result, init;
                 result = pe.reduce(init, [&dpf] (int thread_num,
-                        address_t i, const RDPF::node &leaf) {
+                        address_t i, const RDPF<1>::node &leaf) {
                     return dpf.scaled_xs(leaf);
                 });
                 printf("%016lx\n%016lx\n", result.xshare,
@@ -489,7 +489,7 @@ static void tupleeval_timing(MPCIO &mpcio,
     run_coroutines(tio, [&tio, depth, start] (yield_t &yield) {
         size_t &aes_ops = tio.aes_ops();
         if (tio.player() == 2) {
-            RDPFPair dp = tio.rdpfpair(yield, depth);
+            RDPFPair<1> dp = tio.rdpfpair(yield, depth);
             RegXS scaled_xor0, scaled_xor1;
             auto ev = StreamEval(dp, start, 0, aes_ops, false);
             for (address_t x=0;x<(address_t(1)<<depth);++x) {
@@ -506,7 +506,7 @@ static void tupleeval_timing(MPCIO &mpcio,
                 dp.dpf[1].scaled_xor.xshare);
             printf("\n");
         } else {
-            RDPFTriple dt = tio.rdpftriple(yield, depth);
+            RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
             RegXS scaled_xor0, scaled_xor1, scaled_xor2;
             auto ev = StreamEval(dt, start, 0, aes_ops, false);
             for (address_t x=0;x<(address_t(1)<<depth);++x) {
@@ -551,13 +551,13 @@ static void par_tupleeval_timing(MPCIO &mpcio,
     run_coroutines(tio, [&tio, depth, start, num_threads] (yield_t &yield) {
         size_t &aes_ops = tio.aes_ops();
         if (tio.player() == 2) {
-            RDPFPair dp = tio.rdpfpair(yield, depth);
+            RDPFPair<1> dp = tio.rdpfpair(yield, depth);
             auto pe = ParallelEval(dp, start, 0, address_t(1)<<depth,
                 num_threads, aes_ops);
             using V = std::tuple<RegXS,RegXS>;
             V result, init;
             result = pe.reduce(init, [&dp] (int thread_num, address_t i,
-                    const RDPFPair::node &leaf) {
+                    const RDPFPair<1>::node &leaf) {
                 std::tuple<RegXS,RegXS> scaled;
                 dp.scaled(scaled, leaf);
                 return scaled;
@@ -569,13 +569,13 @@ static void par_tupleeval_timing(MPCIO &mpcio,
                 dp.dpf[1].scaled_xor.xshare);
             printf("\n");
         } else {
-            RDPFTriple dt = tio.rdpftriple(yield, depth);
+            RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
             auto pe = ParallelEval(dt, start, 0, address_t(1)<<depth,
                 num_threads, aes_ops);
             using V = std::tuple<RegXS,RegXS,RegXS>;
             V result, init;
             result = pe.reduce(init, [&dt] (int thread_num, address_t i,
-                    const RDPFTriple::node &leaf) {
+                    const RDPFTriple<1>::node &leaf) {
                 std::tuple<RegXS,RegXS,RegXS> scaled;
                 dt.scaled(scaled, leaf);
                 return scaled;

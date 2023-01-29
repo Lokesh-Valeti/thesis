@@ -273,7 +273,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
+        RDPFTriple<1> dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index offset
         U indoffset;
@@ -281,7 +281,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
         indoffset -= idx;
 
         // We only need two of the DPFs for reading
-        RDPFPair dp(std::move(dt), 0, player == 0 ? 2 : 1);
+        RDPFPair<1> dp(std::move(dt), 0, player == 0 ? 2 : 1);
         // The RDPFTriple dt is now broken, since we've moved things out
         // of it.
 
@@ -304,7 +304,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
             shape.tio.aes_ops());
         FT init;
         res = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair::node &leaf) {
+                address_t i, const RDPFPair<1>::node &leaf) {
             // The values from the two DPFs, which will each be of type T
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -324,7 +324,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
     } else {
         // The server does this
 
-        RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
+        RDPFPair<1> dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         U p0indoffset, p1indoffset;
 
         shape.yield();
@@ -341,7 +341,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         gamma = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair::node &leaf) {
+                address_t i, const RDPFPair<1>::node &leaf) {
             // The values from the two DPFs, each of type FT
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -383,7 +383,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
+        RDPFTriple<1> dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index and message offsets
         U indoffset;
@@ -420,7 +420,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             shape.tio.aes_ops());
         int init = 0;
         pe.reduce(init, [this, &dt, &shape, &Mshift, player] (int thread_num,
-                address_t i, const RDPFTriple::node &leaf) {
+                address_t i, const RDPFTriple<1>::node &leaf) {
             // The values from the three DPFs
             std::tuple<FT,FT,FT> scaled, unit;
             dt.scaled(scaled, leaf);
@@ -442,7 +442,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
     } else {
         // The server does this
 
-        RDPFPair dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
+        RDPFPair<1> dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         U p0indoffset, p1indoffset;
         std::tuple<FT,FT> p0Moffset, p1Moffset;
 
@@ -463,7 +463,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             shape.tio.aes_ops());
         int init = 0;
         pe.reduce(init, [this, &dp, &shape, &Mshift] (int thread_num,
-                address_t i, const RDPFPair::node &leaf) {
+                address_t i, const RDPFPair<1>::node &leaf) {
             // The values from the two DPFs
             std::tuple<FT,FT> scaled, unit;
             dp.scaled(scaled, leaf);

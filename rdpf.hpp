@@ -13,6 +13,7 @@
 // DPFs for oblivious random accesses to memory.  See dpf.hpp for the
 // differences between the different kinds of DPFs.
 
+template <nbits_t WIDTH>
 struct RDPF : public DPF {
     // The amount we have to scale the low words of the leaf values by
     // to get additive shares of a unit vector
@@ -109,13 +110,14 @@ struct RDPF : public DPF {
 // target index), while the server will hold a RDPFPair (which does
 // not).
 
+template <nbits_t WIDTH>
 struct RDPFTriple {
     // The type of node triples
     using node = std::tuple<DPFnode, DPFnode, DPFnode>;
 
     RegAS as_target;
     RegXS xs_target;
-    RDPF dpf[3];
+    RDPF<WIDTH> dpf[3];
 
     // The depth
     inline nbits_t depth() const { return dpf[0].depth(); }
@@ -209,11 +211,12 @@ struct RDPFTriple {
     }
 };
 
+template <nbits_t WIDTH>
 struct RDPFPair {
     // The type of node pairs
     using node = std::tuple<DPFnode, DPFnode>;
 
-    RDPF dpf[2];
+    RDPF<WIDTH> dpf[2];
 
     RDPFPair() {}
 
@@ -221,7 +224,7 @@ struct RDPFPair {
     // and dropping one.  This _moves_ the dpfs from the triple to the
     // pair, so the triple will no longer be valid after using this.
     // which0 and which1 indicate which of the dpfs to keep.
-    RDPFPair(RDPFTriple &&trip, int which0, int which1) {
+    RDPFPair(RDPFTriple<WIDTH> &&trip, int which0, int which1) {
         dpf[0] = std::move(trip.dpf[which0]);
         dpf[1] = std::move(trip.dpf[which1]);
     }

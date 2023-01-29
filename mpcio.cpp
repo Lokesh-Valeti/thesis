@@ -802,17 +802,17 @@ SelectTriple<bit_t> MPCTIO::bitselecttriple(yield_t &yield)
 
 // Only computational peers call this; the server should be calling
 // rdpfpair() at the same time
-RDPFTriple MPCTIO::rdpftriple(yield_t &yield, nbits_t depth,
+RDPFTriple<1> MPCTIO::rdpftriple(yield_t &yield, nbits_t depth,
     bool keep_expansion)
 {
     assert(mpcio.player < 2);
-    RDPFTriple val;
+    RDPFTriple<1> val;
 
     MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
     if (mpcio.mode == MODE_ONLINE) {
         mpcpio.rdpftriples[thread_num][depth-1].get(val);
     } else {
-        val = RDPFTriple(*this, yield, depth,
+        val = RDPFTriple<1>(*this, yield, depth,
             keep_expansion);
         iostream_server() <<
             val.dpf[(mpcio.player == 0) ? 1 : 2];
@@ -824,16 +824,16 @@ RDPFTriple MPCTIO::rdpftriple(yield_t &yield, nbits_t depth,
 
 // Only the server calls this; the computational peers should be calling
 // rdpftriple() at the same time
-RDPFPair MPCTIO::rdpfpair(yield_t &yield, nbits_t depth)
+RDPFPair<1> MPCTIO::rdpfpair(yield_t &yield, nbits_t depth)
 {
     assert(mpcio.player == 2);
-    RDPFPair val;
+    RDPFPair<1> val;
 
     MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
     if (mpcio.mode == MODE_ONLINE) {
         mpcsrvio.rdpfpairs[thread_num][depth-1].get(val);
     } else {
-        RDPFTriple trip(*this, yield, depth, true);
+        RDPFTriple<1> trip(*this, yield, depth, true);
         yield();
         iostream_p0() >> val.dpf[0];
         iostream_p1() >> val.dpf[1];

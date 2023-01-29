@@ -643,9 +643,9 @@ struct ValSelectTripleName { static constexpr const char *name = "s"; };
 
 // These are defined in rdpf.hpp, but declared here to avoid cyclic
 // header dependencies.
-struct RDPFPair;
+template <nbits_t WIDTH> struct RDPFPair;
 struct RDPFPairName { static constexpr const char *name = "r"; };
-struct RDPFTriple;
+template <nbits_t WIDTH> struct RDPFTriple;
 struct RDPFTripleName { static constexpr const char *name = "r"; };
 struct CDPF;
 struct CDPFName { static constexpr const char *name = "c"; };
