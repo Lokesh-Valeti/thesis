@@ -558,7 +558,9 @@ static void par_tupleeval_timing(MPCIO &mpcio,
             V result, init;
             result = pe.reduce(init, [&dp] (int thread_num, address_t i,
                     const RDPFPair::node &leaf) {
-                return dp.scaled<RegXS>(leaf);
+                std::tuple<RegXS,RegXS> scaled;
+                dp.scaled(scaled, leaf);
+                return scaled;
             });
             printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
                 dp.dpf[0].scaled_xor.xshare);
@@ -574,7 +576,9 @@ static void par_tupleeval_timing(MPCIO &mpcio,
             V result, init;
             result = pe.reduce(init, [&dt] (int thread_num, address_t i,
                     const RDPFTriple::node &leaf) {
-                return dt.scaled<RegXS>(leaf);
+                std::tuple<RegXS,RegXS,RegXS> scaled;
+                dt.scaled(scaled, leaf);
+                return scaled;
             });
             printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
                 dt.dpf[0].scaled_xor.xshare);

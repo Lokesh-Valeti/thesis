@@ -276,7 +276,8 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
         RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index offset
-        U indoffset = dt.target<U>();
+        U indoffset;
+        dt.get_target(indoffset);
         indoffset -= idx;
 
         // We only need two of the DPFs for reading
@@ -305,7 +306,9 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
         res = pe.reduce(init, [this, &dp, &shape] (int thread_num,
                 address_t i, const RDPFPair::node &leaf) {
             // The values from the two DPFs, which will each be of type T
-            auto [V0, V1] = dp.unit<FT>(leaf);
+            std::tuple<FT,FT> V;
+            dp.unit(V, leaf);
+            auto [V0, V1] = V;
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i, fieldsel);
@@ -340,7 +343,9 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
         gamma = pe.reduce(init, [this, &dp, &shape] (int thread_num,
                 address_t i, const RDPFPair::node &leaf) {
             // The values from the two DPFs, each of type FT
-            auto [V0, V1] = dp.unit<FT>(leaf);
+            std::tuple<FT,FT> V;
+            dp.unit(V, leaf);
+            auto [V0, V1] = V;
 
             // shape.get_server(i) returns a pair of references to the
             // appropriate cells in the two blinded databases
@@ -381,10 +386,13 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
         RDPFTriple dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
 
         // Compute the index and message offsets
-        U indoffset = dt.target<U>();
+        U indoffset;
+        dt.get_target(indoffset);
         indoffset -= idx;
         auto Moffset = std::make_tuple(M, M, M);
-        Moffset -= dt.scaled_value<FT>();
+        std::tuple<FT,FT,FT> scaled_val;
+        dt.scaled_value(scaled_val);
+        Moffset -= scaled_val;
 
         // Send them to the peer, and everything except the first offset
         // to the server
@@ -414,8 +422,10 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
         pe.reduce(init, [this, &dt, &shape, &Mshift, player] (int thread_num,
                 address_t i, const RDPFTriple::node &leaf) {
             // The values from the three DPFs
-            auto [V0, V1, V2] =
-                dt.scaled<FT>(leaf) + dt.unit<FT>(leaf) * Mshift;
+            std::tuple<FT,FT,FT> scaled, unit;
+            dt.scaled(scaled, leaf);
+            dt.unit(unit, leaf);
+            auto [V0, V1, V2] = scaled + unit * Mshift;
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i,fieldsel);
@@ -455,7 +465,10 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
         pe.reduce(init, [this, &dp, &shape, &Mshift] (int thread_num,
                 address_t i, const RDPFPair::node &leaf) {
             // The values from the two DPFs
-            auto V = dp.scaled<FT>(leaf) + dp.unit<FT>(leaf) * Mshift;
+            std::tuple<FT,FT> scaled, unit;
+            dp.scaled(scaled, leaf);
+            dp.unit(unit, leaf);
+            auto V = scaled + unit * Mshift;
             // shape.get_server(i) returns a pair of references to the
             // appropriate cells in the two blinded databases, so we can
             // subtract the pair directly.
