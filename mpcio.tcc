@@ -12,13 +12,15 @@ PreCompStorage<T,N>::PreCompStorage(unsigned player, ProcessingMode mode,
 
 template<typename T, typename N>
 void PreCompStorage<T,N>::init(unsigned player, ProcessingMode mode,
-        const char *filenameprefix, unsigned thread_num, nbits_t depth)
+        const char *filenameprefix, unsigned thread_num, nbits_t depth,
+        nbits_t width)
 {
     if (mode != MODE_ONLINE) return;
     std::string filename(filenameprefix);
     char suffix[20];
     if (depth) {
         this->depth = depth;
+        this->width = width;
         sprintf(suffix, "%02d.p%d.t%u", depth, player%10, thread_num);
     } else {
         sprintf(suffix, ".p%d.t%u", player%10, thread_num);
@@ -40,6 +42,9 @@ void PreCompStorage<T,N>::get(T& nextval)
         if (depth) {
             std::cerr << (int)depth;
         }
+        if (width > 1) {
+            std::cerr << "." << (int)width;
+        }
         std::cerr << " storage\n";
         exit(1);
     }
@@ -57,13 +62,13 @@ RDPFTriple<WIDTH> MPCTIO::rdpftriple(yield_t &yield, nbits_t depth,
 
     MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
     if (mpcio.mode == MODE_ONLINE) {
-        mpcpio.rdpftriples[thread_num][depth-1].get(val);
+        std::get<WIDTH-1>(mpcpio.rdpftriples)[thread_num][depth-1].get(val);
     } else {
         val = RDPFTriple<WIDTH>(*this, yield, depth,
             keep_expansion);
         iostream_server() <<
             val.dpf[(mpcio.player == 0) ? 1 : 2];
-        mpcpio.rdpftriples[thread_num][depth-1].inc();
+        std::get<WIDTH-1>(mpcpio.rdpftriples)[thread_num][depth-1].inc();
         yield();
     }
     return val;
@@ -79,13 +84,13 @@ RDPFPair<WIDTH> MPCTIO::rdpfpair(yield_t &yield, nbits_t depth)
 
     MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
     if (mpcio.mode == MODE_ONLINE) {
-        mpcsrvio.rdpfpairs[thread_num][depth-1].get(val);
+        std::get<WIDTH-1>(mpcsrvio.rdpfpairs)[thread_num][depth-1].get(val);
     } else {
         RDPFTriple<WIDTH> trip(*this, yield, depth, true);
         yield();
         iostream_p0() >> val.dpf[0];
         iostream_p1() >> val.dpf[1];
-        mpcsrvio.rdpfpairs[thread_num][depth-1].inc();
+        std::get<WIDTH-1>(mpcsrvio.rdpfpairs)[thread_num][depth-1].inc();
     }
     return val;
 }

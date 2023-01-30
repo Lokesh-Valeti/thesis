@@ -30,7 +30,8 @@ public:
     PreCompStorage(unsigned player, ProcessingMode mode,
         const char *filenameprefix, unsigned thread_num);
     void init(unsigned player, ProcessingMode mode,
-        const char *filenameprefix, unsigned thread_num, nbits_t depth = 0);
+        const char *filenameprefix, unsigned thread_num,
+        nbits_t depth = 0, nbits_t width = 1);
     void get(T& nextval);
 
     inline void inc() { ++count; }
@@ -40,6 +41,7 @@ private:
     std::ifstream storage;
     std::string name;
     nbits_t depth;
+    nbits_t width;
     size_t count;
 };
 
@@ -215,7 +217,18 @@ struct MPCPeerIO : public MPCIO {
     std::vector<PreCompStorage<CDPF, CDPFName>> cdpfs;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
-    std::vector<std::array<PreCompStorage<RDPFTriple<1>, RDPFTripleName>,ADDRESS_MAX_BITS>> rdpftriples;
+    // We have one of these whole vectors-of-arrays for each RDPF width,
+    // wrapped into a tuple
+    template <nbits_t WIDTH>
+    using RDPFPrecomps =
+        std::vector<std::array<
+            PreCompStorage<RDPFTriple<WIDTH>, RDPFTripleName>,ADDRESS_MAX_BITS>>;
+    std::tuple<
+        RDPFPrecomps<1>,
+        RDPFPrecomps<2>,
+        RDPFPrecomps<3>,
+        RDPFPrecomps<4>,
+        RDPFPrecomps<5>> rdpftriples;
 
     MPCPeerIO(unsigned player, ProcessingMode mode,
             std::deque<tcp::socket> &peersocks,
@@ -236,7 +249,18 @@ struct MPCServerIO : public MPCIO {
     std::deque<MPCSingleIO> p1ios;
     // The outer vector is (like above) one item per thread
     // The inner array is indexed by DPF depth (depth d is at entry d-1)
-    std::vector<std::array<PreCompStorage<RDPFPair<1>, RDPFPairName>,ADDRESS_MAX_BITS>> rdpfpairs;
+    // We have one of these whole vectors-of-arrays for each RDPF width,
+    // wrapped into a tuple
+    template <nbits_t WIDTH>
+    using RDPFPrecomps =
+        std::vector<std::array<
+            PreCompStorage<RDPFPair<WIDTH>, RDPFPairName>,ADDRESS_MAX_BITS>>;
+    std::tuple<
+        RDPFPrecomps<1>,
+        RDPFPrecomps<2>,
+        RDPFPrecomps<3>,
+        RDPFPrecomps<4>,
+        RDPFPrecomps<5>> rdpfpairs;
 
     MPCServerIO(ProcessingMode mode,
             std::deque<tcp::socket> &p0socks,

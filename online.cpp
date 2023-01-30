@@ -1177,7 +1177,6 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "rdpftest")) {
         ++args;
         rdpf_test<1>(mpcio, opts, args);
-/*
     } else if (!strcmp(*args, "rdpftest2")) {
         ++args;
         rdpf_test<2>(mpcio, opts, args);
@@ -1190,7 +1189,6 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "rdpftest5")) {
         ++args;
         rdpf_test<5>(mpcio, opts, args);
-*/
     } else if (!strcmp(*args, "rdpftime")) {
         ++args;
         rdpf_timing(mpcio, opts, args);
