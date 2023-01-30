@@ -387,10 +387,12 @@ public:
 
     // These ones only work during the online phase
     // Computational peers call:
-    RDPFTriple<1> rdpftriple(yield_t &yield, nbits_t depth,
+    template <nbits_t WIDTH = 1>
+    RDPFTriple<WIDTH> rdpftriple(yield_t &yield, nbits_t depth,
         bool keep_expansion = true);
     // The server calls:
-    RDPFPair<1> rdpfpair(yield_t &yield, nbits_t depth);
+    template <nbits_t WIDTH = 1>
+    RDPFPair<WIDTH> rdpfpair(yield_t &yield, nbits_t depth);
     // Anyone can call:
     CDPF cdpf(yield_t &yield);
 
@@ -437,5 +439,7 @@ void mpcio_setup_server(boost::asio::io_context &io_context,
     const char *p0addr, const char *p1addr, int num_threads,
     std::deque<tcp::socket> &p0socks,
     std::deque<tcp::socket> &p1socks);
+
+#include "mpcio.tcc"
 
 #endif

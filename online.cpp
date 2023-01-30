@@ -192,6 +192,7 @@ static void lamport_test(MPCIO &mpcio,
     pool.join();
 }
 
+template <nbits_t WIDTH>
 static void rdpf_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -207,79 +208,89 @@ static void rdpf_test(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, num_iters] {
-            MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth, num_iters] (yield_t &yield) {
-                size_t &aes_ops = tio.aes_ops();
-                for (size_t iter=0; iter < num_iters; ++iter) {
-                    if (tio.player() == 2) {
-                        RDPFPair<1> dp = tio.rdpfpair(yield, depth);
-                        for (int i=0;i<2;++i) {
-                            const RDPF<1> &dpf = dp.dpf[i];
-                            for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                                RDPF<1>::LeafNode leaf = dpf.leaf(x, aes_ops);
-                                RegBS ub = dpf.unit_bs(leaf);
-                                RegAS ua = dpf.unit_as(leaf);
-                                RDPF<1>::RegXSW sx = dpf.scaled_xs(leaf);
-                                RDPF<1>::RegASW sa = dpf.scaled_as(leaf);
-                                printf("%04x %x %016lx %016lx %016lx\n", x,
-                                    ub.bshare, ua.ashare, sx[0].xshare, sa[0].ashare);
-                            }
-                            printf("\n");
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&tio, depth, num_iters] (yield_t &yield) {
+        size_t &aes_ops = tio.aes_ops();
+        for (size_t iter=0; iter < num_iters; ++iter) {
+            if (tio.player() == 2) {
+                RDPFPair<WIDTH> dp = tio.rdpfpair<WIDTH>(yield, depth);
+                for (int i=0;i<2;++i) {
+                    const RDPF<WIDTH> &dpf = dp.dpf[i];
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        typename RDPF<WIDTH>::LeafNode leaf = dpf.leaf(x, aes_ops);
+                        RegBS ub = dpf.unit_bs(leaf);
+                        RegAS ua = dpf.unit_as(leaf);
+                        typename RDPF<WIDTH>::RegXSW sx = dpf.scaled_xs(leaf);
+                        typename RDPF<WIDTH>::RegASW sa = dpf.scaled_as(leaf);
+                        printf("%04x %x %016lx", x, ub.bshare, ua.ashare);
+                        for (nbits_t j=0;j<WIDTH;++j) {
+                            printf(" %016lx %016lx", sx[j].xshare, sa[j].ashare);
                         }
+                        printf("\n");
+                    }
+                    printf("\n");
+                }
+            } else {
+                RDPFTriple<WIDTH> dt = tio.rdpftriple<WIDTH>(yield, depth);
+                for (int i=0;i<3;++i) {
+                    const RDPF<WIDTH> &dpf = dt.dpf[i];
+                    typename RDPF<WIDTH>::RegXSW peer_scaled_xor;
+                    typename RDPF<WIDTH>::RegASW peer_scaled_sum;
+                    if (tio.player() == 1) {
+                        tio.iostream_peer() << dpf.li[0].scaled_xor << dpf.li[0].scaled_sum;
                     } else {
-                        RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
-                        for (int i=0;i<3;++i) {
-                            const RDPF<1> &dpf = dt.dpf[i];
-                            RegXS peer_scaled_xor;
-                            RegAS peer_scaled_sum;
-                            if (tio.player() == 1) {
-                                tio.iostream_peer() << dpf.li[0].scaled_xor[0] << dpf.li[0].scaled_sum[0];
-                            } else {
-                                tio.iostream_peer() >> peer_scaled_xor >> peer_scaled_sum;
-                                peer_scaled_sum += dpf.li[0].scaled_sum[0];
-                                peer_scaled_xor ^= dpf.li[0].scaled_xor[0];
+                        tio.iostream_peer() >> peer_scaled_xor >> peer_scaled_sum;
+                        peer_scaled_sum += dpf.li[0].scaled_sum;
+                        peer_scaled_xor ^= dpf.li[0].scaled_xor;
+                    }
+                    for (address_t x=0;x<(address_t(1)<<depth);++x) {
+                        typename RDPF<WIDTH>::LeafNode leaf = dpf.leaf(x, aes_ops);
+                        RegBS ub = dpf.unit_bs(leaf);
+                        RegAS ua = dpf.unit_as(leaf);
+                        typename RDPF<WIDTH>::RegXSW sx = dpf.scaled_xs(leaf);
+                        typename RDPF<WIDTH>::RegASW sa = dpf.scaled_as(leaf);
+                        printf("%04x %x %016lx", x, ub.bshare, ua.ashare);
+                        for (nbits_t j=0;j<WIDTH;++j) {
+                            printf(" %016lx %016lx", sx[j].xshare, sa[j].ashare);
+                        }
+                        printf("\n");
+                        if (tio.player() == 1) {
+                            tio.iostream_peer() << ub << ua << sx << sa;
+                        } else {
+                            RegBS peer_ub;
+                            RegAS peer_ua;
+                            typename RDPF<WIDTH>::RegXSW peer_sx;
+                            typename RDPF<WIDTH>::RegASW peer_sa;
+                            tio.iostream_peer() >> peer_ub >> peer_ua >>
+                                peer_sx >> peer_sa;
+                            ub ^= peer_ub;
+                            ua += peer_ua;
+                            sx ^= peer_sx;
+                            sa += peer_sa;
+                            bool is_nonzero = ub.bshare || ua.ashare;
+                            for (nbits_t j=0;j<WIDTH;++j) {
+                                is_nonzero |= (sx[j].xshare || sa[j].ashare);
                             }
-                            for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                                RDPF<1>::LeafNode leaf = dpf.leaf(x, aes_ops);
-                                RegBS ub = dpf.unit_bs(leaf);
-                                RegAS ua = dpf.unit_as(leaf);
-                                RDPF<1>::RegXSW sx = dpf.scaled_xs(leaf);
-                                RDPF<1>::RegASW sa = dpf.scaled_as(leaf);
-                                printf("%04x %x %016lx %016lx %016lx\n", x,
-                                    ub.bshare, ua.ashare, sx[0].xshare, sa[0].ashare);
-                                if (tio.player() == 1) {
-                                    tio.iostream_peer() << ub << ua << sx << sa;
-                                } else {
-                                    RegBS peer_ub;
-                                    RegAS peer_ua;
-                                    RDPF<1>::RegXSW peer_sx;
-                                    RDPF<1>::RegASW peer_sa;
-                                    tio.iostream_peer() >> peer_ub >> peer_ua >>
-                                        peer_sx >> peer_sa;
-                                    ub ^= peer_ub;
-                                    ua += peer_ua;
-                                    sx ^= peer_sx;
-                                    sa += peer_sa;
-                                    if (ub.bshare || ua.ashare || sx[0].xshare || sa[0].ashare) {
-                                        printf("**** %x %016lx %016lx %016lx\n",
-                                            ub.bshare, ua.ashare, sx[0].xshare, sa[0].ashare);
-                                        printf("SCALE                   %016lx %016lx\n",
-                                            peer_scaled_xor.xshare, peer_scaled_sum.ashare);
-                                    }
+                            if (is_nonzero) {
+                                printf("**** %x %016lx", ub.bshare, ua.ashare);
+                                for (nbits_t j=0;j<WIDTH;++j) {
+                                    printf(" %016lx %016lx", sx[j].xshare, sa[j].ashare);
                                 }
+                                printf("\nSCALE                  ");
+                                for (nbits_t j=0;j<WIDTH;++j) {
+                                    printf(" %016lx %016lx",
+                                        peer_scaled_xor[j].xshare,
+                                        peer_scaled_sum[j].ashare);
+                                }
+                                printf("\n");
                             }
-                            printf("\n");
                         }
                     }
+                    printf("\n");
                 }
-            });
-        });
-    }
-    pool.join();
+            }
+        }
+    });
 }
 
 static void rdpf_timing(MPCIO &mpcio,
@@ -1165,7 +1176,21 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
         lamport_test(mpcio, opts, args);
     } else if (!strcmp(*args, "rdpftest")) {
         ++args;
-        rdpf_test(mpcio, opts, args);
+        rdpf_test<1>(mpcio, opts, args);
+/*
+    } else if (!strcmp(*args, "rdpftest2")) {
+        ++args;
+        rdpf_test<2>(mpcio, opts, args);
+    } else if (!strcmp(*args, "rdpftest3")) {
+        ++args;
+        rdpf_test<3>(mpcio, opts, args);
+    } else if (!strcmp(*args, "rdpftest4")) {
+        ++args;
+        rdpf_test<4>(mpcio, opts, args);
+    } else if (!strcmp(*args, "rdpftest5")) {
+        ++args;
+        rdpf_test<5>(mpcio, opts, args);
+*/
     } else if (!strcmp(*args, "rdpftime")) {
         ++args;
         rdpf_timing(mpcio, opts, args);
