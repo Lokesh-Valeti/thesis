@@ -14,10 +14,26 @@
 // DPFs for oblivious random accesses to memory.  See dpf.hpp for the
 // differences between the different kinds of DPFs.
 
+// A single RDPF can use its unit vector for any as reads of the same
+// memory location as you like, as long as it's OK that everyone _knows_
+// it's the same memory location.  The same RDPF can also be configured
+// to allow for WIDTH independent updates; if you otherwise would try to
+// reuse the same RDPF for multiple updates of the same memory location,
+// you would leak the difference between the update _values_.  Typically
+// WIDTH=1, since most RDPFs are not reused at all.
+//
+// We implement this by have a "wide" LeafNode type that can store one
+// 64-bit value for the read, and WIDTH 64-bit values for the writes.
+// Since each DPFnode is 128 bits, you need 1 + (WIDTH/2) DPFnodes in a
+// LeafNode.  We will also need to pass around arrays of WIDTH RegAS and
+// RegXS values, so we make dedicated wide types for those (RegASW and
+// RegXSW).
+
 template <nbits_t WIDTH>
 struct RDPF : public DPF {
     template <typename T>
     using W = std::array<T, WIDTH>;
+    // The wide shared register types
     using RegASW = W<RegAS>;
     using RegXSW = W<RegXS>;
     // The number of 128-bit leaf node entries you need to get 1 unit
@@ -29,8 +45,8 @@ struct RDPF : public DPF {
     // one leaf level (at the bottom), but incremental RDPFs have a leaf
     // level for each level of the DPF.
     struct LeafInfo {
-        // The WIDTH correction words for this leaf level
-        std::array<DPFnode,WIDTH> leaf_cw;
+        // The correction word for this leaf level
+        LeafNode leaf_cw;
         // The amount we have to scale the low words of the leaf values by
         // to get additive shares of a unit vector
         value_t unit_sum_inverse;
@@ -51,12 +67,12 @@ struct RDPF : public DPF {
     // leaf_info[d-i].
     std::vector<LeafInfo> li;
 
-    // The leaf correction flag bits for the WIDTH leaf words at each
+    // The leaf correction flag bits for the LWIDTH leaf words at each
     // leaf level.  The bit for leaf word j of level i (for an
     // incremental DPF of total depth d) is leaf_cfbits[j] & (1<<(d-i)).
     // For a normal (not incremental) RDPF, it's the same, but therefore
-    // only the low bit of each of these WIDTH words gets used.
-    std::array<value_t,WIDTH> leaf_cfbits;
+    // only the low bit of each of these LWIDTH words gets used.
+    std::array<value_t,LWIDTH> leaf_cfbits;
 
     // If we're saving the expansion, put it here
     std::vector<LeafNode> expansion;
@@ -188,7 +204,8 @@ struct RDPFTriple {
     template <typename T>
     using WTriple = Triple<typename RDPF<WIDTH>::W<T>>;
 
-    // The type of node triples
+    // The type of triples of nodes, LeafNodes, and the wide shared
+    // register types
     using node = Triple<DPFnode>;
     using LeafNode = Triple<typename RDPF<WIDTH>::LeafNode>;
     using RegASWT = WTriple<RegAS>;
@@ -301,7 +318,8 @@ struct RDPFPair {
     template <typename T>
     using WPair = Pair<typename RDPF<WIDTH>::W<T>>;
 
-    // The type of node pairs
+    // The type of pairs of nodes, LeafNodes, and the wide shared
+    // register types
     using node = Pair<DPFnode>;
     using LeafNode = Pair<typename RDPF<WIDTH>::LeafNode>;
     using RegASWP = WPair<RegAS>;
