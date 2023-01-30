@@ -304,7 +304,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
             shape.tio.aes_ops());
         FT init;
         res = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair<1>::node &leaf) {
+                address_t i, const RDPFPair<1>::LeafNode &leaf) {
             // The values from the two DPFs, which will each be of type T
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -341,7 +341,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         gamma = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair<1>::node &leaf) {
+                address_t i, const RDPFPair<1>::LeafNode &leaf) {
             // The values from the two DPFs, each of type FT
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -389,8 +389,10 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
         U indoffset;
         dt.get_target(indoffset);
         indoffset -= idx;
-        auto Moffset = std::make_tuple(M, M, M);
-        std::tuple<FT,FT,FT> scaled_val;
+        RDPF<1>::W<FT> MW;
+        MW[0] = M;
+        auto Moffset = std::make_tuple(MW, MW, MW);
+        RDPFTriple<1>::WTriple<FT> scaled_val;
         dt.scaled_value(scaled_val);
         Moffset -= scaled_val;
 
@@ -406,7 +408,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 
         // Receive the above from the peer
         U peerindoffset;
-        std::tuple<FT,FT,FT> peerMoffset;
+        RDPFTriple<1>::WTriple<FT> peerMoffset;
         shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
         shape.tio.iostream_peer() >> peerMoffset;
 
@@ -420,22 +422,23 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             shape.tio.aes_ops());
         int init = 0;
         pe.reduce(init, [this, &dt, &shape, &Mshift, player] (int thread_num,
-                address_t i, const RDPFTriple<1>::node &leaf) {
+                address_t i, const RDPFTriple<1>::LeafNode &leaf) {
             // The values from the three DPFs
-            std::tuple<FT,FT,FT> scaled, unit;
+            RDPFTriple<1>::WTriple<FT> scaled;
+            std::tuple<FT,FT,FT> unit;
             dt.scaled(scaled, leaf);
             dt.unit(unit, leaf);
             auto [V0, V1, V2] = scaled + unit * Mshift;
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i,fieldsel);
-            DB += V0;
+            DB += V0[0];
             if (player == 0) {
-                BL -= V1;
-                PBD += V2-V0;
+                BL -= V1[0];
+                PBD += V2[0]-V0[0];
             } else {
-                BL -= V2;
-                PBD += V1-V0;
+                BL -= V2[0];
+                PBD += V1[0]-V0[0];
             }
             return 0;
         });
@@ -444,7 +447,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 
         RDPFPair<1> dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
         U p0indoffset, p1indoffset;
-        std::tuple<FT,FT> p0Moffset, p1Moffset;
+        RDPFPair<1>::WPair<FT> p0Moffset, p1Moffset;
 
         shape.yield();
 
@@ -463,16 +466,19 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             shape.tio.aes_ops());
         int init = 0;
         pe.reduce(init, [this, &dp, &shape, &Mshift] (int thread_num,
-                address_t i, const RDPFPair<1>::node &leaf) {
+                address_t i, const RDPFPair<1>::LeafNode &leaf) {
             // The values from the two DPFs
-            std::tuple<FT,FT> scaled, unit;
+            RDPFPair<1>::WPair<FT> scaled;
+            std::tuple<FT,FT> unit;
             dp.scaled(scaled, leaf);
             dp.unit(unit, leaf);
-            auto V = scaled + unit * Mshift;
+            auto [V0, V1] = scaled + unit * Mshift;
             // shape.get_server(i) returns a pair of references to the
             // appropriate cells in the two blinded databases, so we can
             // subtract the pair directly.
-            shape.get_server(i,fieldsel) -= V;
+            auto [BL0, BL1] = shape.get_server(i,fieldsel);
+            BL0 -= V0[0];
+            BL1 -= V1[0];
             return 0;
         });
     }

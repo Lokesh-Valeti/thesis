@@ -161,13 +161,13 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                                 yield();
                                 RDPFTriple rdpftrip =
                                     tio.rdpftriple(yield, type, opts.expand_rdpfs);
-                                printf("dep  = %d\n", type);
-                                printf("usi0 = %016lx\n", rdpftrip.dpf[0].unit_sum_inverse);
-                                printf("sxr0 = %016lx\n", rdpftrip.dpf[0].scaled_xor.xshare);
-                                printf("usi1 = %016lx\n", rdpftrip.dpf[1].unit_sum_inverse);
-                                printf("sxr1 = %016lx\n", rdpftrip.dpf[1].scaled_xor.xshare);
-                                printf("usi2 = %016lx\n", rdpftrip.dpf[2].unit_sum_inverse);
-                                printf("sxr2 = %016lx\n", rdpftrip.dpf[2].scaled_xor.xshare);
+printf("dep  = %d\n", type);
+printf("usi0 = %016lx\n", rdpftrip.dpf[0].li[0].unit_sum_inverse);
+printf("sxr0 = %016lx\n", rdpftrip.dpf[0].li[0].scaled_xor[0].xshare);
+printf("usi1 = %016lx\n", rdpftrip.dpf[1].li[0].unit_sum_inverse);
+printf("sxr1 = %016lx\n", rdpftrip.dpf[1].li[0].scaled_xor[0].xshare);
+printf("usi2 = %016lx\n", rdpftrip.dpf[2].li[0].unit_sum_inverse);
+printf("sxr2 = %016lx\n", rdpftrip.dpf[2].li[0].scaled_xor[0].xshare);
                                 tripfile.os() << rdpftrip;
                             });
                     }
@@ -327,12 +327,12 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                                 [&stio, &opts, pairfile, depth](yield_t &yield) {
                                     yield();
                                     RDPFPair rdpfpair = stio.rdpfpair(yield, depth);
-                                printf("usi0 = %016lx\n", rdpfpair.dpf[0].unit_sum_inverse);
-                                printf("sxr0 = %016lx\n", rdpfpair.dpf[0].scaled_xor.xshare);
-                                printf("dep0 = %d\n", rdpfpair.dpf[0].depth());
-                                printf("usi1 = %016lx\n", rdpfpair.dpf[1].unit_sum_inverse);
-                                printf("sxr1 = %016lx\n", rdpfpair.dpf[1].scaled_xor.xshare);
-                                printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
+printf("usi0 = %016lx\n", rdpfpair.dpf[0].li[0].unit_sum_inverse);
+printf("sxr0 = %016lx\n", rdpfpair.dpf[0].li[0].scaled_xor[0].xshare);
+printf("dep0 = %d\n", rdpfpair.dpf[0].depth());
+printf("usi1 = %016lx\n", rdpfpair.dpf[1].li[0].unit_sum_inverse);
+printf("sxr1 = %016lx\n", rdpfpair.dpf[1].li[0].scaled_xor[0].xshare);
+printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
                                     if (opts.expand_rdpfs) {
                                         rdpfpair.dpf[0].expand(stio.aes_ops());
                                         rdpfpair.dpf[1].expand(stio.aes_ops());

@@ -99,6 +99,17 @@ struct RegAS {
         return res;
     }
 
+    // Multiply a scalar by a vector
+    template <size_t N>
+    inline std::array<RegAS,N> operator*(std::array<value_t,N> rhs) const {
+        std::array<RegAS,N> res;
+        for (size_t i=0;i<N;++i) {
+            res[i] = *this;
+            res[i] *= rhs[i];
+        }
+        return res;
+    }
+
     inline RegAS &operator&=(value_t mask) {
         this->ashare &= mask;
         return *this;
@@ -232,6 +243,17 @@ struct RegXS {
     inline RegXS operator*(value_t rhs) const {
         RegXS res = *this;
         res *= rhs;
+        return res;
+    }
+
+    // Multiply a scalar by a vector
+    template <size_t N>
+    inline std::array<RegXS,N> operator*(std::array<value_t,N> rhs) const {
+        std::array<RegXS,N> res;
+        for (size_t i=0;i<N;++i) {
+            res[i] = *this;
+            res[i] *= rhs[i];
+        }
         return res;
     }
 
@@ -427,9 +449,32 @@ std::tuple<T,T> operator*(const std::tuple<T,T> &A,
     return res;
 }
 
-template <typename T>
-inline std::tuple<value_t,value_t> combine(
-        const std::tuple<T,T> &A, const std::tuple<T,T> &B,
+template <typename T, size_t N>
+std::tuple<std::array<T,N>,std::array<T,N>> operator*(
+    const std::tuple<T,T> &A,
+    const std::tuple<std::array<value_t,N>,std::array<value_t,N>> &B)
+{
+    std::tuple<std::array<T,N>,std::array<T,N>> res;
+    std::get<0>(res) = std::get<0>(A) * std::get<0>(B);
+    std::get<1>(res) = std::get<1>(A) * std::get<1>(B);
+    return res;
+}
+
+template <typename S, size_t N>
+inline std::array<value_t,N> combine(const std::array<S,N> &A,
+        const std::array<S,N> &B,
+        nbits_t nbits = VALUE_BITS) {
+    std::array<value_t,N> res;
+    for (size_t i=0;i<N;++i) {
+        res[i] = combine(A[i], B[i], nbits);
+    }
+    return res;
+}
+
+template <typename S, size_t N>
+inline std::tuple<std::array<value_t,N>,std::array<value_t,N>>
+    combine(const std::tuple<std::array<S,N>,std::array<S,N>> &A,
+        const std::tuple<std::array<S,N>,std::array<S,N>> &B,
         nbits_t nbits = VALUE_BITS) {
     return std::make_tuple(
         combine(std::get<0>(A), std::get<0>(B), nbits),
@@ -523,6 +568,18 @@ std::tuple<T,T,T> operator*(const std::tuple<T,T,T> &A,
     return res;
 }
 
+template <typename T, size_t N>
+std::tuple<std::array<T,N>,std::array<T,N>,std::array<T,N>> operator*(
+    const std::tuple<T,T,T> &A,
+    const std::tuple<std::array<value_t,N>,std::array<value_t,N>,std::array<value_t,N>> &B)
+{
+    std::tuple<std::array<T,N>,std::array<T,N>,std::array<T,N>> res;
+    std::get<0>(res) = std::get<0>(A) * std::get<0>(B);
+    std::get<1>(res) = std::get<1>(A) * std::get<1>(B);
+    std::get<2>(res) = std::get<2>(A) * std::get<2>(B);
+    return res;
+}
+
 inline std::vector<RegAS> operator-(const std::vector<RegAS> &A)
 {
     std::vector<RegAS> res;
@@ -564,9 +621,38 @@ inline std::array<RegBS,N> operator-(const std::array<RegBS,N> &A)
     return A;
 }
 
-template <typename T>
-inline std::tuple<value_t,value_t,value_t> combine(
-        const std::tuple<T,T,T> &A, const std::tuple<T,T,T> &B,
+template <typename S, size_t N>
+inline std::array<S,N> &operator+=(std::array<S,N> &A, const std::array<S,N> &B)
+{
+    for (size_t i=0;i<N;++i) {
+        A[i] += B[i];
+    }
+    return A;
+}
+
+template <typename S, size_t N>
+inline std::array<S,N> &operator-=(std::array<S,N> &A, const std::array<S,N> &B)
+{
+    for (size_t i=0;i<N;++i) {
+        A[i] -= B[i];
+    }
+    return A;
+}
+
+template <typename S, size_t N>
+inline std::array<S,N> &operator^=(std::array<S,N> &A, const std::array<S,N> &B)
+{
+    for (size_t i=0;i<N;++i) {
+        A[i] ^= B[i];
+    }
+    return A;
+}
+
+template <typename S, size_t N>
+inline std::tuple<std::array<value_t,N>,std::array<value_t,N>,std::array<value_t,N>>
+    combine(
+        const std::tuple<std::array<S,N>,std::array<S,N>,std::array<S,N>> &A,
+        const std::tuple<std::array<S,N>,std::array<S,N>,std::array<S,N>> &B,
         nbits_t nbits = VALUE_BITS) {
     return std::make_tuple(
         combine(std::get<0>(A), std::get<0>(B), nbits),
@@ -680,6 +766,25 @@ DEFAULT_IO(HalfTriple)
 // We don't need one for AndTriple because it's exactly the same type as
 // MultTriple
 
+// I/O for arrays
+template <typename T, typename S, size_t N>
+T& operator>>(T& is, std::array<S,N> &x)
+{
+    for (size_t i=0;i<N;++i) {
+        is >> x[i];
+    }
+    return is;
+}
+
+template <typename T, typename S, size_t N>
+T& operator<<(T& os, const std::array<S,N> &x)
+{
+    for (size_t i=0;i<N;++i) {
+        os << x[i];
+    }
+    return os;
+}
+
 // I/O for SelectTriples
 template <typename T, typename V>
 T& operator>>(T& is, SelectTriple<V> &x)
@@ -732,6 +837,36 @@ T& operator<<(T& os, const SelectTriple<V> &x)
 
 DEFAULT_TUPLE_IO(RegAS)
 DEFAULT_TUPLE_IO(RegXS)
+
+// And for pairs and triples of arrays
+
+template <typename T, typename S, size_t N>
+T& operator>>(T& is, std::tuple<std::array<S,N>, std::array<S,N>> &x)
+{
+    is >> std::get<0>(x) >> std::get<1>(x);
+    return is;
+}
+
+template <typename T, typename S, size_t N>
+T& operator<<(T& os, const std::tuple<std::array<S,N>, std::array<S,N>> &x)
+{
+    os << std::get<0>(x) << std::get<1>(x);
+    return os;
+}
+
+template <typename T, typename S, size_t N>
+T& operator>>(T& is, std::tuple<std::array<S,N>, std::array<S,N>, std::array<S,N>> &x)
+{
+    is >> std::get<0>(x) >> std::get<1>(x) >> std::get<2>(x);
+    return is;
+}
+
+template <typename T, typename S, size_t N>
+T& operator<<(T& os, const std::tuple<std::array<S,N>, std::array<S,N>, std::array<S,N>> &x)
+{
+    os << std::get<0>(x) << std::get<1>(x) << std::get<2>(x);
+    return os;
+}
 
 enum ProcessingMode {
     MODE_ONLINE,        // Online mode, after preprocessing has been done

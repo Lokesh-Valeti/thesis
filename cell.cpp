@@ -92,7 +92,8 @@ struct Cell {
     // the word with value 1.  This is used for ORAM reads, where the
     // same DPF is used for all the fields.
     template <nbits_t WIDTH>
-    inline void unit(const RDPF<WIDTH> &dpf, DPFnode leaf) {
+    inline void unit(const RDPF<WIDTH> &dpf,
+        typename RDPF<WIDTH>::LeafNode leaf) {
         key = dpf.unit_as(leaf);
         pointers = dpf.unit_bs(leaf);
         value = dpf.unit_bs(leaf);

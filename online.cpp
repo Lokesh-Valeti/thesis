@@ -220,13 +220,13 @@ static void rdpf_test(MPCIO &mpcio,
                         for (int i=0;i<2;++i) {
                             const RDPF<1> &dpf = dp.dpf[i];
                             for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                                DPFnode leaf = dpf.leaf(x, aes_ops);
+                                RDPF<1>::LeafNode leaf = dpf.leaf(x, aes_ops);
                                 RegBS ub = dpf.unit_bs(leaf);
                                 RegAS ua = dpf.unit_as(leaf);
-                                RegXS sx = dpf.scaled_xs(leaf);
-                                RegAS sa = dpf.scaled_as(leaf);
+                                RDPF<1>::RegXSW sx = dpf.scaled_xs(leaf);
+                                RDPF<1>::RegASW sa = dpf.scaled_as(leaf);
                                 printf("%04x %x %016lx %016lx %016lx\n", x,
-                                    ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                                    ub.bshare, ua.ashare, sx[0].xshare, sa[0].ashare);
                             }
                             printf("\n");
                         }
@@ -237,36 +237,36 @@ static void rdpf_test(MPCIO &mpcio,
                             RegXS peer_scaled_xor;
                             RegAS peer_scaled_sum;
                             if (tio.player() == 1) {
-                                tio.iostream_peer() << dpf.scaled_xor << dpf.scaled_sum;
+                                tio.iostream_peer() << dpf.li[0].scaled_xor[0] << dpf.li[0].scaled_sum[0];
                             } else {
                                 tio.iostream_peer() >> peer_scaled_xor >> peer_scaled_sum;
-                                peer_scaled_sum += dpf.scaled_sum;
-                                peer_scaled_xor ^= dpf.scaled_xor;
+                                peer_scaled_sum += dpf.li[0].scaled_sum[0];
+                                peer_scaled_xor ^= dpf.li[0].scaled_xor[0];
                             }
                             for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                                DPFnode leaf = dpf.leaf(x, aes_ops);
+                                RDPF<1>::LeafNode leaf = dpf.leaf(x, aes_ops);
                                 RegBS ub = dpf.unit_bs(leaf);
                                 RegAS ua = dpf.unit_as(leaf);
-                                RegXS sx = dpf.scaled_xs(leaf);
-                                RegAS sa = dpf.scaled_as(leaf);
+                                RDPF<1>::RegXSW sx = dpf.scaled_xs(leaf);
+                                RDPF<1>::RegASW sa = dpf.scaled_as(leaf);
                                 printf("%04x %x %016lx %016lx %016lx\n", x,
-                                    ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                                    ub.bshare, ua.ashare, sx[0].xshare, sa[0].ashare);
                                 if (tio.player() == 1) {
                                     tio.iostream_peer() << ub << ua << sx << sa;
                                 } else {
                                     RegBS peer_ub;
                                     RegAS peer_ua;
-                                    RegXS peer_sx;
-                                    RegAS peer_sa;
+                                    RDPF<1>::RegXSW peer_sx;
+                                    RDPF<1>::RegASW peer_sa;
                                     tio.iostream_peer() >> peer_ub >> peer_ua >>
                                         peer_sx >> peer_sa;
                                     ub ^= peer_ub;
                                     ua += peer_ua;
                                     sx ^= peer_sx;
                                     sa += peer_sa;
-                                    if (ub.bshare || ua.ashare || sx.xshare || sa.ashare) {
+                                    if (ub.bshare || ua.ashare || sx[0].xshare || sa[0].ashare) {
                                         printf("**** %x %016lx %016lx %016lx\n",
-                                            ub.bshare, ua.ashare, sx.xshare, sa.ashare);
+                                            ub.bshare, ua.ashare, sx[0].xshare, sa[0].ashare);
                                         printf("SCALE                   %016lx %016lx\n",
                                             peer_scaled_xor.xshare, peer_scaled_sum.ashare);
                                     }
@@ -304,14 +304,14 @@ static void rdpf_timing(MPCIO &mpcio,
                     for (int i=0;i<2;++i) {
                         RDPF<1> &dpf = dp.dpf[i];
                         dpf.expand(aes_ops);
-                        RegXS scaled_xor;
+                        RDPF<1>::RegXSW scaled_xor;
                         for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                            DPFnode leaf = dpf.leaf(x, aes_ops);
-                            RegXS sx = dpf.scaled_xs(leaf);
+                            RDPF<1>::LeafNode leaf = dpf.leaf(x, aes_ops);
+                            RDPF<1>::RegXSW sx = dpf.scaled_xs(leaf);
                             scaled_xor ^= sx;
                         }
-                        printf("%016lx\n%016lx\n", scaled_xor.xshare,
-                            dpf.scaled_xor.xshare);
+                        printf("%016lx\n%016lx\n", scaled_xor[0].xshare,
+                            dpf.li[0].scaled_xor[0].xshare);
                         printf("\n");
                     }
                 } else {
@@ -319,14 +319,14 @@ static void rdpf_timing(MPCIO &mpcio,
                     for (int i=0;i<3;++i) {
                         RDPF<1> &dpf = dt.dpf[i];
                         dpf.expand(aes_ops);
-                        RegXS scaled_xor;
+                        RDPF<1>::RegXSW scaled_xor;
                         for (address_t x=0;x<(address_t(1)<<depth);++x) {
-                            DPFnode leaf = dpf.leaf(x, aes_ops);
-                            RegXS sx = dpf.scaled_xs(leaf);
+                            RDPF<1>::LeafNode leaf = dpf.leaf(x, aes_ops);
+                            RDPF<1>::RegXSW sx = dpf.scaled_xs(leaf);
                             scaled_xor ^= sx;
                         }
-                        printf("%016lx\n%016lx\n", scaled_xor.xshare,
-                            dpf.scaled_xor.xshare);
+                        printf("%016lx\n%016lx\n", scaled_xor[0].xshare,
+                            dpf.li[0].scaled_xor[0].xshare);
                         printf("\n");
                     }
                 }
@@ -339,7 +339,7 @@ static void rdpf_timing(MPCIO &mpcio,
 static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
     address_t start, int num_threads)
 {
-    RegXS scaled_xor[num_threads];
+    RDPF<1>::RegXSW scaled_xor[num_threads];
     boost::asio::thread_pool pool(num_threads);
     address_t totsize = (address_t(1)<<dpf.depth());
     address_t threadstart = start;
@@ -351,12 +351,12 @@ static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
             [&mpcio, &dpf, &scaled_xor, thread_num, threadstart, threadsize] {
                 MPCTIO tio(mpcio, thread_num);
 //printf("Thread %d from %X for %X\n", thread_num, threadstart, threadsize);
-                RegXS local_xor;
+                RDPF<1>::RegXSW local_xor;
                 size_t local_aes_ops = 0;
                 auto ev = StreamEval(dpf, threadstart, 0, local_aes_ops);
                 for (address_t x=0;x<threadsize;++x) {
 //if (x%0x10000 == 0) printf("%d", thread_num);
-                    DPFnode leaf = ev.next();
+                    RDPF<1>::LeafNode leaf = ev.next();
                     local_xor ^= dpf.scaled_xs(leaf);
                 }
                 scaled_xor[thread_num] = local_xor;
@@ -366,11 +366,11 @@ static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
         threadstart = (threadstart + threadsize) % totsize;
     }
     pool.join();
-    RegXS res;
+    RDPF<1>::RegXSW res;
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         res ^= scaled_xor[thread_num];
     }
-    return res.xshare;
+    return res[0].xshare;
 }
 
 static void rdpfeval_timing(MPCIO &mpcio,
@@ -398,7 +398,7 @@ static void rdpfeval_timing(MPCIO &mpcio,
                 value_t scaled_xor =
                     parallel_streameval_rdpf(mpcio, dpf, start, num_threads);
                 printf("%016lx\n%016lx\n", scaled_xor,
-                    dpf.scaled_xor.xshare);
+                    dpf.li[0].scaled_xor[0].xshare);
                 printf("\n");
             }
         } else {
@@ -408,7 +408,7 @@ static void rdpfeval_timing(MPCIO &mpcio,
                 value_t scaled_xor =
                     parallel_streameval_rdpf(mpcio, dpf, start, num_threads);
                 printf("%016lx\n%016lx\n", scaled_xor,
-                    dpf.scaled_xor.xshare);
+                    dpf.li[0].scaled_xor[0].xshare);
                 printf("\n");
             }
         }
@@ -440,13 +440,13 @@ static void par_rdpfeval_timing(MPCIO &mpcio,
                 nbits_t depth = dpf.depth();
                 auto pe = ParallelEval(dpf, start, 0,
                     address_t(1)<<depth, num_threads, tio.aes_ops());
-                RegXS result, init;
+                RDPF<1>::RegXSW result, init;
                 result = pe.reduce(init, [&dpf] (int thread_num,
-                        address_t i, const RDPF<1>::node &leaf) {
+                        address_t i, const RDPF<1>::LeafNode &leaf) {
                     return dpf.scaled_xs(leaf);
                 });
-                printf("%016lx\n%016lx\n", result.xshare,
-                    dpf.scaled_xor.xshare);
+                printf("%016lx\n%016lx\n", result[0].xshare,
+                    dpf.li[0].scaled_xor[0].xshare);
                 printf("\n");
             }
         } else {
@@ -456,13 +456,13 @@ static void par_rdpfeval_timing(MPCIO &mpcio,
                 nbits_t depth = dpf.depth();
                 auto pe = ParallelEval(dpf, start, 0,
                     address_t(1)<<depth, num_threads, tio.aes_ops());
-                RegXS result, init;
+                RDPF<1>::RegXSW result, init;
                 result = pe.reduce(init, [&dpf] (int thread_num,
-                        address_t i, const RDPF<1>::node &leaf) {
+                        address_t i, const RDPF<1>::LeafNode &leaf) {
                     return dpf.scaled_xs(leaf);
                 });
-                printf("%016lx\n%016lx\n", result.xshare,
-                    dpf.scaled_xor.xshare);
+                printf("%016lx\n%016lx\n", result[0].xshare,
+                    dpf.li[0].scaled_xor[0].xshare);
                 printf("\n");
             }
         }
@@ -490,42 +490,42 @@ static void tupleeval_timing(MPCIO &mpcio,
         size_t &aes_ops = tio.aes_ops();
         if (tio.player() == 2) {
             RDPFPair<1> dp = tio.rdpfpair(yield, depth);
-            RegXS scaled_xor0, scaled_xor1;
+            RDPF<1>::RegXSW scaled_xor0, scaled_xor1;
             auto ev = StreamEval(dp, start, 0, aes_ops, false);
             for (address_t x=0;x<(address_t(1)<<depth);++x) {
                 auto [L0, L1] = ev.next();
-                RegXS sx0 = dp.dpf[0].scaled_xs(L0);
-                RegXS sx1 = dp.dpf[1].scaled_xs(L1);
+                RDPF<1>::RegXSW sx0 = dp.dpf[0].scaled_xs(L0);
+                RDPF<1>::RegXSW sx1 = dp.dpf[1].scaled_xs(L1);
                 scaled_xor0 ^= sx0;
                 scaled_xor1 ^= sx1;
             }
-            printf("%016lx\n%016lx\n", scaled_xor0.xshare,
-                dp.dpf[0].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", scaled_xor0[0].xshare,
+                dp.dpf[0].li[0].scaled_xor[0].xshare);
             printf("\n");
-            printf("%016lx\n%016lx\n", scaled_xor1.xshare,
-                dp.dpf[1].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", scaled_xor1[0].xshare,
+                dp.dpf[1].li[0].scaled_xor[0].xshare);
             printf("\n");
         } else {
             RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
-            RegXS scaled_xor0, scaled_xor1, scaled_xor2;
+            RDPF<1>::RegXSW scaled_xor0, scaled_xor1, scaled_xor2;
             auto ev = StreamEval(dt, start, 0, aes_ops, false);
             for (address_t x=0;x<(address_t(1)<<depth);++x) {
                 auto [L0, L1, L2] = ev.next();
-                RegXS sx0 = dt.dpf[0].scaled_xs(L0);
-                RegXS sx1 = dt.dpf[1].scaled_xs(L1);
-                RegXS sx2 = dt.dpf[2].scaled_xs(L2);
+                RDPF<1>::RegXSW sx0 = dt.dpf[0].scaled_xs(L0);
+                RDPF<1>::RegXSW sx1 = dt.dpf[1].scaled_xs(L1);
+                RDPF<1>::RegXSW sx2 = dt.dpf[2].scaled_xs(L2);
                 scaled_xor0 ^= sx0;
                 scaled_xor1 ^= sx1;
                 scaled_xor2 ^= sx2;
             }
-            printf("%016lx\n%016lx\n", scaled_xor0.xshare,
-                dt.dpf[0].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", scaled_xor0[0].xshare,
+                dt.dpf[0].li[0].scaled_xor[0].xshare);
             printf("\n");
-            printf("%016lx\n%016lx\n", scaled_xor1.xshare,
-                dt.dpf[1].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", scaled_xor1[0].xshare,
+                dt.dpf[1].li[0].scaled_xor[0].xshare);
             printf("\n");
-            printf("%016lx\n%016lx\n", scaled_xor2.xshare,
-                dt.dpf[2].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", scaled_xor2[0].xshare,
+                dt.dpf[2].li[0].scaled_xor[0].xshare);
             printf("\n");
         }
     });
@@ -554,40 +554,38 @@ static void par_tupleeval_timing(MPCIO &mpcio,
             RDPFPair<1> dp = tio.rdpfpair(yield, depth);
             auto pe = ParallelEval(dp, start, 0, address_t(1)<<depth,
                 num_threads, aes_ops);
-            using V = std::tuple<RegXS,RegXS>;
-            V result, init;
+            RDPFPair<1>::RegXSWP result, init;
             result = pe.reduce(init, [&dp] (int thread_num, address_t i,
-                    const RDPFPair<1>::node &leaf) {
-                std::tuple<RegXS,RegXS> scaled;
+                    const RDPFPair<1>::LeafNode &leaf) {
+                RDPFPair<1>::RegXSWP scaled;
                 dp.scaled(scaled, leaf);
                 return scaled;
             });
-            printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
-                dp.dpf[0].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", std::get<0>(result)[0].xshare,
+                dp.dpf[0].li[0].scaled_xor[0].xshare);
             printf("\n");
-            printf("%016lx\n%016lx\n", std::get<1>(result).xshare,
-                dp.dpf[1].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", std::get<1>(result)[0].xshare,
+                dp.dpf[1].li[0].scaled_xor[0].xshare);
             printf("\n");
         } else {
             RDPFTriple<1> dt = tio.rdpftriple(yield, depth);
             auto pe = ParallelEval(dt, start, 0, address_t(1)<<depth,
                 num_threads, aes_ops);
-            using V = std::tuple<RegXS,RegXS,RegXS>;
-            V result, init;
+            RDPFTriple<1>::RegXSWT result, init;
             result = pe.reduce(init, [&dt] (int thread_num, address_t i,
-                    const RDPFTriple<1>::node &leaf) {
-                std::tuple<RegXS,RegXS,RegXS> scaled;
+                    const RDPFTriple<1>::LeafNode &leaf) {
+                RDPFTriple<1>::RegXSWT scaled;
                 dt.scaled(scaled, leaf);
                 return scaled;
             });
-            printf("%016lx\n%016lx\n", std::get<0>(result).xshare,
-                dt.dpf[0].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", std::get<0>(result)[0].xshare,
+                dt.dpf[0].li[0].scaled_xor[0].xshare);
             printf("\n");
-            printf("%016lx\n%016lx\n", std::get<1>(result).xshare,
-                dt.dpf[1].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", std::get<1>(result)[0].xshare,
+                dt.dpf[1].li[0].scaled_xor[0].xshare);
             printf("\n");
-            printf("%016lx\n%016lx\n", std::get<2>(result).xshare,
-                dt.dpf[2].scaled_xor.xshare);
+            printf("%016lx\n%016lx\n", std::get<2>(result)[0].xshare,
+                dt.dpf[2].li[0].scaled_xor[0].xshare);
             printf("\n");
         }
     });

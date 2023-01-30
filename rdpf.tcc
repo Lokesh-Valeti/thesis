@@ -63,11 +63,11 @@ StreamEval<T>::StreamEval(const T &rdpf, address_t start,
 }
 
 template <typename T>
-typename T::node StreamEval<T>::next()
+typename T::LeafNode StreamEval<T>::next()
 {
     if (use_expansion && rdpf.has_expansion()) {
         // Just use the precomputed values
-        typename T::node leaf =
+        typename T::LeafNode leaf =
             rdpf.get_expansion(nextindex ^ counter_xor_offset);
         nextindex = (nextindex + 1) & indexmask;
         return leaf;
@@ -113,7 +113,7 @@ typename T::node StreamEval<T>::next()
         }
     }
     bool xor_offset_bit = counter_xor_offset & 1;
-    typename T::node leaf = rdpf.descend(path[depth-1], depth-1,
+    typename T::LeafNode leaf = rdpf.descend_to_leaf(path[depth-1], depth-1,
         (nextindex & 1) ^ xor_offset_bit, aes_ops);
     pathindex = nextindex;
     nextindex = (nextindex + 1) & indexmask;
@@ -161,7 +161,7 @@ inline V ParallelEval<T>::reduce(V init, W process)
                     xor_offset, local_aes_ops);
                 V accum = init;
                 for (address_t x=0;x<threadsize;++x) {
-                    typename T::node leaf = ev.next();
+                    typename T::LeafNode leaf = ev.next();
                     accum += process(thread_num,
                         (threadstart+x)&indexmask, leaf);
                 }
@@ -177,6 +177,28 @@ inline V ParallelEval<T>::reduce(V init, W process)
         aes_ops += thread_aes_ops[thread_num];
     }
     return total;
+}
+
+// Descend from a node at depth parentdepth to one of its leaf children
+// whichchild = 0: left child
+// whichchild = 1: right child
+//
+// Cost: 1 AES operation
+template <nbits_t WIDTH>
+inline typename RDPF<WIDTH>::LeafNode RDPF<WIDTH>::descend_to_leaf(
+    const DPFnode &parent, nbits_t parentdepth, bit_t whichchild,
+    size_t &aes_ops) const
+{
+    typename RDPF<WIDTH>::LeafNode prgout;
+    bool flag = get_lsb(parent);
+    prg(prgout[0], parent, whichchild, aes_ops);
+    if (flag) {
+        DPFnode CW = cw[parentdepth];
+        bit_t cfbit = !!(cfbits & (value_t(1)<<parentdepth));
+        DPFnode CWR = CW ^ lsb128_mask[cfbit];
+        prgout[0] ^= (whichchild ? CWR : CW);
+    }
+    return prgout;
 }
 
 // I/O for RDPFs
@@ -209,9 +231,13 @@ T& operator>>(T &is, RDPF<WIDTH> &rdpf)
     value_t cfbits = 0;
     is.read((char *)&cfbits, BITBYTES(depth));
     rdpf.cfbits = cfbits;
-    is.read((char *)&rdpf.unit_sum_inverse, sizeof(rdpf.unit_sum_inverse));
-    is.read((char *)&rdpf.scaled_sum, sizeof(rdpf.scaled_sum));
-    is.read((char *)&rdpf.scaled_xor, sizeof(rdpf.scaled_xor));
+    rdpf.li.resize(1);
+    is.read((char *)&rdpf.li[0].unit_sum_inverse,
+        sizeof(rdpf.li[0].unit_sum_inverse));
+    is.read((char *)&rdpf.li[0].scaled_sum,
+        sizeof(rdpf.li[0].scaled_sum));
+    is.read((char *)&rdpf.li[0].scaled_xor,
+        sizeof(rdpf.li[0].scaled_xor));
 
     return is;
 }
@@ -242,9 +268,12 @@ T& write_maybe_expanded(T &os, const RDPF<WIDTH> &rdpf,
             sizeof(rdpf.expansion[0])<<depth);
     }
     os.write((const char *)&rdpf.cfbits, BITBYTES(depth));
-    os.write((const char *)&rdpf.unit_sum_inverse, sizeof(rdpf.unit_sum_inverse));
-    os.write((const char *)&rdpf.scaled_sum, sizeof(rdpf.scaled_sum));
-    os.write((const char *)&rdpf.scaled_xor, sizeof(rdpf.scaled_xor));
+    os.write((const char *)&rdpf.li[0].unit_sum_inverse,
+        sizeof(rdpf.li[0].unit_sum_inverse));
+    os.write((const char *)&rdpf.li[0].scaled_sum,
+        sizeof(rdpf.li[0].scaled_sum));
+    os.write((const char *)&rdpf.li[0].scaled_xor,
+        sizeof(rdpf.li[0].scaled_xor));
 
     return os;
 }
@@ -332,6 +361,8 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
     DPFnode *nextlevel = new DPFnode[1];
     nextlevel[0] = seed;
 
+    li.resize(1);
+
     // Construct each intermediate level
     while(level < depth) {
         if (player < 2) {
@@ -339,7 +370,7 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
             curlevel = nextlevel;
             if (save_expansion && level == depth-1) {
                 expansion.resize(1<<depth);
-                nextlevel = expansion.data();
+                nextlevel = (DPFnode *)expansion.data();
             } else {
                 nextlevel = new DPFnode[1<<(level+1)];
             }
@@ -666,8 +697,8 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
                     low_sum = -low_sum;
                     high_sum = -high_sum;
                 }
-                scaled_sum.ashare = high_sum;
-                scaled_xor.xshare = high_xor;
+                li[0].scaled_sum[0].ashare = high_sum;
+                li[0].scaled_xor[0].xshare = high_xor;
                 // Exchange low_sum and add them up
                 tio.queue_peer(&low_sum, sizeof(low_sum));
                 yield();
@@ -676,7 +707,7 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
                 low_sum += peer_low_sum;
                 // The low_sum had better be odd
                 assert(low_sum & 1);
-                unit_sum_inverse = inverse_value_t(low_sum);
+                li[0].unit_sum_inverse = inverse_value_t(low_sum);
             }
             cw.push_back(CW);
         } else if (level == depth-1) {
@@ -694,7 +725,8 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
 
 // Get the leaf node for the given input
 template <nbits_t WIDTH>
-DPFnode RDPF<WIDTH>::leaf(address_t input, size_t &aes_ops) const
+typename RDPF<WIDTH>::LeafNode
+    RDPF<WIDTH>::leaf(address_t input, size_t &aes_ops) const
 {
     // If we have a precomputed expansion, just use it
     if (expansion.size()) {
@@ -707,7 +739,9 @@ DPFnode RDPF<WIDTH>::leaf(address_t input, size_t &aes_ops) const
         bit_t dir = !!(input & (address_t(1)<<(totdepth-d-1)));
         node = descend(node, d, dir, aes_ops);
     }
-    return node;
+    LeafNode ln;
+    ln[0] = node;
+    return ln;
 }
 
 // Expand the DPF if it's not already expanded
@@ -728,8 +762,8 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
     for (nbits_t i=1;i<depth;++i) {
         path[i] = descend(path[i-1], i-1, 0, aes_ops);
     }
-    expansion[index++] = descend(path[depth-1], depth-1, 0, aes_ops);
-    expansion[index++] = descend(path[depth-1], depth-1, 1, aes_ops);
+    expansion[index++][0] = descend(path[depth-1], depth-1, 0, aes_ops);
+    expansion[index++][0] = descend(path[depth-1], depth-1, 1, aes_ops);
     while(index < num_leaves) {
         // Invariant: lastindex and index will both be even, and
         // index=lastindex+2
@@ -749,8 +783,8 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
             path[i+1] = descend(path[i], i, 0, aes_ops);
         }
         lastindex = index;
-        expansion[index++] = descend(path[depth-1], depth-1, 0, aes_ops);
-        expansion[index++] = descend(path[depth-1], depth-1, 1, aes_ops);
+        expansion[index++][0] = descend(path[depth-1], depth-1, 0, aes_ops);
+        expansion[index++][0] = descend(path[depth-1], depth-1, 1, aes_ops);
     }
 
     delete[] path;
@@ -797,6 +831,20 @@ typename RDPFTriple<WIDTH>::node RDPFTriple<WIDTH>::descend(
 }
 
 template <nbits_t WIDTH>
+typename RDPFTriple<WIDTH>::LeafNode RDPFTriple<WIDTH>::descend_to_leaf(
+    const RDPFTriple<WIDTH>::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &aes_ops) const
+{
+    auto [P0, P1, P2] = parent;
+    typename RDPF<WIDTH>::LeafNode C0, C1, C2;
+    C0 = dpf[0].descend_to_leaf(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf[1].descend_to_leaf(P1, parentdepth, whichchild, aes_ops);
+    C2 = dpf[2].descend_to_leaf(P2, parentdepth, whichchild, aes_ops);
+    return std::make_tuple(C0,C1,C2);
+}
+
+template <nbits_t WIDTH>
 typename RDPFPair<WIDTH>::node RDPFPair<WIDTH>::descend(
     const RDPFPair<WIDTH>::node &parent,
     nbits_t parentdepth, bit_t whichchild,
@@ -806,5 +854,18 @@ typename RDPFPair<WIDTH>::node RDPFPair<WIDTH>::descend(
     DPFnode C0, C1;
     C0 = dpf[0].descend(P0, parentdepth, whichchild, aes_ops);
     C1 = dpf[1].descend(P1, parentdepth, whichchild, aes_ops);
+    return std::make_tuple(C0,C1);
+}
+
+template <nbits_t WIDTH>
+typename RDPFPair<WIDTH>::LeafNode RDPFPair<WIDTH>::descend_to_leaf(
+    const RDPFPair<WIDTH>::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &aes_ops) const
+{
+    auto [P0, P1] = parent;
+    typename RDPF<WIDTH>::LeafNode C0, C1;
+    C0 = dpf[0].descend_to_leaf(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf[1].descend_to_leaf(P1, parentdepth, whichchild, aes_ops);
     return std::make_tuple(C0,C1);
 }
