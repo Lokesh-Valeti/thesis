@@ -159,22 +159,50 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     }
                 } else if (type >= 0x01 && type <= 0x30) {
                     // RAM DPFs
-                    auto tripfile = ofiles.open("rdpf",
+                    assert(subtype >= 0x01 && subtype <= 0x05);
+                    char prefix[11];
+                    strcpy(prefix, "rdpf");
+                    if (subtype > 1) {
+                        sprintf(prefix+strlen(prefix), "%d_", subtype);
+                    }
+                    auto tripfile = ofiles.open(prefix,
                         mpcio.player, thread_num, type);
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&tio, &opts, tripfile, type](yield_t &yield) {
+                            [&tio, &opts, tripfile, type, subtype](yield_t &yield) {
                                 yield();
-                                RDPFTriple rdpftrip =
-                                    tio.rdpftriple(yield, type, opts.expand_rdpfs);
-printf("dep  = %d\n", type);
-printf("usi0 = %016lx\n", rdpftrip.dpf[0].li[0].unit_sum_inverse);
-printf("sxr0 = %016lx\n", rdpftrip.dpf[0].li[0].scaled_xor[0].xshare);
-printf("usi1 = %016lx\n", rdpftrip.dpf[1].li[0].unit_sum_inverse);
-printf("sxr1 = %016lx\n", rdpftrip.dpf[1].li[0].scaled_xor[0].xshare);
-printf("usi2 = %016lx\n", rdpftrip.dpf[2].li[0].unit_sum_inverse);
-printf("sxr2 = %016lx\n", rdpftrip.dpf[2].li[0].scaled_xor[0].xshare);
-                                tripfile.os() << rdpftrip;
+                                switch(subtype) {
+                                case 1: {
+                                    RDPFTriple<1> rdpftrip =
+                                        tio.rdpftriple<1>(yield, type, opts.expand_rdpfs);
+                                    tripfile.os() << rdpftrip;
+                                    break;
+                                }
+                                case 2: {
+                                    RDPFTriple<2> rdpftrip =
+                                        tio.rdpftriple<2>(yield, type, opts.expand_rdpfs);
+                                    tripfile.os() << rdpftrip;
+                                    break;
+                                }
+                                case 3: {
+                                    RDPFTriple<3> rdpftrip =
+                                        tio.rdpftriple<3>(yield, type, opts.expand_rdpfs);
+                                    tripfile.os() << rdpftrip;
+                                    break;
+                                }
+                                case 4: {
+                                    RDPFTriple<4> rdpftrip =
+                                        tio.rdpftriple<4>(yield, type, opts.expand_rdpfs);
+                                    tripfile.os() << rdpftrip;
+                                    break;
+                                }
+                                case 5: {
+                                    RDPFTriple<5> rdpftrip =
+                                        tio.rdpftriple<5>(yield, type, opts.expand_rdpfs);
+                                    tripfile.os() << rdpftrip;
+                                    break;
+                                }
+                                }
                             });
                     }
                 } else if (type == 0x40) {
@@ -328,12 +356,19 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                             });
                     }
                 } else if (type[0] == 'r') {
+                    char *widthstr = strchr(type, '.');
+                    unsigned char width = 1;
+                    if (widthstr) {
+                        *widthstr = '\0';
+                        ++widthstr;
+                        width = atoi(widthstr);
+                    }
                     int depth = atoi(type+1);
                     if (depth < 1 || depth > 48) {
                         std::cerr << "Invalid DPF depth\n";
                     } else {
                         unsigned char typetag = depth;
-                        unsigned char subtypetag = 0x01;
+                        unsigned char subtypetag = width;
                         stio.queue_p0(&typetag, 1);
                         stio.queue_p0(&subtypetag, 1);
                         stio.queue_p0(&num, 4);
@@ -341,24 +376,69 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                         stio.queue_p1(&subtypetag, 1);
                         stio.queue_p1(&num, 4);
 
-                        auto pairfile = ofiles.open("rdpf",
+                        char prefix[11];
+                        strcpy(prefix, "rdpf");
+                        if (width > 1) {
+                            sprintf(prefix+strlen(prefix), "%d_", width);
+                        }
+                        auto pairfile = ofiles.open(prefix,
                             mpcsrvio.player, thread_num, depth);
                         for (unsigned int i=0; i<num; ++i) {
                             coroutines.emplace_back(
-                                [&stio, &opts, pairfile, depth](yield_t &yield) {
+                                [&stio, &opts, pairfile, depth, width](yield_t &yield) {
                                     yield();
-                                    RDPFPair rdpfpair = stio.rdpfpair(yield, depth);
-printf("usi0 = %016lx\n", rdpfpair.dpf[0].li[0].unit_sum_inverse);
-printf("sxr0 = %016lx\n", rdpfpair.dpf[0].li[0].scaled_xor[0].xshare);
-printf("dep0 = %d\n", rdpfpair.dpf[0].depth());
-printf("usi1 = %016lx\n", rdpfpair.dpf[1].li[0].unit_sum_inverse);
-printf("sxr1 = %016lx\n", rdpfpair.dpf[1].li[0].scaled_xor[0].xshare);
-printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
-                                    if (opts.expand_rdpfs) {
-                                        rdpfpair.dpf[0].expand(stio.aes_ops());
-                                        rdpfpair.dpf[1].expand(stio.aes_ops());
+                                    switch (width) {
+                                    case 1: {
+                                        RDPFPair<1> rdpfpair =
+                                            stio.rdpfpair<1>(yield, depth);
+                                        if (opts.expand_rdpfs) {
+                                            rdpfpair.dpf[0].expand(stio.aes_ops());
+                                            rdpfpair.dpf[1].expand(stio.aes_ops());
+                                        }
+                                        pairfile.os() << rdpfpair;
+                                        break;
                                     }
-                                    pairfile.os() << rdpfpair;
+                                    case 2: {
+                                        RDPFPair<2> rdpfpair =
+                                            stio.rdpfpair<2>(yield, depth);
+                                        if (opts.expand_rdpfs) {
+                                            rdpfpair.dpf[0].expand(stio.aes_ops());
+                                            rdpfpair.dpf[1].expand(stio.aes_ops());
+                                        }
+                                        pairfile.os() << rdpfpair;
+                                        break;
+                                    }
+                                    case 3: {
+                                        RDPFPair<3> rdpfpair =
+                                            stio.rdpfpair<3>(yield, depth);
+                                        if (opts.expand_rdpfs) {
+                                            rdpfpair.dpf[0].expand(stio.aes_ops());
+                                            rdpfpair.dpf[1].expand(stio.aes_ops());
+                                        }
+                                        pairfile.os() << rdpfpair;
+                                        break;
+                                    }
+                                    case 4: {
+                                        RDPFPair<4> rdpfpair =
+                                            stio.rdpfpair<4>(yield, depth);
+                                        if (opts.expand_rdpfs) {
+                                            rdpfpair.dpf[0].expand(stio.aes_ops());
+                                            rdpfpair.dpf[1].expand(stio.aes_ops());
+                                        }
+                                        pairfile.os() << rdpfpair;
+                                        break;
+                                    }
+                                    case 5: {
+                                        RDPFPair<5> rdpfpair =
+                                            stio.rdpfpair<5>(yield, depth);
+                                        if (opts.expand_rdpfs) {
+                                            rdpfpair.dpf[0].expand(stio.aes_ops());
+                                            rdpfpair.dpf[1].expand(stio.aes_ops());
+                                        }
+                                        pairfile.os() << rdpfpair;
+                                        break;
+                                    }
+                                    }
                                 });
                         }
                     }

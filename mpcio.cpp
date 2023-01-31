@@ -241,7 +241,7 @@ static void rdpfstorage_init(TVA &storage, unsigned player,
     char prefix[11];
     strcpy(prefix, "rdpf");
     if (WIDTH > 1) {
-        sprintf(prefix+strlen(prefix), "_w%d", WIDTH);
+        sprintf(prefix+strlen(prefix), "%d_", WIDTH);
     }
     for (unsigned i=0; i<num_threads; ++i) {
         for (unsigned depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
