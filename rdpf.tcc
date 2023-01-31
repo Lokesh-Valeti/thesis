@@ -191,12 +191,16 @@ inline typename RDPF<WIDTH>::LeafNode RDPF<WIDTH>::descend_to_leaf(
 {
     typename RDPF<WIDTH>::LeafNode prgout;
     bool flag = get_lsb(parent);
-    prg(prgout[0], parent, whichchild, aes_ops);
+    prgleaf(prgout, parent, whichchild, aes_ops);
     if (flag) {
-        DPFnode CW = cw[parentdepth];
-        bit_t cfbit = !!(cfbits & (value_t(1)<<parentdepth));
-        DPFnode CWR = CW ^ lsb128_mask[cfbit];
-        prgout[0] ^= (whichchild ? CWR : CW);
+        LeafNode CW = li[0].leaf_cw;
+        LeafNode CWR = CW;
+        for (nbits_t j=0;j<LWIDTH;++j) {
+            bit_t cfbit = !!(leaf_cfbits[j] &
+                (value_t(1)<<(depth()-parentdepth)));
+            CWR[j] ^= lsb128_mask[cfbit];
+        }
+        prgout ^= (whichchild ? CWR : CW);
     }
     return prgout;
 }
