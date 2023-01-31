@@ -739,15 +739,13 @@ typename RDPF<WIDTH>::LeafNode
         return expansion[input];
     }
 
-    nbits_t totdepth = depth();
     DPFnode node = seed;
-    for (nbits_t d=0;d<totdepth;++d) {
-        bit_t dir = !!(input & (address_t(1)<<(totdepth-d-1)));
+    for (nbits_t d=0;d<curdepth-1;++d) {
+        bit_t dir = !!(input & (address_t(1)<<(curdepth-d-1)));
         node = descend(node, d, dir, aes_ops);
     }
-    LeafNode ln;
-    ln[0] = node;
-    return ln;
+    bit_t dir = (input & 1);
+    return descend_to_leaf(node, curdepth, dir, aes_ops);
 }
 
 // Expand the DPF if it's not already expanded
