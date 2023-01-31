@@ -77,6 +77,10 @@ void Openfiles::closeall()
 //   0x8f: Set number of CPU threads for this communication thread
 //   0x00: End of preprocessing
 //
+// One byte: subtype (not sent for type == 0x00)
+//   For RAM DPFs, the subtype is the width (0x01 to 0x05)
+//   Otherwise, it is 0x00
+//
 // Four bytes: number of objects of that type (not sent for type == 0x00)
 //
 // Then that number of objects
@@ -94,9 +98,11 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
             std::vector<coro_t> coroutines;
             while(1) {
                 unsigned char type = 0;
+                unsigned char subtype = 0;
                 unsigned int num = 0;
                 size_t res = tio.recv_server(&type, 1);
                 if (res < 1 || type == 0) break;
+                tio.recv_server(&subtype, 1);
                 tio.recv_server(&num, 4);
                 if (type == 0x80) {
                     // Multiplication triples
@@ -255,9 +261,12 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                 char *type = arg;
                 if (!strcmp(type, "m")) {
                     unsigned char typetag = 0x80;
+                    unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&subtypetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&subtypetag, 1);
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
@@ -269,9 +278,12 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     }
                 } else if (!strcmp(type, "h")) {
                     unsigned char typetag = 0x81;
+                    unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&subtypetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&subtypetag, 1);
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
@@ -283,9 +295,12 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     }
                 } else if (!strcmp(type, "a")) {
                     unsigned char typetag = 0x82;
+                    unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&subtypetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&subtypetag, 1);
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
@@ -297,9 +312,12 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                     }
                 } else if (!strcmp(type, "s")) {
                     unsigned char typetag = 0x83;
+                    unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&subtypetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&subtypetag, 1);
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
@@ -315,9 +333,12 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                         std::cerr << "Invalid DPF depth\n";
                     } else {
                         unsigned char typetag = depth;
+                        unsigned char subtypetag = 0x01;
                         stio.queue_p0(&typetag, 1);
+                        stio.queue_p0(&subtypetag, 1);
                         stio.queue_p0(&num, 4);
                         stio.queue_p1(&typetag, 1);
+                        stio.queue_p1(&subtypetag, 1);
                         stio.queue_p1(&num, 4);
 
                         auto pairfile = ofiles.open("rdpf",
@@ -343,9 +364,12 @@ printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
                     }
                 } else if (!strcmp(type, "c")) {
                     unsigned char typetag = 0x40;
+                    unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&subtypetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&subtypetag, 1);
                     stio.queue_p1(&num, 4);
 
                     for (unsigned int i=0; i<num; ++i) {
@@ -357,9 +381,12 @@ printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
                     }
                 } else if (!strcmp(type, "i")) {
                     unsigned char typetag = 0x8e;
+                    unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&subtypetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&subtypetag, 1);
                     stio.queue_p1(&num, 4);
 
                     coroutines.emplace_back(
@@ -383,9 +410,12 @@ printf("dep1 = %d\n", rdpfpair.dpf[1].depth());
 
                 } else if (!strcmp(type, "p")) {
                     unsigned char typetag = 0x8f;
+                    unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
+                    stio.queue_p0(&subtypetag, 1);
                     stio.queue_p0(&num, 4);
                     stio.queue_p1(&typetag, 1);
+                    stio.queue_p1(&subtypetag, 1);
                     stio.queue_p1(&num, 4);
 
                     stio.cpu_nthreads(num);
