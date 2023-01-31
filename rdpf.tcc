@@ -218,9 +218,11 @@ T& operator>>(T &is, RDPF<WIDTH> &rdpf)
         read_expanded = true;
         depth -= 64;
     }
+    rdpf.maxdepth = depth;
+    rdpf.curdepth = depth;
     assert(depth <= ADDRESS_MAX_BITS);
     rdpf.cw.clear();
-    for (uint8_t i=0; i<depth; ++i) {
+    for (uint8_t i=0; i<depth-1; ++i) {
         DPFnode cw;
         is.read((char *)&cw, sizeof(cw));
         rdpf.cw.push_back(cw);
@@ -231,15 +233,23 @@ T& operator>>(T &is, RDPF<WIDTH> &rdpf)
             sizeof(rdpf.expansion[0])<<depth);
     }
     value_t cfbits = 0;
-    is.read((char *)&cfbits, BITBYTES(depth));
+    is.read((char *)&cfbits, BITBYTES(depth-1));
     rdpf.cfbits = cfbits;
-    rdpf.li.resize(1);
-    is.read((char *)&rdpf.li[0].unit_sum_inverse,
-        sizeof(rdpf.li[0].unit_sum_inverse));
-    is.read((char *)&rdpf.li[0].scaled_sum,
-        sizeof(rdpf.li[0].scaled_sum));
-    is.read((char *)&rdpf.li[0].scaled_xor,
-        sizeof(rdpf.li[0].scaled_xor));
+    nbits_t num_leaflevels = 1;
+    value_t leaf_cfbits = 0;
+    is.read((char *)&leaf_cfbits, BITBYTES(num_leaflevels));
+    rdpf.leaf_cfbits = leaf_cfbits;
+    rdpf.li.resize(num_leaflevels);
+    for (nbits_t i=0; i<num_leaflevels; ++i) {
+        is.read((char *)&rdpf.li[i].leaf_cw,
+            sizeof(rdpf.li[i].leaf_cw));
+        is.read((char *)&rdpf.li[i].unit_sum_inverse,
+            sizeof(rdpf.li[i].unit_sum_inverse));
+        is.read((char *)&rdpf.li[i].scaled_sum,
+            sizeof(rdpf.li[i].scaled_sum));
+        is.read((char *)&rdpf.li[i].scaled_xor,
+            sizeof(rdpf.li[i].scaled_xor));
+    }
 
     return is;
 }
@@ -252,7 +262,7 @@ T& write_maybe_expanded(T &os, const RDPF<WIDTH> &rdpf,
     bool expanded = true)
 {
     os.write((const char *)&rdpf.seed, sizeof(rdpf.seed));
-    uint8_t depth = rdpf.cw.size();
+    uint8_t depth = rdpf.maxdepth;
     assert(depth <= ADDRESS_MAX_BITS);
     // If we're writing an expansion, add 64 to depth
     uint8_t expanded_depth = depth;
@@ -262,20 +272,26 @@ T& write_maybe_expanded(T &os, const RDPF<WIDTH> &rdpf,
         expanded_depth += 64;
     }
     os.write((const char *)&expanded_depth, sizeof(expanded_depth));
-    for (uint8_t i=0; i<depth; ++i) {
+    for (uint8_t i=0; i<depth-1; ++i) {
         os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));
     }
     if (write_expansion) {
         os.write((const char *)rdpf.expansion.data(),
             sizeof(rdpf.expansion[0])<<depth);
     }
-    os.write((const char *)&rdpf.cfbits, BITBYTES(depth));
-    os.write((const char *)&rdpf.li[0].unit_sum_inverse,
-        sizeof(rdpf.li[0].unit_sum_inverse));
-    os.write((const char *)&rdpf.li[0].scaled_sum,
-        sizeof(rdpf.li[0].scaled_sum));
-    os.write((const char *)&rdpf.li[0].scaled_xor,
-        sizeof(rdpf.li[0].scaled_xor));
+    os.write((const char *)&rdpf.cfbits, BITBYTES(depth-1));
+    nbits_t num_leaflevels = 1;
+    os.write((const char *)&rdpf.leaf_cfbits, BITBYTES(num_leaflevels));
+    for (nbits_t i=0; i<num_leaflevels; ++i) {
+        os.write((const char *)&rdpf.li[i].leaf_cw,
+            sizeof(rdpf.li[i].leaf_cw));
+        os.write((const char *)&rdpf.li[i].unit_sum_inverse,
+            sizeof(rdpf.li[i].unit_sum_inverse));
+        os.write((const char *)&rdpf.li[i].scaled_sum,
+            sizeof(rdpf.li[i].scaled_sum));
+        os.write((const char *)&rdpf.li[i].scaled_xor,
+            sizeof(rdpf.li[i].scaled_xor));
+    }
 
     return os;
 }
