@@ -196,7 +196,7 @@ inline typename RDPF<WIDTH>::LeafNode RDPF<WIDTH>::descend_to_leaf(
         LeafNode CW = li[0].leaf_cw;
         LeafNode CWR = CW;
         bit_t cfbit = !!(leaf_cfbits &
-            (value_t(1)<<(maxdepth-parentdepth)));
+            (value_t(1)<<(maxdepth-parentdepth-1)));
         CWR[0] ^= lsb128_mask[cfbit];
         prgout ^= (whichchild ? CWR : CW);
     }
@@ -828,6 +828,7 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
     // Ensure the flag bits (the lsb of each node) are different
     seed = set_lsb(seed, !!player);
     cfbits = 0;
+    leaf_cfbits = 0;
     whichhalf = (player == 1);
     maxdepth = depth;
     curdepth = depth;
@@ -881,6 +882,7 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
             create_level(tio, yield, curlevel, leaflevel, player, level,
                 depth, bs_choice, CW, cfbit, save_expansion, li[0],
                 aes_ops);
+            leaf_cfbits |= (value_t(cfbit)<<(depth-level-1));
             li[0].leaf_cw = CW;
         }
 
@@ -910,7 +912,7 @@ typename RDPF<WIDTH>::LeafNode
         node = descend(node, d, dir, aes_ops);
     }
     bit_t dir = (input & 1);
-    return descend_to_leaf(node, curdepth, dir, aes_ops);
+    return descend_to_leaf(node, curdepth-1, dir, aes_ops);
 }
 
 // Expand the DPF if it's not already expanded
