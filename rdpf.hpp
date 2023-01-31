@@ -45,6 +45,7 @@ struct RDPF : public DPF {
     // one leaf level (at the bottom), but incremental RDPFs have a leaf
     // level for each level of the DPF.
     struct LeafInfo {
+        static const nbits_t W = WIDTH;
         // The correction word for this leaf level
         LeafNode leaf_cw;
         // The amount we have to scale the low words of the leaf values by
@@ -153,7 +154,7 @@ struct RDPF : public DPF {
         value_t highword =
             value_t(_mm_cvtsi128_si64x(_mm_srli_si128(leaf[0],8)));
         x[j++].xshare = highword;
-        for (nbits_t i=1;i<WIDTH;++i) {
+        for (nbits_t i=1;i<LWIDTH;++i) {
             value_t lowword =
                 value_t(_mm_cvtsi128_si64x(leaf[i]));
             value_t highword =

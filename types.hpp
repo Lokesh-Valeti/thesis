@@ -8,6 +8,8 @@
 #include <x86intrin.h>  // SSE and AVX intrinsics
 #include <bsd/stdlib.h> // arc4random_buf
 
+#include "bitutils.hpp"
+
 // The number of bits in an MPC secret-shared memory word
 
 #ifndef VALUE_BITS
@@ -648,6 +650,14 @@ inline std::array<S,N> &operator^=(std::array<S,N> &A, const std::array<S,N> &B)
     return A;
 }
 
+// XOR the bit B into the low bit of A
+template <typename S, size_t N>
+inline std::array<S,N> &xor_lsb(std::array<S,N> &A, bit_t B)
+{
+    A[0] ^= lsb128_mask[B];
+    return A;
+}
+
 template <typename S, size_t N>
 inline std::tuple<std::array<value_t,N>,std::array<value_t,N>,std::array<value_t,N>>
     combine(
@@ -712,6 +722,13 @@ struct AndTripleName { static constexpr const char *name = "a"; };
 // the security parameter, and at least twice as many bits as value_t.
 
 using DPFnode = __m128i;
+
+// XOR the bit B into the low bit of A
+inline DPFnode &xor_lsb(DPFnode &A, bit_t B)
+{
+    A ^= lsb128_mask[B];
+    return A;
+}
 
 // A Select triple for type V (V is DPFnode, value_t, or bit_t) is a
 // triple of (X0,Y0,Z0) where X0 is a bit and Y0 and Z0 are Vs held by

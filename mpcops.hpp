@@ -110,6 +110,17 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
 void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
     DPFnode &z, RegBS f, DPFnode x, DPFnode y);
 
+// As above, but for arrays of DPFnode
+//
+// Cost:
+// 6*LWIDTH 64-bit words sent in 2 messages
+// consumes LWIDTH AndTriples
+template <size_t LWIDTH>
+void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
+    std::array<DPFnode,LWIDTH> &z, RegBS f,
+    const std::array<DPFnode,LWIDTH> &x,
+    const std::array<DPFnode,LWIDTH> &y);
+
 // P0 and P1 hold bit shares of x and y.  Set z to bit shares of x & y.
 //
 // Cost:
@@ -125,5 +136,7 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
 // consumes 1/64 AndTriple
 void mpc_or(MPCTIO &tio, yield_t &yield,
     RegBS &z, RegBS x, RegBS y);
+
+#include "mpcops.tcc"
 
 #endif

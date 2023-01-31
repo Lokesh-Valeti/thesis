@@ -191,7 +191,7 @@ inline typename RDPF<WIDTH>::LeafNode RDPF<WIDTH>::descend_to_leaf(
 {
     typename RDPF<WIDTH>::LeafNode prgout;
     bool flag = get_lsb(parent);
-    prgleaf(prgout, parent, whichchild, aes_ops);
+    prg(prgout, parent, whichchild, aes_ops);
     if (flag) {
         LeafNode CW = li[0].leaf_cw;
         LeafNode CWR = CW;
@@ -335,6 +335,463 @@ T& operator>>(T &is, RDPFPair<WIDTH> &rdpfpair)
     return is;
 }
 
+// Set a DPFnode to zero
+static inline void zero(DPFnode &z)
+{
+    z = _mm_setzero_si128();
+}
+
+// Set a LeafNode to zero
+template <size_t LWIDTH>
+static inline void zero(std::array<DPFnode,LWIDTH> &z)
+{
+    for (size_t j=0;j<LWIDTH;++j) {
+        zero(z[j]);
+    }
+}
+
+// Set an array of value_r to zero
+template <size_t WIDTH>
+static inline void zero(std::array<value_t,WIDTH> &z)
+{
+    for (size_t j=0;j<WIDTH;++j) {
+        z[j] = 0;
+    }
+}
+
+
+// Expand a level of the RDPF into the next level without threads. This
+// just computes the PRGs without computing or applying the correction
+// words.  L and R will be set to the XORs of the left children and the
+// XORs of the right children respectively. NT will be LeafNode if we
+// are expanding into a leaf level, DPFnode if not.
+template <typename NT>
+static inline void expand_level_nothreads(size_t start, size_t end,
+    const DPFnode *curlevel, NT *nextlevel, NT &L, NT &R,
+    size_t &aes_ops)
+{
+    // Only touch registers in the inner loop if possible
+    NT lL, lR;
+    zero(lL);
+    zero(lR);
+    size_t laes_ops = 0;
+    for(size_t i=start;i<end;++i) {
+        NT lchild, rchild;
+        prgboth(lchild, rchild, curlevel[i], laes_ops);
+        lL ^= lchild;
+        lR ^= rchild;
+        nextlevel[2*i] = lchild;
+        nextlevel[2*i+1] = rchild;
+    }
+    L = lL;
+    R = lR;
+    aes_ops += laes_ops;
+}
+
+// As above, but possibly use threads, based on the RDPF_MTGEN_TIMING_1
+// timing benchmarks
+template <typename NT>
+static inline void expand_level(int max_nthreads, nbits_t level,
+    const DPFnode *curlevel, NT *nextlevel, NT &L, NT &R,
+    size_t &aes_ops)
+{
+    size_t curlevel_size = (size_t(1)<<level);
+    if (max_nthreads == 1 || level < 19) {
+        // No threading
+        expand_level_nothreads(0, curlevel_size,
+            curlevel, nextlevel, L, R, aes_ops);
+    } else {
+        int nthreads =
+            int(ceil(sqrt(double(curlevel_size/6000))));
+        if (nthreads > max_nthreads) {
+            nthreads = max_nthreads;
+        }
+        NT tL[nthreads];
+        NT tR[nthreads];
+        size_t taes_ops[nthreads];
+        size_t threadstart = 0;
+        size_t threadchunk = curlevel_size / nthreads;
+        size_t threadextra = curlevel_size % nthreads;
+        boost::asio::thread_pool pool(nthreads);
+        for (int t=0;t<nthreads;++t) {
+            size_t threadsize = threadchunk + (size_t(t) < threadextra);
+            size_t threadend = threadstart + threadsize;
+            taes_ops[t] = 0;
+            boost::asio::post(pool,
+                [t, &tL, &tR, &taes_ops, threadstart, threadend,
+                &curlevel, &nextlevel] {
+                    expand_level_nothreads(threadstart, threadend,
+                        curlevel, nextlevel, tL[t], tR[t], taes_ops[t]);
+                });
+            threadstart = threadend;
+        }
+        pool.join();
+        // Again work on registers as much as possible
+        NT lL, lR;
+        zero(lL);
+        zero(lR);
+        size_t laes_ops = 0;
+        for (int t=0;t<nthreads;++t) {
+            lL ^= tL[t];
+            lR ^= tR[t];
+            laes_ops += taes_ops[t];
+        }
+        L = lL;
+        R = lR;
+        aes_ops += laes_ops;
+    }
+}
+
+// Apply the correction words to an expanded non-leaf level (nextlevel),
+// based on the flag bits in curlevel. This version does not use
+// threads.
+static inline void finalize_nonleaf_layer_nothreads(size_t start,
+    size_t end, const DPFnode *curlevel, DPFnode *nextlevel,
+    DPFnode CWL, DPFnode CWR)
+{
+    for(size_t i=start;i<end;++i) {
+        bool flag = get_lsb(curlevel[i]);
+        nextlevel[2*i] = xor_if(nextlevel[2*i], CWL, flag);
+        nextlevel[2*i+1] = xor_if(nextlevel[2*i+1], CWR, flag);
+    }
+}
+
+// As above, but possibly use threads, based on the RDPF_MTGEN_TIMING_1
+// timing benchmarks.  The timing of each iteration of the inner loop is
+// comparable to the above, so just use the same computations.  All of
+// this could be tuned, of course.
+static inline void finalize_nonleaf_layer(int max_nthreads, nbits_t level,
+    const DPFnode *curlevel, DPFnode *nextlevel, DPFnode CWL,
+    DPFnode CWR)
+{
+    size_t curlevel_size = (size_t(1)<<level);
+    if (max_nthreads == 1 || level < 19) {
+        // No threading
+        finalize_nonleaf_layer_nothreads(0, curlevel_size,
+            curlevel, nextlevel, CWL, CWR);
+    } else {
+        int nthreads =
+            int(ceil(sqrt(double(curlevel_size/6000))));
+        if (nthreads > max_nthreads) {
+            nthreads = max_nthreads;
+        }
+        size_t threadstart = 0;
+        size_t threadchunk = curlevel_size / nthreads;
+        size_t threadextra = curlevel_size % nthreads;
+        boost::asio::thread_pool pool(nthreads);
+        for (int t=0;t<nthreads;++t) {
+            size_t threadsize = threadchunk + (size_t(t) < threadextra);
+            size_t threadend = threadstart + threadsize;
+            boost::asio::post(pool,
+                [threadstart, threadend, CWL, CWR,
+                &curlevel, &nextlevel] {
+                    finalize_nonleaf_layer_nothreads(threadstart, threadend,
+                        curlevel, nextlevel, CWL, CWR);
+                });
+            threadstart = threadend;
+        }
+        pool.join();
+    }
+}
+
+// Finalize a leaf layer. This applies the correction words, and
+// computes the low and high sums and XORs.  This version does not use
+// threads.  You can pass save_expansion = false here if you don't need
+// to save the expansion.  LN is a LeafNode.
+template <size_t WIDTH, typename LN>
+static inline void finalize_leaf_layer_nothreads(size_t start,
+    size_t end, const DPFnode *curlevel, LN *nextlevel,
+    bool save_expansion, LN CWL, LN CWR, value_t &low_sum,
+    std::array<value_t,WIDTH> &high_sum,
+    std::array<value_t,WIDTH> &high_xor)
+{
+    value_t llow_sum = 0;
+    std::array<value_t,WIDTH> lhigh_sum;
+    std::array<value_t,WIDTH> lhigh_xor;
+    zero(lhigh_sum);
+    zero(lhigh_xor);
+    for(size_t i=start;i<end;++i) {
+        bool flag = get_lsb(curlevel[i]);
+        LN leftchild = xor_if(nextlevel[2*i], CWL, flag);
+        LN rightchild = xor_if(nextlevel[2*i+1], CWR, flag);
+        if (save_expansion) {
+            nextlevel[2*i] = leftchild;
+            nextlevel[2*i+1] = rightchild;
+        }
+        value_t leftlow = value_t(_mm_cvtsi128_si64x(leftchild[0]));
+        value_t rightlow = value_t(_mm_cvtsi128_si64x(rightchild[0]));
+        value_t lefthigh =
+            value_t(_mm_cvtsi128_si64x(_mm_srli_si128(leftchild[0],8)));
+        value_t righthigh =
+            value_t(_mm_cvtsi128_si64x(_mm_srli_si128(rightchild[0],8)));
+        llow_sum += (leftlow + rightlow);
+        lhigh_sum[0] += (lefthigh + righthigh);
+        lhigh_xor[0] ^= (lefthigh ^ righthigh);
+        size_t w = 0;
+        for (size_t j=1; j<WIDTH; j+=2) {
+            ++w;
+            value_t leftlow = value_t(_mm_cvtsi128_si64x(leftchild[w]));
+            value_t rightlow = value_t(_mm_cvtsi128_si64x(rightchild[w]));
+            value_t lefthigh =
+                value_t(_mm_cvtsi128_si64x(_mm_srli_si128(leftchild[w],8)));
+            value_t righthigh =
+                value_t(_mm_cvtsi128_si64x(_mm_srli_si128(rightchild[w],8)));
+            lhigh_sum[j] += (leftlow + rightlow);
+            lhigh_xor[j] ^= (leftlow ^ rightlow);
+            if (j+1 < WIDTH) {
+                lhigh_sum[j+1] += (lefthigh + righthigh);
+                lhigh_xor[j+1] ^= (lefthigh ^ righthigh);
+            }
+        }
+    }
+    low_sum = llow_sum;
+    high_sum = lhigh_sum;
+    high_xor = lhigh_xor;
+}
+
+// As above, but possibly use threads, based on the RDPF_MTGEN_TIMING_1
+// timing benchmarks.  The timing of each iteration of the inner loop is
+// comparable to the above, so just use the same computations.  All of
+// this could be tuned, of course.
+template <size_t WIDTH, typename LN>
+static inline void finalize_leaf_layer(int max_nthreads, nbits_t level,
+    const DPFnode *curlevel, LN *nextlevel, bool save_expansion,
+    LN CWL, LN CWR, value_t &low_sum,
+    std::array<value_t,WIDTH> &high_sum,
+    std::array<value_t,WIDTH> &high_xor)
+{
+    size_t curlevel_size = (size_t(1)<<level);
+    if (max_nthreads == 1 || level < 19) {
+        // No threading
+        finalize_leaf_layer_nothreads(0, curlevel_size,
+            curlevel, nextlevel, save_expansion, CWL, CWR,
+            low_sum, high_sum, high_xor);
+    } else {
+        int nthreads =
+            int(ceil(sqrt(double(curlevel_size/6000))));
+        if (nthreads > max_nthreads) {
+            nthreads = max_nthreads;
+        }
+        value_t tlow_sum[nthreads];
+        std::array<value_t,WIDTH> thigh_sum[nthreads];
+        std::array<value_t,WIDTH> thigh_xor[nthreads];
+        size_t threadstart = 0;
+        size_t threadchunk = curlevel_size / nthreads;
+        size_t threadextra = curlevel_size % nthreads;
+        boost::asio::thread_pool pool(nthreads);
+        for (int t=0;t<nthreads;++t) {
+            size_t threadsize = threadchunk + (size_t(t) < threadextra);
+            size_t threadend = threadstart + threadsize;
+            boost::asio::post(pool,
+                [t, &tlow_sum, &thigh_sum, &thigh_xor, threadstart, threadend,
+                &curlevel, &nextlevel, CWL, CWR, save_expansion] {
+                    finalize_leaf_layer_nothreads(threadstart, threadend,
+                        curlevel, nextlevel, save_expansion, CWL, CWR,
+                        tlow_sum[t], thigh_sum[t], thigh_xor[t]);
+                });
+            threadstart = threadend;
+        }
+        pool.join();
+        low_sum = 0;
+        zero(high_sum);
+        zero(high_xor);
+        for (int t=0;t<nthreads;++t) {
+            low_sum += tlow_sum[t];
+            high_sum += thigh_sum[t];
+            high_xor ^= thigh_xor[t];
+        }
+    }
+}
+
+
+
+// Create one level of the RDPF.  NT will be as above: LeafNode if we
+// are expanding into a leaf level, DPFnode if not.  LI will be LeafInfo
+// if we are expanding into a leaf level, and it is unused otherwise.
+template<typename NT, typename LI>
+static inline void create_level(MPCTIO &tio, yield_t &yield,
+    const DPFnode *curlevel, NT *nextlevel,
+    int player, nbits_t level, nbits_t depth, RegBS bs_choice, NT &CW,
+    bool &cfbit, bool save_expansion, LI &li, size_t &aes_ops)
+{
+    // tio.cpu_nthreads() is the maximum number of threads we
+    // have available.
+    int max_nthreads = tio.cpu_nthreads();
+
+    NT L, R;
+    zero(L);
+    zero(R);
+    // The server doesn't need to do this computation, but it does
+    // need to execute mpc_reconstruct_choice so that it sends
+    // the AndTriples at the appropriate time.
+    if (player < 2) {
+#ifdef RDPF_MTGEN_TIMING_1
+        if (player == 0) {
+            mtgen_timetest_1(level, 0, (1<<23)>>level, curlevel,
+                nextlevel, aes_ops);
+            size_t niters = 2048;
+            if (level > 8) niters = (1<<20)>>level;
+            for(int t=1;t<=8;++t) {
+                mtgen_timetest_1(level, t, niters, curlevel,
+                    nextlevel, aes_ops);
+            }
+            mtgen_timetest_1(level, 0, (1<<23)>>level, curlevel,
+                nextlevel, aes_ops);
+        }
+#endif
+        // Using the timing results gathered above, decide whether
+        // to multithread, and if so, how many threads to use.
+        expand_level(max_nthreads, level, curlevel, nextlevel,
+            L, R, aes_ops);
+    }
+
+    // If we're going left (bs_choice = 0), we want the correction
+    // word to be the XOR of our right side and our peer's right
+    // side; if bs_choice = 1, it should be the XOR or our left side
+    // and our peer's left side.
+
+    // We also have to ensure that the flag bits (the lsb) of the
+    // side that will end up the same be of course the same, but
+    // also that the flag bits (the lsb) of the side that will end
+    // up different _must_ be different.  That is, it's not enough
+    // for the nodes of the child selected by choice to be different
+    // as 128-bit values; they also have to be different in their
+    // lsb.
+
+    // This is where we make a small optimization over Appendix C of
+    // the Duoram paper: instead of keeping separate correction flag
+    // bits for the left and right children, we observe that the low
+    // bit of the overall correction word effectively serves as one
+    // of those bits, so we just need to store one extra bit per
+    // level, not two.  (We arbitrarily choose the one for the right
+    // child.)
+
+    // Note that the XOR of our left and right child before and
+    // after applying the correction word won't change, since the
+    // correction word is applied to either both children or
+    // neither, depending on the value of the parent's flag. So in
+    // particular, the XOR of the flag bits won't change, and if our
+    // children's flag's XOR equals our peer's children's flag's
+    // XOR, then we won't have different flag bits even for the
+    // children that have different 128-bit values.
+
+    // So we compute our_parity = lsb(L^R)^player, and we XOR that
+    // into the R value in the correction word computation.  At the
+    // same time, we exchange these parity values to compute the
+    // combined parity, which we store in the DPF.  Then when the
+    // DPF is evaluated, if the parent's flag is set, not only apply
+    // the correction work to both children, but also apply the
+    // (combined) parity bit to just the right child.  Then for
+    // unequal nodes (where the flag bit is different), exactly one
+    // of the four children (two for P0 and two for P1) will have
+    // the parity bit applied, which will set the XOR of the lsb of
+    // those four nodes to just L0^R0^L1^R1^our_parity^peer_parity
+    // = 1 because everything cancels out except player (for which
+    // one player is 0 and the other is 1).
+
+    bool our_parity_bit = get_lsb(L) ^ get_lsb(R) ^ !!player;
+    xor_lsb(R, our_parity_bit);
+
+    NT CWL;
+    bool peer_parity_bit;
+    // Exchange the parities and do mpc_reconstruct_choice at the
+    // same time (bundled into the same rounds)
+    run_coroutines(yield,
+        [&tio, &our_parity_bit, &peer_parity_bit](yield_t &yield) {
+            tio.queue_peer(&our_parity_bit, 1);
+            yield();
+            uint8_t peer_parity_byte;
+            tio.recv_peer(&peer_parity_byte, 1);
+            peer_parity_bit = peer_parity_byte & 1;
+        },
+        [&tio, &CWL, &L, &R, bs_choice](yield_t &yield) {
+            mpc_reconstruct_choice(tio, yield, CWL, bs_choice, R, L);
+        });
+    cfbit = our_parity_bit ^ peer_parity_bit;
+    CW = CWL;
+    NT CWR = CWL;
+    xor_lsb(CWR, cfbit);
+    if (player < 2) {
+        // The timing of each iteration of the inner loop is
+        // comparable to the above, so just use the same
+        // computations.  All of this could be tuned, of course.
+
+        if constexpr (std::is_same_v<NT, DPFnode>) {
+            finalize_nonleaf_layer(max_nthreads, level, curlevel,
+                nextlevel, CWL, CWR);
+        } else {
+            // Recall there are four potentially useful vectors that
+            // can come out of a DPF:
+            // - (single-bit) bitwise unit vector
+            // - additive-shared unit vector
+            // - XOR-shared scaled unit vector
+            // - additive-shared scaled unit vector
+            //
+            // (No single DPF should be used for both of the first
+            // two or both of the last two, though, since they're
+            // correlated; you _can_ use one of the first two and
+            // one of the last two.)
+            //
+            // For each 128-bit leaf, the low bit is the flag bit,
+            // and we're guaranteed that the flag bits (and indeed
+            // the whole 128-bit value) for P0 and P1 are the same
+            // for every leaf except the target, and that the flag
+            // bits definitely differ for the target (and the other
+            // 127 bits are independently random on each side).
+            //
+            // We divide the 128-bit leaf into a low 64-bit word and
+            // a high 64-bit word.  We use the low word for the unit
+            // vector and the high word for the scaled vector; this
+            // choice is not arbitrary: the flag bit in the low word
+            // means that the sum of all the low words (with P1's
+            // low words negated) across both P0 and P1 is
+            // definitely odd, so we can compute that sum's inverse
+            // mod 2^64, and store it now during precomputation.  At
+            // evaluation time for the additive-shared unit vector,
+            // we will output this global inverse times the low word
+            // of each leaf, which will make the sum of all of those
+            // values 1.  (This technique replaces the protocol in
+            // Appendix D of the Duoram paper.)
+            //
+            // For the scaled vector, we just have to compute shares
+            // of what the scaled vector is a sharing _of_, but
+            // that's just XORing or adding all of each party's
+            // local high words; no communication needed.
+
+            value_t low_sum;
+            const size_t WIDTH = LI::W;
+            std::array<value_t,WIDTH> high_sum;
+            std::array<value_t,WIDTH> high_xor;
+            finalize_leaf_layer(max_nthreads, level, curlevel,
+                nextlevel, save_expansion, CWL, CWR, low_sum, high_sum,
+                high_xor);
+
+            if (player == 1) {
+                low_sum = -low_sum;
+                for(size_t j=0; j<WIDTH; ++j) {
+                    high_sum[j] = -high_sum[j];
+                }
+            }
+            for(size_t j=0; j<WIDTH; ++j) {
+                li.scaled_sum[j].ashare = high_sum[j];
+                li.scaled_xor[j].xshare = high_xor[j];
+            }
+            // Exchange low_sum and add them up
+            tio.queue_peer(&low_sum, sizeof(low_sum));
+            yield();
+            value_t peer_low_sum;
+            tio.recv_peer(&peer_low_sum, sizeof(peer_low_sum));
+            low_sum += peer_low_sum;
+            // The low_sum had better be odd
+            assert(low_sum & 1);
+            li.unit_sum_inverse = inverse_value_t(low_sum);
+        }
+    } else if (level == depth-1) {
+        yield();
+    }
+}
+
+
 // Construct a DPF with the given (XOR-shared) target location, and
 // of the given depth, to be used for random-access memory reads and
 // writes.  The DPF is construction collaboratively by P0 and P1,
@@ -369,362 +826,56 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
 
     // Construct each intermediate level
     while(level < depth) {
+        LeafNode *leaflevel = NULL;
         if (player < 2) {
             delete[] curlevel;
             curlevel = nextlevel;
+            nextlevel = NULL;
             if (save_expansion && level == depth-1) {
                 expansion.resize(1<<depth);
-                nextlevel = (DPFnode *)expansion.data();
+                leaflevel = expansion.data();
+            } else if (level == depth-1) {
+                leaflevel = new LeafNode[1<<depth];
             } else {
                 nextlevel = new DPFnode[1<<(level+1)];
             }
         }
         // Invariant: curlevel has 2^level elements; nextlevel has
-        // 2^{level+1} elements
+        // 2^{level+1} DPFnode elements if we're not at the last level,
+        // and leaflevel has 2^{level+1} LeafNode elements if we are at
+        // a leaf level (the last level always, and all levels if we are
+        // making an incremental RDPF).
 
         // The bit-shared choice bit is bit (depth-level-1) of the
         // XOR-shared target index
         RegBS bs_choice = target.bit(depth-level-1);
-        size_t curlevel_size = (size_t(1)<<level);
-        DPFnode L = _mm_setzero_si128();
-        DPFnode R = _mm_setzero_si128();
-        // The server doesn't need to do this computation, but it does
-        // need to execute mpc_reconstruct_choice so that it sends
-        // the AndTriples at the appropriate time.
-        if (player < 2) {
-#ifdef RDPF_MTGEN_TIMING_1
-            if (player == 0) {
-                mtgen_timetest_1(level, 0, (1<<23)>>level, curlevel,
-                    nextlevel, aes_ops);
-                size_t niters = 2048;
-                if (level > 8) niters = (1<<20)>>level;
-                for(int t=1;t<=8;++t) {
-                    mtgen_timetest_1(level, t, niters, curlevel,
-                        nextlevel, aes_ops);
-                }
-                mtgen_timetest_1(level, 0, (1<<23)>>level, curlevel,
-                    nextlevel, aes_ops);
+        bool cfbit;
+
+        if (level < depth-1) {
+            DPFnode CW;
+            create_level(tio, yield, curlevel, nextlevel, player, level,
+                depth, bs_choice, CW, cfbit, save_expansion, li[0],
+                aes_ops);
+            cfbits |= (value_t(cfbit)<<level);
+            if (player < 2) {
+                cw.push_back(CW);
             }
-#endif
-            // Using the timing results gathered above, decide whether
-            // to multithread, and if so, how many threads to use.
-            // tio.cpu_nthreads() is the maximum number we have
-            // available.
-            int max_nthreads = tio.cpu_nthreads();
-            if (max_nthreads == 1 || level < 19) {
-                // No threading
-                size_t laes_ops = 0;
-                for(size_t i=0;i<curlevel_size;++i) {
-                    DPFnode lchild, rchild;
-                    prgboth(lchild, rchild, curlevel[i], laes_ops);
-                    L = (L ^ lchild);
-                    R = (R ^ rchild);
-                    nextlevel[2*i] = lchild;
-                    nextlevel[2*i+1] = rchild;
-                }
-                aes_ops += laes_ops;
-            } else {
-                size_t curlevel_size = size_t(1)<<level;
-                int nthreads =
-                    int(ceil(sqrt(double(curlevel_size/6000))));
-                if (nthreads > max_nthreads) {
-                    nthreads = max_nthreads;
-                }
-                DPFnode tL[nthreads];
-                DPFnode tR[nthreads];
-                size_t taes_ops[nthreads];
-                size_t threadstart = 0;
-                size_t threadchunk = curlevel_size / nthreads;
-                size_t threadextra = curlevel_size % nthreads;
-                boost::asio::thread_pool pool(nthreads);
-                for (int t=0;t<nthreads;++t) {
-                    size_t threadsize = threadchunk + (size_t(t) < threadextra);
-                    size_t threadend = threadstart + threadsize;
-                    boost::asio::post(pool,
-                        [t, &tL, &tR, &taes_ops, threadstart, threadend,
-                        &curlevel, &nextlevel] {
-                            DPFnode L = _mm_setzero_si128();
-                            DPFnode R = _mm_setzero_si128();
-                            size_t aes_ops = 0;
-                            for(size_t i=threadstart;i<threadend;++i) {
-                                DPFnode lchild, rchild;
-                                prgboth(lchild, rchild, curlevel[i], aes_ops);
-                                L = (L ^ lchild);
-                                R = (R ^ rchild);
-                                nextlevel[2*i] = lchild;
-                                nextlevel[2*i+1] = rchild;
-                            }
-                            tL[t] = L;
-                            tR[t] = R;
-                            taes_ops[t] = aes_ops;
-                        });
-                    threadstart = threadend;
-                }
-                pool.join();
-                for (int t=0;t<nthreads;++t) {
-                    L ^= tL[t];
-                    R ^= tR[t];
-                    aes_ops += taes_ops[t];
-                }
-            }
-        }
-        // If we're going left (bs_choice = 0), we want the correction
-        // word to be the XOR of our right side and our peer's right
-        // side; if bs_choice = 1, it should be the XOR or our left side
-        // and our peer's left side.
-
-        // We also have to ensure that the flag bits (the lsb) of the
-        // side that will end up the same be of course the same, but
-        // also that the flag bits (the lsb) of the side that will end
-        // up different _must_ be different.  That is, it's not enough
-        // for the nodes of the child selected by choice to be different
-        // as 128-bit values; they also have to be different in their
-        // lsb.
-
-        // This is where we make a small optimization over Appendix C of
-        // the Duoram paper: instead of keeping separate correction flag
-        // bits for the left and right children, we observe that the low
-        // bit of the overall correction word effectively serves as one
-        // of those bits, so we just need to store one extra bit per
-        // level, not two.  (We arbitrarily choose the one for the right
-        // child.)
-
-        // Note that the XOR of our left and right child before and
-        // after applying the correction word won't change, since the
-        // correction word is applied to either both children or
-        // neither, depending on the value of the parent's flag. So in
-        // particular, the XOR of the flag bits won't change, and if our
-        // children's flag's XOR equals our peer's children's flag's
-        // XOR, then we won't have different flag bits even for the
-        // children that have different 128-bit values.
-
-        // So we compute our_parity = lsb(L^R)^player, and we XOR that
-        // into the R value in the correction word computation.  At the
-        // same time, we exchange these parity values to compute the
-        // combined parity, which we store in the DPF.  Then when the
-        // DPF is evaluated, if the parent's flag is set, not only apply
-        // the correction work to both children, but also apply the
-        // (combined) parity bit to just the right child.  Then for
-        // unequal nodes (where the flag bit is different), exactly one
-        // of the four children (two for P0 and two for P1) will have
-        // the parity bit applied, which will set the XOR of the lsb of
-        // those four nodes to just L0^R0^L1^R1^our_parity^peer_parity
-        // = 1 because everything cancels out except player (for which
-        // one player is 0 and the other is 1).
-
-        bool our_parity_bit = get_lsb(L ^ R) ^ !!player;
-        DPFnode our_parity = lsb128_mask[our_parity_bit];
-
-        DPFnode CW;
-        bool peer_parity_bit;
-        // Exchange the parities and do mpc_reconstruct_choice at the
-        // same time (bundled into the same rounds)
-        run_coroutines(yield,
-            [this, &tio, &our_parity_bit, &peer_parity_bit](yield_t &yield) {
-                tio.queue_peer(&our_parity_bit, 1);
-                yield();
-                uint8_t peer_parity_byte;
-                tio.recv_peer(&peer_parity_byte, 1);
-                peer_parity_bit = peer_parity_byte & 1;
-            },
-            [this, &tio, &CW, &L, &R, &bs_choice, &our_parity](yield_t &yield) {
-                mpc_reconstruct_choice(tio, yield, CW, bs_choice,
-                    (R ^ our_parity), L);
-            });
-        bool parity_bit = our_parity_bit ^ peer_parity_bit;
-        cfbits |= (value_t(parity_bit)<<level);
-        DPFnode CWR = CW ^ lsb128_mask[parity_bit];
-        if (player < 2) {
-            // The timing of each iteration of the inner loop is
-            // comparable to the above, so just use the same
-            // computations.  All of this could be tuned, of course.
-
-            if (level < depth-1) {
-                // Using the timing results gathered above, decide whether
-                // to multithread, and if so, how many threads to use.
-                // tio.cpu_nthreads() is the maximum number we have
-                // available.
-                int max_nthreads = tio.cpu_nthreads();
-                if (max_nthreads == 1 || level < 19) {
-                    // No threading
-                    for(size_t i=0;i<curlevel_size;++i) {
-                        bool flag = get_lsb(curlevel[i]);
-                        nextlevel[2*i] = xor_if(nextlevel[2*i], CW, flag);
-                        nextlevel[2*i+1] = xor_if(nextlevel[2*i+1], CWR, flag);
-                    }
-                } else {
-                    int nthreads =
-                        int(ceil(sqrt(double(curlevel_size/6000))));
-                    if (nthreads > max_nthreads) {
-                        nthreads = max_nthreads;
-                    }
-                    size_t threadstart = 0;
-                    size_t threadchunk = curlevel_size / nthreads;
-                    size_t threadextra = curlevel_size % nthreads;
-                    boost::asio::thread_pool pool(nthreads);
-                    for (int t=0;t<nthreads;++t) {
-                        size_t threadsize = threadchunk + (size_t(t) < threadextra);
-                        size_t threadend = threadstart + threadsize;
-                        boost::asio::post(pool, [CW, CWR, threadstart, threadend,
-                            &curlevel, &nextlevel] {
-                                for(size_t i=threadstart;i<threadend;++i) {
-                                    bool flag = get_lsb(curlevel[i]);
-                                    nextlevel[2*i] = xor_if(nextlevel[2*i], CW, flag);
-                                    nextlevel[2*i+1] = xor_if(nextlevel[2*i+1], CWR, flag);
-                                }
-                        });
-                        threadstart = threadend;
-                    }
-                    pool.join();
-                }
-            } else {
-                // Recall there are four potentially useful vectors that
-                // can come out of a DPF:
-                // - (single-bit) bitwise unit vector
-                // - additive-shared unit vector
-                // - XOR-shared scaled unit vector
-                // - additive-shared scaled unit vector
-                //
-                // (No single DPF should be used for both of the first
-                // two or both of the last two, though, since they're
-                // correlated; you _can_ use one of the first two and
-                // one of the last two.)
-                //
-                // For each 128-bit leaf, the low bit is the flag bit,
-                // and we're guaranteed that the flag bits (and indeed
-                // the whole 128-bit value) for P0 and P1 are the same
-                // for every leaf except the target, and that the flag
-                // bits definitely differ for the target (and the other
-                // 127 bits are independently random on each side).
-                //
-                // We divide the 128-bit leaf into a low 64-bit word and
-                // a high 64-bit word.  We use the low word for the unit
-                // vector and the high word for the scaled vector; this
-                // choice is not arbitrary: the flag bit in the low word
-                // means that the sum of all the low words (with P1's
-                // low words negated) across both P0 and P1 is
-                // definitely odd, so we can compute that sum's inverse
-                // mod 2^64, and store it now during precomputation.  At
-                // evaluation time for the additive-shared unit vector,
-                // we will output this global inverse times the low word
-                // of each leaf, which will make the sum of all of those
-                // values 1.  (This technique replaces the protocol in
-                // Appendix D of the Duoram paper.)
-                //
-                // For the scaled vector, we just have to compute shares
-                // of what the scaled vector is a sharing _of_, but
-                // that's just XORing or adding all of each party's
-                // local high words; no communication needed.
-
-                value_t low_sum = 0;
-                value_t high_sum = 0;
-                value_t high_xor = 0;
-                // Using the timing results gathered above, decide whether
-                // to multithread, and if so, how many threads to use.
-                // tio.cpu_nthreads() is the maximum number we have
-                // available.
-                int max_nthreads = tio.cpu_nthreads();
-                if (max_nthreads == 1 || level < 19) {
-                    // No threading
-                    for(size_t i=0;i<curlevel_size;++i) {
-                        bool flag = get_lsb(curlevel[i]);
-                        DPFnode leftchild = xor_if(nextlevel[2*i], CW, flag);
-                        DPFnode rightchild = xor_if(nextlevel[2*i+1], CWR, flag);
-                        if (save_expansion) {
-                            nextlevel[2*i] = leftchild;
-                            nextlevel[2*i+1] = rightchild;
-                        }
-                        value_t leftlow = value_t(_mm_cvtsi128_si64x(leftchild));
-                        value_t rightlow = value_t(_mm_cvtsi128_si64x(rightchild));
-                        value_t lefthigh =
-                            value_t(_mm_cvtsi128_si64x(_mm_srli_si128(leftchild,8)));
-                        value_t righthigh =
-                            value_t(_mm_cvtsi128_si64x(_mm_srli_si128(rightchild,8)));
-                        low_sum += (leftlow + rightlow);
-                        high_sum += (lefthigh + righthigh);
-                        high_xor ^= (lefthigh ^ righthigh);
-                    }
-                } else {
-                    int nthreads =
-                        int(ceil(sqrt(double(curlevel_size/6000))));
-                    if (nthreads > max_nthreads) {
-                        nthreads = max_nthreads;
-                    }
-                    value_t tlow_sum[nthreads];
-                    value_t thigh_sum[nthreads];
-                    value_t thigh_xor[nthreads];
-                    size_t threadstart = 0;
-                    size_t threadchunk = curlevel_size / nthreads;
-                    size_t threadextra = curlevel_size % nthreads;
-                    boost::asio::thread_pool pool(nthreads);
-                    for (int t=0;t<nthreads;++t) {
-                        size_t threadsize = threadchunk + (size_t(t) < threadextra);
-                        size_t threadend = threadstart + threadsize;
-                        boost::asio::post(pool,
-                            [t, &tlow_sum, &thigh_sum, &thigh_xor, threadstart, threadend,
-                            &curlevel, &nextlevel, CW, CWR, save_expansion] {
-                                value_t low_sum = 0;
-                                value_t high_sum = 0;
-                                value_t high_xor = 0;
-                                for(size_t i=threadstart;i<threadend;++i) {
-                                    bool flag = get_lsb(curlevel[i]);
-                                    DPFnode leftchild = xor_if(nextlevel[2*i], CW, flag);
-                                    DPFnode rightchild = xor_if(nextlevel[2*i+1], CWR, flag);
-                                    if (save_expansion) {
-                                        nextlevel[2*i] = leftchild;
-                                        nextlevel[2*i+1] = rightchild;
-                                    }
-                                    value_t leftlow = value_t(_mm_cvtsi128_si64x(leftchild));
-                                    value_t rightlow = value_t(_mm_cvtsi128_si64x(rightchild));
-                                    value_t lefthigh =
-                                        value_t(_mm_cvtsi128_si64x(_mm_srli_si128(leftchild,8)));
-                                    value_t righthigh =
-                                        value_t(_mm_cvtsi128_si64x(_mm_srli_si128(rightchild,8)));
-                                    low_sum += (leftlow + rightlow);
-                                    high_sum += (lefthigh + righthigh);
-                                    high_xor ^= (lefthigh ^ righthigh);
-                                }
-                                tlow_sum[t] = low_sum;
-                                thigh_sum[t] = high_sum;
-                                thigh_xor[t] = high_xor;
-                            });
-                        threadstart = threadend;
-                    }
-                    pool.join();
-                    for (int t=0;t<nthreads;++t) {
-                        low_sum += tlow_sum[t];
-                        high_sum += thigh_sum[t];
-                        high_xor ^= thigh_xor[t];
-                    }
-                }
-                if (player == 1) {
-                    low_sum = -low_sum;
-                    high_sum = -high_sum;
-                }
-                li[0].scaled_sum[0].ashare = high_sum;
-                li[0].scaled_xor[0].xshare = high_xor;
-                // Exchange low_sum and add them up
-                tio.queue_peer(&low_sum, sizeof(low_sum));
-                yield();
-                value_t peer_low_sum;
-                tio.recv_peer(&peer_low_sum, sizeof(peer_low_sum));
-                low_sum += peer_low_sum;
-                // The low_sum had better be odd
-                assert(low_sum & 1);
-                li[0].unit_sum_inverse = inverse_value_t(low_sum);
-            }
-            cw.push_back(CW);
-        } else if (level == depth-1) {
-            yield();
+        } else {
+            LeafNode CW;
+            create_level(tio, yield, curlevel, leaflevel, player, level,
+                depth, bs_choice, CW, cfbit, save_expansion, li[0],
+                aes_ops);
+            li[0].leaf_cw = CW;
         }
 
+        if (!save_expansion) {
+            delete[] leaflevel;
+        }
         ++level;
     }
 
     delete[] curlevel;
-    if (!save_expansion || player == 2) {
-        delete[] nextlevel;
-    }
+    delete[] nextlevel;
 }
 
 // Get the leaf node for the given input

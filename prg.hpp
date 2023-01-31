@@ -50,7 +50,7 @@ static inline void prgboth(__m128i &left, __m128i &right, __m128i seed,
 // Compute one of the leaf children of node seed; whichchild=0 for
 // the left child, 1 for the right child
 template <size_t LWIDTH>
-static inline void prgleaf(std::array<__m128i,LWIDTH> &out,
+static inline void prg(std::array<__m128i,LWIDTH> &out,
     __m128i seed, bool whichchild, size_t &aes_ops)
 {
     __m128i in = set_lsb(seed, whichchild);
@@ -73,7 +73,7 @@ static inline void prgleaf(std::array<__m128i,LWIDTH> &out,
 
 // Compute both of the leaf children of node seed
 template <size_t LWIDTH>
-static inline void prgleafboth(std::array<__m128i,LWIDTH> &left,
+static inline void prgboth(std::array<__m128i,LWIDTH> &left,
     std::array<__m128i,LWIDTH> &right, __m128i seed, size_t &aes_ops)
 {
     __m128i inl = set_lsb(seed, 0);
