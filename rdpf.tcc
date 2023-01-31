@@ -195,11 +195,9 @@ inline typename RDPF<WIDTH>::LeafNode RDPF<WIDTH>::descend_to_leaf(
     if (flag) {
         LeafNode CW = li[0].leaf_cw;
         LeafNode CWR = CW;
-        for (nbits_t j=0;j<LWIDTH;++j) {
-            bit_t cfbit = !!(leaf_cfbits[j] &
-                (value_t(1)<<(maxdepth-parentdepth)));
-            CWR[j] ^= lsb128_mask[cfbit];
-        }
+        bit_t cfbit = !!(leaf_cfbits &
+            (value_t(1)<<(maxdepth-parentdepth)));
+        CWR[0] ^= lsb128_mask[cfbit];
         prgout ^= (whichchild ? CWR : CW);
     }
     return prgout;

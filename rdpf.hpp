@@ -75,12 +75,11 @@ struct RDPF : public DPF {
     // leaf_info[d-i].
     std::vector<LeafInfo> li;
 
-    // The leaf correction flag bits for the LWIDTH leaf words at each
-    // leaf level.  The bit for leaf word j of level i (for an
-    // incremental DPF of max depth m) is leaf_cfbits[j] & (1<<(m-i)).
-    // For a normal (not incremental) RDPF, it's the same, but therefore
-    // only the low bit of each of these LWIDTH words gets used.
-    std::array<value_t,LWIDTH> leaf_cfbits;
+    // The leaf correction flag bits for each leaf level.  The bit for
+    // level i (for an incremental DPF of max depth m) is leaf_cfbits &
+    // (1<<(m-i)).  For a normal (not incremental) RDPF, it's the same,
+    // but therefore only the low bit gets used.
+    value_t leaf_cfbits;
 
     // If we're saving the expansion, put it here
     std::vector<LeafNode> expansion;
