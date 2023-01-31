@@ -764,8 +764,8 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
     for (nbits_t i=1;i<depth;++i) {
         path[i] = descend(path[i-1], i-1, 0, aes_ops);
     }
-    expansion[index++][0] = descend(path[depth-1], depth-1, 0, aes_ops);
-    expansion[index++][0] = descend(path[depth-1], depth-1, 1, aes_ops);
+    expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
+    expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
     while(index < num_leaves) {
         // Invariant: lastindex and index will both be even, and
         // index=lastindex+2
@@ -785,8 +785,8 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
             path[i+1] = descend(path[i], i, 0, aes_ops);
         }
         lastindex = index;
-        expansion[index++][0] = descend(path[depth-1], depth-1, 0, aes_ops);
-        expansion[index++][0] = descend(path[depth-1], depth-1, 1, aes_ops);
+        expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
+        expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
     }
 
     delete[] path;
