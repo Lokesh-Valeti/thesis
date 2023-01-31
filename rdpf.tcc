@@ -197,7 +197,7 @@ inline typename RDPF<WIDTH>::LeafNode RDPF<WIDTH>::descend_to_leaf(
         LeafNode CWR = CW;
         for (nbits_t j=0;j<LWIDTH;++j) {
             bit_t cfbit = !!(leaf_cfbits[j] &
-                (value_t(1)<<(depth()-parentdepth)));
+                (value_t(1)<<(maxdepth-parentdepth)));
             CWR[j] ^= lsb128_mask[cfbit];
         }
         prgout ^= (whichchild ? CWR : CW);
@@ -358,6 +358,8 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
     seed = set_lsb(seed, !!player);
     cfbits = 0;
     whichhalf = (player == 1);
+    maxdepth = depth;
+    curdepth = depth;
 
     // The root level is just the seed
     nbits_t level = 0;

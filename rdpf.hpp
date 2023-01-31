@@ -60,6 +60,14 @@ struct RDPF : public DPF {
         LeafInfo() : unit_sum_inverse(0) {}
     };
 
+    // The depth of this RDPF.  If this is not an incremental DPF, then
+    // both the maximum depth and current depth are just the normal
+    // depth (specified at DPF creation time).  If this is an
+    // incremental DPF, then the maximum depth is the one specified at
+    // creation time, but the current depth will be between 1 and that
+    // value (inclusive).
+    nbits_t maxdepth, curdepth;
+
     // The LeafInfo for each leaf level.  Normal RDPFs only have one
     // leaf level, so this will be a vector of length 1.  Incremental
     // RDPFs will have one entry for each level in the DPF.  The entry
@@ -69,7 +77,7 @@ struct RDPF : public DPF {
 
     // The leaf correction flag bits for the LWIDTH leaf words at each
     // leaf level.  The bit for leaf word j of level i (for an
-    // incremental DPF of total depth d) is leaf_cfbits[j] & (1<<(d-i)).
+    // incremental DPF of max depth m) is leaf_cfbits[j] & (1<<(m-i)).
     // For a normal (not incremental) RDPF, it's the same, but therefore
     // only the low bit of each of these LWIDTH words gets used.
     std::array<value_t,LWIDTH> leaf_cfbits;
@@ -103,7 +111,7 @@ struct RDPF : public DPF {
     }
 
     // The depth
-    inline nbits_t depth() const { return cw.size(); }
+    inline nbits_t depth() const { return curdepth; }
 
     // Get the leaf node for the given input
     //
