@@ -210,7 +210,10 @@ struct RDPFTriple {
     template <typename T>
     using Triple = std::tuple<T, T, T>;
     template <typename T>
-    using WTriple = Triple<typename RDPF<WIDTH>::W<T>>;
+    using WTriple = std::tuple<
+        typename std::array<T,WIDTH>,
+        typename std::array<T,WIDTH>,
+        typename std::array<T,WIDTH> >;
 
     // The type of triples of nodes, LeafNodes, and the wide shared
     // register types
@@ -324,7 +327,9 @@ struct RDPFPair {
     template <typename T>
     using Pair = std::tuple<T, T>;
     template <typename T>
-    using WPair = Pair<typename RDPF<WIDTH>::W<T>>;
+    using WPair = std::tuple<
+        typename std::array<T,WIDTH>,
+        typename std::array<T,WIDTH> >;
 
     // The type of pairs of nodes, LeafNodes, and the wide shared
     // register types
