@@ -132,6 +132,18 @@ T& operator<<(T& os, const Node &x)
 
 DEFAULT_TUPLE_IO(Node)
 
+struct del_return {
+    // Flag to indicate if the key to delete was found in tree
+    RegBS F_f;
+    RegXS ret_ptr;
+    // Flag to indicate if the key this deletion requires a successor swap
+    RegBS F_ss;
+    // Pointers to node to delete and successor node that would replace
+    // deleted node
+    RegXS N_d;
+    RegXS N_s;
+};
+
 class BST {
   private: 
     Duoram<Node> *oram;
@@ -140,8 +152,14 @@ class BST {
     size_t num_items = 0;
     size_t MAX_SIZE;
 
-    std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr, const Node &new_node, Duoram<Node>::Flat &A, int TTL, RegBS isDummy);
+    std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
+        const Node &new_node, Duoram<Node>::Flat &A, int TTL, RegBS isDummy);
     void insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Flat &A);
+
+
+    int del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
+        Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL, 
+        del_return &ret_struct);
 
   public:
     BST(int num_players, size_t size) {
@@ -155,6 +173,7 @@ class BST {
 
     void initialize(int num_players, size_t size);
     void insert(MPCTIO &tio, yield_t &yield, Node &node);
+    int del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
 
     // Display and correctness check functions
     void pretty_print(MPCTIO &tio, yield_t &yield);
