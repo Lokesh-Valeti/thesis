@@ -17,7 +17,7 @@
 // it through a "Shape", such as Flat, Tree, Path, etc.  Shapes can be
 // nested, so you can have a Path of a Subtree of a Tree sitting on the
 // base Duoram.  Each Shape's parent must remain in scope (references to
-// it must remain valid) for the lifetime of the child Shapre.  Each
+// it must remain valid) for the lifetime of the child Shape.  Each
 // shape is bound to a context, which is a thread-specific MPCTIO and a
 // coroutine-specific yield_t.  If you launch new threads and/or
 // coroutines, you'll need to make a copy of the current Shape for your
