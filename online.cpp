@@ -26,8 +26,8 @@ static void online_test(MPCIO &mpcio,
     RegAS *A = new RegAS[as_memsize];
     RegXS *AX = new RegXS[xs_memsize];
     value_t V;
-    RegBS F0, F1;
-    RegBS FA, FO;
+    RegBS F0, F1, F2;
+    RegBS FA, FO, FS;
     RegXS X;
 
     if (!is_server) {
@@ -36,6 +36,7 @@ static void online_test(MPCIO &mpcio,
         F0.randomize();
         A[4].randomize();
         F1.randomize();
+        F2.randomize();
         A[6].randomize();
         A[7].randomize();
         X.randomize();
@@ -47,6 +48,7 @@ static void online_test(MPCIO &mpcio,
         printf("V  : %016lX\n", V);
         printf("F0 : %01X\n", F0.bshare);
         printf("F1 : %01X\n", F1.bshare);
+        printf("F2 : %01X\n", F2.bshare);
         printf("X  : %016lX\n", X.xshare);
     }
     std::vector<coro_t> coroutines;
@@ -75,12 +77,16 @@ static void online_test(MPCIO &mpcio,
             mpc_select(tio, yield, AX[2], F0, AX[0], AX[1], nbits);
         });
     coroutines.emplace_back(
-        [&tio, &FA, &F0, &F1, nbits](yield_t &yield) {
+        [&tio, &FA, &F0, &F1](yield_t &yield) {
             mpc_and(tio, yield, FA, F0, F1);
         });
     coroutines.emplace_back(
-        [&tio, &FO, &F0, &F1, nbits](yield_t &yield) {
+        [&tio, &FO, &F0, &F1](yield_t &yield) {
             mpc_or(tio, yield, FO, F0, F1);
+        });
+    coroutines.emplace_back(
+        [&tio, &FS, &F0, &F1, &F2](yield_t &yield) {
+            mpc_select(tio, yield, FS, F2, F0, F1);
         });
     run_coroutines(tio, coroutines);
     if (!is_server) {
@@ -96,43 +102,51 @@ static void online_test(MPCIO &mpcio,
         tio.queue_peer(&V, sizeof(V));
         tio.queue_peer(&F0, sizeof(RegBS));
         tio.queue_peer(&F1, sizeof(RegBS));
+        tio.queue_peer(&F2, sizeof(RegBS));
         tio.queue_peer(&FA, sizeof(RegBS));
         tio.queue_peer(&FO, sizeof(RegBS));
+        tio.queue_peer(&FS, sizeof(RegBS));
         tio.queue_peer(&X, sizeof(RegXS));
         tio.send();
     } else if (mpcio.player == 0) {
         RegAS *B = new RegAS[as_memsize];
         RegXS *BAX = new RegXS[xs_memsize];
-        RegBS BF0, BF1;
-        RegBS BFA, BFO;
+        RegBS BF0, BF1, BF2;
+        RegBS BFA, BFO, BFS;
         RegXS BX;
         value_t BV;
         value_t *S = new value_t[as_memsize];
         value_t *Y = new value_t[xs_memsize];
-        bit_t SF0, SF1;
-        bit_t SFA, SFO;
+        bit_t SF0, SF1, SF2;
+        bit_t SFA, SFO, SFS;
         value_t SX;
         tio.recv_peer(B, as_memsize*sizeof(RegAS));
         tio.recv_peer(BAX, xs_memsize*sizeof(RegXS));
         tio.recv_peer(&BV, sizeof(BV));
         tio.recv_peer(&BF0, sizeof(RegBS));
         tio.recv_peer(&BF1, sizeof(RegBS));
+        tio.recv_peer(&BF2, sizeof(RegBS));
         tio.recv_peer(&BFA, sizeof(RegBS));
         tio.recv_peer(&BFO, sizeof(RegBS));
+        tio.recv_peer(&BFS, sizeof(RegBS));
         tio.recv_peer(&BX, sizeof(RegXS));
         for(size_t i=0; i<as_memsize; ++i) S[i] = A[i].ashare+B[i].ashare;
         for(size_t i=0; i<xs_memsize; ++i) Y[i] = AX[i].xshare^BAX[i].xshare;
         SF0 = F0.bshare ^ BF0.bshare;
         SF1 = F1.bshare ^ BF1.bshare;
+        SF2 = F2.bshare ^ BF2.bshare;
         SFA = FA.bshare ^ BFA.bshare;
         SFO = FO.bshare ^ BFO.bshare;
+        SFS = FS.bshare ^ BFS.bshare;
         SX = X.xshare ^ BX.xshare;
         printf("S:\n"); for (size_t i=0; i<as_memsize; ++i) printf("%3lu: %016lX\n", i, S[i]);
         printf("Y:\n"); for (size_t i=0; i<xs_memsize; ++i) printf("%3lu: %016lX\n", i, Y[i]);
         printf("SF0: %01X\n", SF0);
         printf("SF1: %01X\n", SF1);
+        printf("SF2: %01X\n", SF2);
         printf("SFA: %01X\n", SFA);
         printf("SFO: %01X\n", SFO);
+        printf("SFS: %01X\n", SFS);
         printf("SX : %016lX\n", SX);
         printf("\n%016lx\n", S[0]*S[1]-S[2]);
         printf("%016lx\n", (V*BV)-S[3]);

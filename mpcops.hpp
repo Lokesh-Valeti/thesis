@@ -76,6 +76,16 @@ void mpc_select(MPCTIO &tio, yield_t &yield,
     RegXS &z, RegBS f, RegXS x, RegXS y,
     nbits_t nbits = VALUE_BITS);
 
+// P0 and P1 hold bit shares f0 and f1 of the single bit f, and bit
+// shares of the values x and y; compute bit shares of z, where
+// z = x if f=0 and z = y if f=1.
+//
+// Cost:
+// 1 byte sent in 1 message
+// consumes 1/64 AndTriple
+void mpc_select(MPCTIO &tio, yield_t &yield,
+    RegBS &z, RegBS f, RegBS x, RegBS y);
+
 // P0 and P1 hold bit shares f0 and f1 of the single bit f, and additive
 // shares of the values x and y. Obliviously swap x and y; that is,
 // replace x and y with new additive sharings of x and y respectively
