@@ -1249,5 +1249,10 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
         cell(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
+    } else if (!strcmp(*args, "heap")) {
+        ++args;
+        heap(mpcio, opts, args);
+    } else {
+        std::cerr << "Unknown mode " << *args << "\n";
     }
 }
