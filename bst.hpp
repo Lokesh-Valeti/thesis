@@ -85,7 +85,9 @@ struct Node {
     // Note that RegXS will extend a RegBS of 1 to the all-1s word, not
     // the word with value 1.  This is used for ORAM reads, where the
     // same DPF is used for all the fields.
-    inline void unit(const RDPF &dpf, DPFnode leaf) {
+    template <nbits_t WIDTH>
+    inline void unit(const RDPF<WIDTH> &dpf,
+        typename RDPF<WIDTH>::LeafNode leaf) {
         key = dpf.unit_as(leaf);
         pointers = dpf.unit_bs(leaf);
         value = dpf.unit_bs(leaf);
@@ -133,15 +135,15 @@ T& operator<<(T& os, const Node &x)
 DEFAULT_TUPLE_IO(Node)
 
 struct del_return {
-    // Flag to indicate if the key to delete was found in tree
-    RegBS F_f;
-    RegXS ret_ptr;
     // Flag to indicate if the key this deletion requires a successor swap
     RegBS F_ss;
     // Pointers to node to delete and successor node that would replace
     // deleted node
     RegXS N_d;
     RegXS N_s;
+    // Flag for updating child pointer with returned pointer
+    RegBS F_r;
+    RegXS ret_ptr;
 };
 
 class BST {
@@ -157,7 +159,7 @@ class BST {
     void insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Flat &A);
 
 
-    int del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
+    bool del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL, 
         del_return &ret_struct);
 
@@ -173,7 +175,7 @@ class BST {
 
     void initialize(int num_players, size_t size);
     void insert(MPCTIO &tio, yield_t &yield, Node &node);
-    int del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
+    bool del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
 
     // Display and correctness check functions
     void pretty_print(MPCTIO &tio, yield_t &yield);

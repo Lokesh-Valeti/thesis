@@ -87,24 +87,22 @@ void BST::pretty_print(const std::vector<Node> &R, value_t node,
 
 bool reconstruct_flag(MPCTIO &tio, yield_t &yield, RegBS flag) {
     RegBS peer_flag;
-    RegBS reconstructed_flag;
-    if (tio.player() == 1) {
-        tio.queue_peer(&flag, sizeof(flag));
-    } else {
-        RegBS peer_flag;
-        tio.recv_peer(&peer_flag, sizeof(peer_flag));
-        reconstructed_flag ^= peer_flag;
-    }
-
-    if (tio.player() == 0) {
-        tio.queue_peer(&flag, sizeof(flag));
-    } else {
-        RegBS peer_flag;
-        tio.recv_peer(&peer_flag, sizeof(peer_flag));
-        reconstructed_flag ^= peer_flag;
-    }
-    
+    RegBS reconstructed_flag = flag;
+    tio.queue_peer(&flag, 1);
+    yield();
+    tio.recv_peer(&peer_flag, 1);
+    reconstructed_flag ^= peer_flag;
+    //return 1;
+    /* 
+    //Opt 1:
+    if(reconstructed_flag.bshare)
+      return 1;
+    else
+      return 0;
+    */
+    //Opt 2:
     return reconstructed_flag.bshare;
+    
 }
 
 void BST::pretty_print(MPCTIO &tio, yield_t &yield) {
@@ -294,22 +292,22 @@ void mpc_or(MPCTIO &tio, yield_t &yield, RegBS &result, RegBS a, RegBS b) {
 }
 */
 
-int BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
+bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
      Duoram<Node>::Flat &A, RegBS af, RegBS fs, int TTL, 
     del_return &ret_struct) {
-
+    printf("TTL = %d\n", TTL);
     if(TTL==0) {
         //Reconstruct and return af
-        bool af = reconstruct_flag(tio, yield, af);
-        printf("Reconstructed flag = %d\n", af);
-        return af;
+        bool success = reconstruct_flag(tio, yield, af);
+        printf("Reconstructed flag = %d\n", success);
+        return success;
     } else {
         bool player0 = tio.player()==0;
         Node node = A[ptr];
         // Compare key
 
         CDPF cdpf = tio.cdpf(yield);
-        auto [lt, eq, gt] = cdpf.compare(tio, yield, node.key - del_key, tio.aes_ops());
+        auto [lt, eq, gt] = cdpf.compare(tio, yield, del_key - node.key, tio.aes_ops());
         // c is the direction bit for next_ptr 
         // (c=0: go left or c=1: go right)
         RegBS c = gt;
@@ -343,14 +341,14 @@ int BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         RegBS c_prime;
         // Case 1: found the node here (lf) or we are finding successor (fs)
         // and there is only one child. We traverse down the lone child path.
-        RegBS F_c11, F_c12, F_c2, F_c3;
+        RegBS F_c1a, F_c1b, F_c2, F_c3;
         // Case 1a: lf & F_1
-        mpc_and(tio, yield, F_c11, lf, F_1);
+        mpc_and(tio, yield, F_c1a, lf, F_1);
         // Case 1b: fs & F_1
-        mpc_and(tio, yield, F_c12, fs, F_1);
+        mpc_and(tio, yield, F_c1b, fs, F_1);
         // Set c_prime for Case 1a and 1b
-        mpc_select(tio, yield, c_prime, F_c1, c, l0);
-        mpc_select(tio, yield, c_prime, F_c2, c, l0);
+        mpc_select(tio, yield, c_prime, F_c1a, c, l0);
+        mpc_select(tio, yield, c_prime, F_c1b, c, l0);
 
         // s1: shares of 1 bit, s0: shares of 0 bit
         RegBS s1, s0;
@@ -372,25 +370,57 @@ int BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         RegBS af_prime, fs_prime;
         mpc_or(tio, yield, af_prime, af, lf);
 
+        //A[ptr].dump();
+        printf("af = %d, lf = %d\n", af.bshare, lf.bshare);
         // If in Case 2, set fs. We are now finding successor
         mpc_or(tio, yield, fs_prime, fs, F_c2); 
-        int key_found = del(tio, yield, next_ptr, del_key, A, af_prime, fs_prime, TTL-1, ret_struct);
+        bool key_found = del(tio, yield, next_ptr, del_key, A, af_prime, fs_prime, TTL-1, ret_struct);
 
         // If we didn't find the key, we can end here.
         if(!key_found)
           return 0;
 
-        // Update node.left and node.right with ret_struct.rptr and [c] as slct bit
+        printf("TTL = %d\n", TTL);
+        /*
+        RegBS F_rs;
+        // Flag here should be direction (c_prime) and F_r i.e. we need to swap return ptr in,
+        // F_r needs to be returned in ret_struct
+        mpc_and(tio, yield, F_rs, c_prime, ret_struct.F_r);
+        mpc_select(tio, yield, right, F_rs, right, ret_struct.ret_ptr);
+        if(player0)
+            c_prime^=1; 
+        mpc_and(tio, yield, F_rs, c_prime, ret_struct.F_r);
+        mpc_select(tio, yield, left, F_rs, left, ret_struct.ret_ptr); 
 
         // Update the return structure        
+        RegBS F_nd, F_ns, F_r, F_rp, F_rp0;
+        mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);
+        if(player0)
+            af^=1; 
+        mpc_and(tio, yield, F_nd, lf, af);
+        mpc_and(tio, yield, F_ns, fs, F_0);
+        // F_r = F_d.(!F_2)
+        if(player0)
+            F_2^=1;
+        // If we have to delete here, and it doesn't have two children we have to
+        // update child pointer in parent with the returned pointer
+        mpc_and(tio, yield, F_r, F_nd, F_2);
+        mpc_and(tio, yield, F_rp, F_nd, F_1);
+        mpc_and(tio, yield, F_rp0, F_nd, F_0);
 
+        mpc_select(tio, yield, ret_struct.N_d, F_nd, ret_struct.N_s, ptr);
+        mpc_select(tio, yield, ret_struct.N_s, F_ns, ret_struct.N_s, ptr);
+        
+        mpc_select(tio, yield, ret_struct.ret_ptr, F_rp, ptr, ret_struct.ret_ptr);
+        mpc_select(tio, yield, ret_struct.ret_ptr, F_rp0, ptr, s0);
+        ret_struct.F_r = F_r;
+        */
+        return 1;
     }
-
-    return 1;
 }
 
 
-int BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
+bool BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
     if(num_items==0)
         return 0;
     if(num_items==1) {
@@ -410,6 +440,18 @@ int BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
         auto A = oram->flat(tio, yield);
         int success = del(tio, yield, root, del_key, A, af, fs, TTL, ret_struct); 
         printf ("Success =  %d\n", success); 
+        if(!success){
+            return 0;
+        }
+        else{
+            //Fix up the actual deletion and succesor swap (if needed) here
+            Node del_node = A.reconstruct(A[ret_struct.N_d]);
+            Node suc_ptr = A.reconstruct(A[ret_struct.N_s]);
+            printf("del_node key = %ld, suc_node key = %ld\n", 
+                del_node.key.ashare, suc_ptr.key.ashare); 
+            //print("flag_s = %d\n", rec_struct.F_ss);
+        }
+
       return 1;
     }
 }
@@ -436,7 +478,7 @@ void bst(MPCIO &mpcio,
         size_t size = size_t(1)<<depth;
         BST tree(tio.player(), size);
 
-        /*
+        
         Node node; 
         for(size_t i = 1; i<=items; i++) {
           newnode(node);
@@ -445,11 +487,13 @@ void bst(MPCIO &mpcio,
         }
        
         tree.pretty_print(tio, yield);
-        */
+        
         
         RegAS del_key;
+        del_key.set(1);
         tree.del(tio, yield, del_key);
 
+        tree.pretty_print(tio, yield);
         /*
         if (depth < 10) {
             //oram.dump();
