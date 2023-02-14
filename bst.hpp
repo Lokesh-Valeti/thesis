@@ -154,6 +154,8 @@ class BST {
     size_t num_items = 0;
     size_t MAX_SIZE;
 
+    std::vector<RegXS> empty_locations;
+
     std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
         const Node &new_node, Duoram<Node>::Flat &A, int TTL, RegBS isDummy);
     void insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Flat &A);
@@ -184,6 +186,10 @@ class BST {
     void check_bst(MPCTIO &tio, yield_t &yield);
     std::tuple<bool, address_t> check_bst(const std::vector<Node> &R,
         value_t node, value_t min_key, value_t max_key);
+    void print_oram(MPCTIO &tio, yield_t &yield);
+    size_t numEmptyLocations(){
+      return(empty_locations.size());
+    };
 
 };
 
@@ -206,5 +212,6 @@ class BST_OP {
 
 void bst(MPCIO &mpcio,
     const PRACOptions &opts, char **args);
+
 
 #endif
