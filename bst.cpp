@@ -290,13 +290,21 @@ void BST::insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Fl
         return;
     } else {
         // Insert node into next free slot in the ORAM
-        int new_id = 1 + num_items;
+        int new_id;
+        RegXS insert_address;
         int TTL = num_items++;
-        A[new_id] = node;
-        RegXS new_addr;
-        new_addr.set(new_id * tio.player());
-        RegBS isDummy;
+        bool insertAtEmptyLocation = (numEmptyLocations() > 0);
+        if(insertAtEmptyLocation) {
+            insert_address = empty_locations.back();
+            empty_locations.pop_back(); 
+            A[insert_address] = node;
+        } else {
+            new_id = 1 + num_items;
+            A[new_id] = node;
+            insert_address.set(new_id * tio.player());
+        }
 
+        RegBS isDummy;
         //Do a recursive insert
         auto [wptr, direction] = insert(tio, yield, root, node, A, TTL, isDummy);
 
@@ -305,11 +313,12 @@ void BST::insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Fl
         RegXS left_ptr = extractLeftPtr(pointers);
         RegXS right_ptr = extractRightPtr(pointers);
         RegXS new_right_ptr, new_left_ptr;
-        mpc_select(tio, yield, new_right_ptr, direction, right_ptr, new_addr);
+      
+        mpc_select(tio, yield, new_right_ptr, direction, right_ptr, insert_address);
         if(player0) {
             direction^=1;
         }
-        mpc_select(tio, yield, new_left_ptr, direction, left_ptr, new_addr);
+        mpc_select(tio, yield, new_left_ptr, direction, left_ptr, insert_address);
         setLeftPtr(pointers, new_left_ptr);
         setRightPtr(pointers, new_right_ptr);
         A[wptr].NODE_POINTERS = pointers;
@@ -649,6 +658,7 @@ void bst(MPCIO &mpcio,
         tree.print_oram(tio, yield);
         tree.pretty_print(tio, yield);
         tree.check_bst(tio, yield);
+        printf("Num empty_locations = %ld\n", tree.numEmptyLocations());
 
         printf("\n\nDelete %x\n", 5);
         del_key.set(5 * tio.player());
@@ -656,5 +666,16 @@ void bst(MPCIO &mpcio,
         tree.print_oram(tio, yield);
         tree.pretty_print(tio, yield);
         tree.check_bst(tio, yield);
+        printf("Num empty_locations = %ld\n", tree.numEmptyLocations());
+
+        printf("\n\nInsert %x\n", 14);
+        newnode(node);
+        node.key.set(14 * tio.player());
+        tree.insert(tio, yield, node);
+        tree.print_oram(tio, yield);
+        tree.pretty_print(tio, yield);
+        tree.check_bst(tio, yield);
+        printf("Num empty_locations = %ld\n", tree.numEmptyLocations());
+
     });
 }
