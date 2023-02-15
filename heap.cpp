@@ -208,79 +208,85 @@ return 1;
 }
 
 
-void restore_heap_property(MPCTIO tio, yield_t &yield, RegAS& parent, RegAS& leftchild, RegAS& rightchild)
+RegAS HEAP::restore_heap_property(MPCTIO tio, yield_t &yield, RegAS index)
 {
+    auto HeapArray = oram->flat(tio, yield);
+    RegAS parent = HeapArray[index];
+    RegAS leftchild = HeapArray[index + index];
+    RegAS rightchild = HeapArray[index + index];
+    RegAS sum = parent + leftchild + rightchild;
+    CDPF cdpf = tio.cdpf(yield);
+    auto [lt, eq, gt] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
 
-  RegAS sum = parent + leftchild + rightchild;
-  CDPF cdpf = tio.cdpf(yield);
-  auto [lt, eq, gt] = cdpf.compare(tio, yield, leftchild-rightchild, tio.aes_ops());  
+    RegAS smallerchild;
+    mpc_select(tio, yield, smallerchild, lt, leftchild, rightchild, 64); // smallerchild holds smaller of left and right child 
 
-  RegAS smallerchild;
-  mpc_select(tio, yield, smallerchild, lt, leftchild, rightchild, 64); // smallerchild holds smaller of left and right child 
+    CDPF cdpf0 = tio.cdpf(yield);
+    auto [lt0, eq0, gt0] = cdpf.compare(tio, yield, smallerchild - parent, tio.aes_ops());
 
+    RegAS smallest;
+    mpc_select(tio, yield, smallest, lt0, smallerchild, parent, 64); // smallest holds smaller of left/right child and parent   
 
-  CDPF cdpf0 = tio.cdpf(yield);
-  auto [lt0, eq0, gt0] = cdpf.compare(tio, yield, smallerchild-parent, tio.aes_ops());
+    parent     = smallest;
+    leftchild  = smallerchild;
+    rightchild = (sum - smallerchild - smallest);
 
-  RegAS smallest;
-  mpc_select(tio, yield, smallest, lt0, smallerchild, parent, 64); // smallerchild holds smaller of left and right child   
+    HeapArray[index] = parent;
+    HeapArray[index + index] = leftchild;
 
-  parent     = smallest;
-  leftchild  = smallerchild;
-  rightchild = (sum - smallerchild - smallest);
+    return smallest;
 }
 
-// RegAS HEAP::extract_min(MPCTIO tio, yield_t &yield) {
-//     // this->MAX_SIZE = size;
-//     // oram = new Duoram<RegXS>(num_players, size);
-//     std::cout << "extract_min" << std::endl;
-//     std::cout << "num_items = " << num_items << std::endl;
-//     // if(num_items==0)
-//     //     return RegAS(0);
+RegAS HEAP::restore_heap_property_at_root(MPCTIO tio, yield_t &yield, size_t index)
+{
+    auto HeapArray = oram->flat(tio, yield);
+    RegAS parent = HeapArray[index];
+    RegAS leftchild  = HeapArray[2 * index];
+    RegAS rightchild = HeapArray[2 * index + 1];
+    RegAS sum = parent + leftchild + rightchild;
+    CDPF cdpf = tio.cdpf(yield);
+    auto [lt, eq, gt] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
+
+    RegAS smallerchild;
+    mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild,  64); // smallerchild holds smaller of left and right child 
+
+    CDPF cdpf0 = tio.cdpf(yield);
+    auto [lt0, eq0, gt0] = cdpf.compare(tio, yield, smallerchild - parent, tio.aes_ops());
+
+    RegAS smallest;
+    mpc_select(tio, yield, smallest, lt0, parent, smallerchild, 64); // smallest holds smaller of left/right child and parent   
+
+    parent     = smallest;
+    leftchild  = smallerchild;
+    rightchild = (sum - smallerchild - smallest);
+
+    HeapArray[index] = parent;
+    HeapArray[2*index] = leftchild;
+    HeapArray[2*index + 1] = rightchild;
+
+    RegAS parent_reconstruction = reconstruct_AS(tio, yield, parent);
+    yield();
+    RegAS leftchild_reconstruction = reconstruct_AS(tio, yield, leftchild);
+    yield();
+    RegAS rightchild_reconstruction = reconstruct_AS(tio, yield, rightchild);
+    yield();
+
+    assert(parent_reconstruction.ashare <= leftchild_reconstruction.ashare);
+    assert(parent_reconstruction.ashare <= rightchild_reconstruction.ashare);
     
+    return smallest;
+}
 
-// //    restore_heap_property(tio, yield, A[0], A[1], A[2]);
-//     //RegAS minval = A[1];    
-//     //A[1] = A[num_items-1];
-//     //if(num_items!=0) 
-//     {
-//         //Delete root
-
-//         //Node zero;
-//         // for(size_t j = 0; j < num_items; ++j)   
-//         // {
-//         //     RegAS val;
-//         //     val.set((0+j)*tio.player());
-//         //     A[j] = val;
-//         // }
-
-//        // num_items--;
-
-//      //    CDPF cdpf = tio.cdpf(yield);
-//      //    RegAS tmp = A[10];
-//      //    RegAS tmp1 = A[12];
-
-//      //    auto [lt, eq, gt] = cdpf.compare(tio, yield, tmp-tmp1, tio.aes_ops());    
-    
-//      // //   reconstruct_flag(tio, yield, lt);
-//      //    RegAS selected_val;
-//      //    mpc_select(tio, yield, selected_val, gt, tmp, tmp1, 64);
-
-//      //    printf("selected_val is: \n");
-//      //    reconstruct_AS(tio, yield, selected_val);
-       
-//      //    yield();
-//      //    printf("first option is: \n");
-//      //    reconstruct_AS(tio, yield, tmp);
-//      //    yield();
-//      //    printf("second option is: \n");
-//      //    reconstruct_AS(tio, yield, tmp1);
+RegAS HEAP::extract_min(MPCTIO tio, yield_t &yield) {
  
+      RegAS minval;
+      auto HeapArray = oram->flat(tio, yield);
+      minval = HeapArray[1];
+      HeapArray[1] = RegAS(HeapArray[num_items]);
+       
 
-//         //return 1; 
-//     } 
-//      return 1;
-// }
+      return minval;
+ }
  void Heap(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
 
@@ -312,7 +318,7 @@ void restore_heap_property(MPCTIO tio, yield_t &yield, RegAS& parent, RegAS& lef
         HEAP tree(tio.player(), size);
  
         
-        for(size_t j = 0; j < 100; ++j)
+        for(size_t j = 0; j < 22; ++j)
         {
          RegAS inserted_val;
          tree.insert(tio, yield, inserted_val);
@@ -321,7 +327,12 @@ void restore_heap_property(MPCTIO tio, yield_t &yield, RegAS& parent, RegAS& lef
 
      
       
-         //tree.extract_min(tio, yield);
+        tree.extract_min(tio, yield);
         
+        RegAS smaller =tree.restore_heap_property_at_root(tio, yield, 1);
+
+        // size_t height = std::log(tree.num_items);
+        // for(size_t i = 0; i < height; ++i) smaller = tree.restore_heap_property(tio, yield, smaller);
+        //      tree.verify_heap_property(tio, yield);
     });
 }

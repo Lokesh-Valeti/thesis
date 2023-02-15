@@ -13,7 +13,7 @@ class HEAP {
     Duoram<RegAS> *oram;
     // RegXS root;
 
-     size_t num_items = 0;
+     
      size_t MAX_SIZE;
 
     // std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
@@ -26,6 +26,7 @@ class HEAP {
     //     del_return &ret_struct);
 
   public:
+    size_t num_items = 0;
     HEAP(int num_players, size_t size) {
       this->initialize(num_players, size);
     };
@@ -35,22 +36,12 @@ class HEAP {
         delete oram;
     };
 
-    void initialize(int num_players, size_t size);
+    void  initialize(int num_players, size_t size);
     RegAS extract_min(MPCTIO tio, yield_t &yield);
-    int insert(MPCTIO tio, yield_t &yield, RegAS val);
-    int verify_heap_property(MPCTIO tio, yield_t &yield);
-
-    // void insert(MPCTIO &tio, yield_t &yield, Node &node);
-    // int del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
-
-    // // Display and correctness check functions
-    // void pretty_print(MPCTIO &tio, yield_t &yield);
-    // void pretty_print(const std::vector<Node> &R, value_t node,
-    //     const std::string &prefix, bool is_left_child, bool is_right_child);
-    // void check_bst(MPCTIO &tio, yield_t &yield);
-    // std::tuple<bool, address_t> check_bst(const std::vector<Node> &R,
-    //     value_t node, value_t min_key, value_t max_key);
-
+    int   insert(MPCTIO tio, yield_t &yield, RegAS val);
+    int   verify_heap_property(MPCTIO tio, yield_t &yield);
+    RegAS restore_heap_property(MPCTIO tio, yield_t &yield, RegAS index);
+    RegAS restore_heap_property_at_root(MPCTIO tio, yield_t &yield, size_t index);
 };
 
  void Heap(MPCIO &mpcio,
