@@ -63,57 +63,28 @@ bool reconstruct_flag(MPCTIO &tio, yield_t &yield, RegBS flag) {
 
 int HEAP::insert(MPCTIO tio, yield_t &yield, std::vector<RegAS>& A, RegAS val) {
 
+    auto HeapArray = oram->flat(tio, yield);
     num_items++;
     //auto A = oram->flat(tio, yield);
     std::cout << "num_items = " << num_items << std::endl;
-    uint64_t rand1;
-    arc4random_buf(&rand1, sizeof(uint32_t));
-    val.set((0+rand1)*tio.player());
-    printf("reconstructed_AS of value insert: \n");
-    reconstruct_AS(tio, yield, val);
-    yield();
-    A.push_back(val);
-    reconstruct_AS(tio, yield, A[num_items-1]);
-    yield();
-    // for(size_t i = 0; i < num_items; ++i)
-    // {
-    //     std::cout << "i = " << i << std::endl;
-    //        reconstruct_AS(tio, yield, A[i]);
-    //         yield();
-    //     std::cout << std::endl;
-    // }
+ 
+    val.randomize();
     size_t child  = num_items-1;
     size_t parent = child/2;
-  
     std::cout << "child = " << child << std::endl;
-    A[child].dump();
+    HeapArray[num_items] = val;
     while(parent != 0)
     {
      CDPF cdpf = tio.cdpf(yield);
  
      auto [lt, eq, gt] = cdpf.compare(tio, yield, A[child]-A[parent], tio.aes_ops());   
      std::cout << "child = " << child << std::endl;
-          reconstruct_AS(tio, yield, A[child]);
-          yield();
-     reconstruct_AS(tio, yield, A[parent]);
-      yield();
-     A[child].dump();
-     std::cout << "\nparent = " << parent << std::endl;
-     A[parent].dump();
-     std::cout << "\n\n^^ before swapping\n";
-     std::cout << "lt = " << lt << std::endl;
+ 
      
 
      mpc_oswap(tio, yield, A[child], A[parent], lt, 64);
-     std::cout << "child = " << child << std::endl;
-     reconstruct_AS(tio, yield, A[child]);
-      yield();
-     reconstruct_AS(tio, yield, A[parent]);
-      yield();
-     A[child].dump();
-     std::cout << "\nparent = " << parent << std::endl;
-     A[parent].dump();
-     std::cout << "\n^^ after swapping\n";
+ 
+ 
      child = parent;
      parent = parent/2;
     }
@@ -219,12 +190,18 @@ RegAS HEAP::extract_min(MPCTIO tio, yield_t &yield, std::vector<RegAS> A) {
         ++args;
     }
 
-    
+       
+
         MPCTIO tio(mpcio, 0, opts.num_threads);
+
+       
+       
         run_coroutines(tio, [&tio, depth, items] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         std::cout << "size = " << size << std::endl;
         
+
+
         std::vector<RegAS> HeapArray;
         HeapArray.resize(size);
         for(size_t i = 0; i < size; ++i)
