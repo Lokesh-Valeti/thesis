@@ -36,9 +36,9 @@ class HEAP {
     };
 
     void initialize(int num_players, size_t size);
-    RegAS extract_min(MPCTIO tio, yield_t &yield, std::vector<RegAS> A);
-    int insert(MPCTIO tio, yield_t &yield, std::vector<RegAS>& A, RegAS val);
-    int verify_heap_property(MPCTIO tio, yield_t &yield, std::vector<RegAS> A);
+    RegAS extract_min(MPCTIO tio, yield_t &yield);
+    int insert(MPCTIO tio, yield_t &yield, RegAS val);
+    int verify_heap_property(MPCTIO tio, yield_t &yield);
 
     // void insert(MPCTIO &tio, yield_t &yield, Node &node);
     // int del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
