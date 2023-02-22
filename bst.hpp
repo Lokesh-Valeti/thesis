@@ -1,5 +1,5 @@
-#ifndef __NODE_HPP__
-#define __NODE_HPP__
+#ifndef __BST_HPP__
+#define __BST_HPP__
 
 #include "types.hpp"
 #include "duoram.hpp"
@@ -135,7 +135,7 @@ T& operator<<(T& os, const Node &x)
 DEFAULT_TUPLE_IO(Node)
 
 struct del_return {
-    // Flag to indicate if the key this deletion requires a successor swap
+    // Flag to indicate if the key this deletion targets requires a successor swap
     RegBS F_ss;
     // Pointers to node to delete and successor node that would replace
     // deleted node
