@@ -160,10 +160,12 @@ class BST {
         const Node &new_node, Duoram<Node>::Flat &A, int TTL, RegBS isDummy);
     void insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Flat &A);
 
-
     bool del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL, 
         del_return &ret_struct);
+
+    bool lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, 
+        Duoram<Node>::Flat &A, int TTL, RegBS isDummy, Node *ret_node);
 
   public:
     BST(int num_players, size_t size) {
@@ -177,7 +179,12 @@ class BST {
 
     void initialize(int num_players, size_t size);
     void insert(MPCTIO &tio, yield_t &yield, Node &node);
+
+    // Deletes the first node that matches del_key
     bool del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
+
+    // Returns the first node that matches key 
+    bool lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node);
 
     // Display and correctness check functions
     void pretty_print(MPCTIO &tio, yield_t &yield);
@@ -190,7 +197,6 @@ class BST {
     size_t numEmptyLocations(){
       return(empty_locations.size());
     };
-
 };
 
 /*

@@ -345,6 +345,64 @@ void BST::insert(MPCTIO &tio, yield_t &yield, Node &node) {
     */
 }
 
+bool BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>::Flat &A,
+    int TTL, RegBS isDummy, Node *ret_node) {
+    if(TTL==0) {
+        // Reconstruct and return isDummy
+        // If we found the key, then isDummy will be true
+        bool found = reconstruct_RegBS(tio, yield, isDummy);
+        return found;
+    }
+
+    RegBS isNotDummy = isDummy ^ (tio.player());
+    Node cnode = A[ptr];
+    // Compare key
+    CDPF cdpf = tio.cdpf(yield);
+    auto [lt, eq, gt] = cdpf.compare(tio, yield, key - cnode.key, tio.aes_ops());
+
+    // Depending on [lteq, gt] select the next ptr/index as
+    // upper 32 bits of cnode.pointers if lteq
+    // lower 32 bits of cnode.pointers if gt 
+    RegXS left = extractLeftPtr(cnode.pointers);
+    RegXS right = extractRightPtr(cnode.pointers);
+    
+    RegXS next_ptr;
+    mpc_select(tio, yield, next_ptr, gt, left, right, 32);
+
+    RegBS F_found;
+    // If we haven't found the key yet, and the lookup matches the current node key,
+    // then we found the node to return
+    mpc_and(tio, yield, F_found, isNotDummy, eq);
+    mpc_select(tio, yield, ret_node->key, eq, ret_node->key, cnode.key); 
+    mpc_select(tio, yield, ret_node->value, eq, ret_node->value, cnode.value); 
+  
+    isDummy^=F_found;
+    bool found = lookup(tio, yield, next_ptr, key, A, TTL-1, isDummy, ret_node);
+
+    return found;    
+}
+
+bool BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
+    auto A = oram->flat(tio, yield);
+    auto R = A.reconstruct();
+
+    RegBS isDummy;
+
+    bool found = lookup(tio, yield, root, key, A, num_items, isDummy, ret_node);
+    /*
+    // To visualize database and tree after each lookup:
+    if (tio.player() == 0) {
+        for(size_t i=0;i<R.size();++i) {
+            printf("\n%04lx ", i);
+            R[i].dump();
+        }
+        printf("\n");
+    }
+    pretty_print(R, 1);
+    */
+    return found;
+}
+
 bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
      Duoram<Node>::Flat &A, RegBS af, RegBS fs, int TTL, 
     del_return &ret_struct) {
@@ -617,6 +675,7 @@ void bst(MPCIO &mpcio,
          
         RegAS del_key;
 
+        /*
         printf("\n\nDelete %x\n", 20);
         del_key.set(20 * tio.player());
         tree.del(tio, yield, del_key);
@@ -667,6 +726,7 @@ void bst(MPCIO &mpcio,
         tree.pretty_print(tio, yield);
         tree.check_bst(tio, yield);
         printf("Num empty_locations = %ld\n", tree.numEmptyLocations());
+        */
 
         printf("\n\nInsert %x\n", 14);
         newnode(node);
@@ -676,6 +736,36 @@ void bst(MPCIO &mpcio,
         tree.pretty_print(tio, yield);
         tree.check_bst(tio, yield);
         printf("Num empty_locations = %ld\n", tree.numEmptyLocations());
+
+        printf("\n\nLookup %x\n", 8);
+        newnode(node);
+        RegAS lookup_key;
+        bool found;
+        lookup_key.set(8 * tio.player());
+        found = tree.lookup(tio, yield, lookup_key, &node);
+        tree.print_oram(tio, yield);
+        tree.pretty_print(tio, yield);
+        if(found) {
+          printf("Lookup Success\n");
+          size_t value = reconstruct_RegXS(tio, yield, node.value);
+          printf("value = %lx\n", value);    
+        } else {
+          printf("Lookup Failed\n");
+        }
+
+        printf("\n\nLookup %x\n", 99);
+        newnode(node);
+        lookup_key.set(99 * tio.player());
+        found = tree.lookup(tio, yield, lookup_key, &node);
+        tree.print_oram(tio, yield);
+        tree.pretty_print(tio, yield);
+        if(found) {
+          printf("Lookup Success\n");
+          size_t value = reconstruct_RegXS(tio, yield, node.value);
+          printf("value = %lx\n", value);    
+        } else {
+          printf("Lookup Failed\n");
+        }
 
     });
 }
