@@ -40,8 +40,8 @@ class HEAP {
     RegAS extract_min(MPCTIO tio, yield_t &yield);
     int   insert(MPCTIO tio, yield_t &yield, RegAS val);
     int   verify_heap_property(MPCTIO tio, yield_t &yield);
-    RegAS restore_heap_property(MPCTIO tio, yield_t &yield, RegAS index);
-    RegAS restore_heap_property_at_root(MPCTIO tio, yield_t &yield, size_t index);
+    RegXS restore_heap_property(MPCTIO tio, yield_t &yield, RegXS index);
+    RegXS restore_heap_property_at_root(MPCTIO tio, yield_t &yield, size_t index);
 };
 
  void Heap(MPCIO &mpcio,
