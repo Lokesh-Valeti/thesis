@@ -385,7 +385,7 @@ void Heap(MPCIO &mpcio, const PRACOptions &opts, char **args)
         }
 
         std::cout << std::endl << "=============[Insert Done]================" << std::endl << std::endl;
-        //tree.verify_heap_property(tio, yield);
+        tree.verify_heap_property(tio, yield);
 
         for(size_t j = 0; j < 2; ++j)
         {
