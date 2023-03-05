@@ -350,7 +350,9 @@ RegAS HEAP::extract_min(MPCTIO tio, yield_t &yield) {
 
 void Heap(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
-    nbits_t depth=3;
+    nbits_t depth=atoi(args[0]);
+    std::cout << "print arguements " << std::endl;
+    std::cout << args[0] << std::endl;
 
     if (*args) {
         depth = atoi(*args);
@@ -363,6 +365,8 @@ void Heap(MPCIO &mpcio, const PRACOptions &opts, char **args)
         items = atoi(*args);
         ++args;
     }
+
+    std::cout << "items = " << items << std::endl;
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
 
