@@ -247,10 +247,19 @@ void verify_parent_children_heaps(MPCTIO tio, yield_t &yield, RegAS parent, RegA
 
 
 
-//
-//
-//
-//
+//  Let "x" be the root, and let "y" and "z" be the left and right children
+//  For an array, we have A[i] = x, A[2i] = y, A[2i + 1] = z.
+//  We want x \le y, and x \le z.
+//  The steps are as follows:
+//  Step 1: compare(y,z);  (1st call to to MPC Compare)
+//  Step 2: smaller = min(y,z); This is done with an mpcselect (1st call to mpcselect)
+//  Step 3: if(smaller == y) then smallerindex = 2i else smalleindex = 2i + 1; This is done with an mpcselect (2nd call to mpcselect)
+//  Step 4: compare(x,smaller); (2nd call to to MPC Compare)
+//  Step 5: smallest = min(x, smaller);  (3 call to mpcselect)
+//  Step 6: otherchild = max(x, smaller)  (4th call to mpcselect)
+//  Step 7: A[i] \gets smallest   (1st Duoam Write)
+//  Step 8: A[smallerindex] \gets otherchild (2nd Duoam Write)
+//  Overall restore_heap_property takes 2 MPC Comparisons, 4 MPC Selects, and 2 Duoram Writes
 RegXS HEAP::restore_heap_property(MPCTIO tio, yield_t &yield, RegXS index)
 {
  RegAS smallest;
