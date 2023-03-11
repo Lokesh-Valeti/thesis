@@ -234,12 +234,12 @@ void MPCIO::dump_stats(std::ostream &os)
 // TVA is a tuple of vectors of arrays of PreCompStorage
 template <nbits_t WIDTH, typename TVA>
 static void rdpfstorage_init(TVA &storage, unsigned player,
-    ProcessingMode mode, unsigned num_threads)
+    ProcessingMode mode, unsigned num_threads, bool incremental)
 {
     auto &VA = std::get<WIDTH-1>(storage);
     VA.resize(num_threads);
-    char prefix[11];
-    strcpy(prefix, "rdpf");
+    char prefix[12];
+    strcpy(prefix, incremental ? "irdpf" : "rdpf");
     if (WIDTH > 1) {
         sprintf(prefix+strlen(prefix), "%d_", WIDTH);
     }
@@ -253,13 +253,13 @@ static void rdpfstorage_init(TVA &storage, unsigned player,
 // TVA is a tuple of vectors of arrays of PreCompStorage
 template <nbits_t WIDTH, typename TVA>
 static void rdpfstorage_dumpstats(std::ostream &os, TVA &storage,
-    size_t thread_num)
+    size_t thread_num, bool incremental)
 {
     auto &VA = std::get<WIDTH-1>(storage);
     for (nbits_t depth=1; depth<=ADDRESS_MAX_BITS; ++depth) {
         size_t cnt = VA[thread_num][depth-1].get_stats();
         if (cnt > 0) {
-            os << " r" << int(depth);
+            os << (incremental ? " i" : " r") << int(depth);
             if (WIDTH > 1) {
                 os << "." << int(WIDTH);
             }
@@ -296,11 +296,16 @@ MPCPeerIO::MPCPeerIO(unsigned player, ProcessingMode mode,
     for (unsigned i=0; i<num_threads; ++i) {
         valselecttriples.emplace_back(player, mode, "selects", i);
     }
-    rdpfstorage_init<1>(rdpftriples, player, mode, num_threads);
-    rdpfstorage_init<2>(rdpftriples, player, mode, num_threads);
-    rdpfstorage_init<3>(rdpftriples, player, mode, num_threads);
-    rdpfstorage_init<4>(rdpftriples, player, mode, num_threads);
-    rdpfstorage_init<5>(rdpftriples, player, mode, num_threads);
+    rdpfstorage_init<1>(rdpftriples, player, mode, num_threads, false);
+    rdpfstorage_init<2>(rdpftriples, player, mode, num_threads, false);
+    rdpfstorage_init<3>(rdpftriples, player, mode, num_threads, false);
+    rdpfstorage_init<4>(rdpftriples, player, mode, num_threads, false);
+    rdpfstorage_init<5>(rdpftriples, player, mode, num_threads, false);
+    rdpfstorage_init<1>(irdpftriples, player, mode, num_threads, true);
+    rdpfstorage_init<2>(irdpftriples, player, mode, num_threads, true);
+    rdpfstorage_init<3>(irdpftriples, player, mode, num_threads, true);
+    rdpfstorage_init<4>(irdpftriples, player, mode, num_threads, true);
+    rdpfstorage_init<5>(irdpftriples, player, mode, num_threads, true);
     for (unsigned i=0; i<num_threads; ++i) {
         cdpfs.emplace_back(player, mode, "cdpf", i);
     }
@@ -336,11 +341,16 @@ void MPCPeerIO::dump_precomp_stats(std::ostream &os)
         if (cnt > 0) {
             os << " s:" << cnt;
         }
-        rdpfstorage_dumpstats<1>(os, rdpftriples, i);
-        rdpfstorage_dumpstats<2>(os, rdpftriples, i);
-        rdpfstorage_dumpstats<3>(os, rdpftriples, i);
-        rdpfstorage_dumpstats<4>(os, rdpftriples, i);
-        rdpfstorage_dumpstats<5>(os, rdpftriples, i);
+        rdpfstorage_dumpstats<1>(os, rdpftriples, i, false);
+        rdpfstorage_dumpstats<2>(os, rdpftriples, i, false);
+        rdpfstorage_dumpstats<3>(os, rdpftriples, i, false);
+        rdpfstorage_dumpstats<4>(os, rdpftriples, i, false);
+        rdpfstorage_dumpstats<5>(os, rdpftriples, i, false);
+        rdpfstorage_dumpstats<1>(os, irdpftriples, i, true);
+        rdpfstorage_dumpstats<2>(os, irdpftriples, i, true);
+        rdpfstorage_dumpstats<3>(os, irdpftriples, i, true);
+        rdpfstorage_dumpstats<4>(os, irdpftriples, i, true);
+        rdpfstorage_dumpstats<5>(os, irdpftriples, i, true);
         cnt = cdpfs[i].get_stats();
         if (cnt > 0) {
             os << " c:" << cnt;
@@ -361,6 +371,11 @@ void MPCPeerIO::reset_precomp_stats()
         rdpfstorage_resetstats<3>(rdpftriples, i);
         rdpfstorage_resetstats<4>(rdpftriples, i);
         rdpfstorage_resetstats<5>(rdpftriples, i);
+        rdpfstorage_resetstats<1>(irdpftriples, i);
+        rdpfstorage_resetstats<2>(irdpftriples, i);
+        rdpfstorage_resetstats<3>(irdpftriples, i);
+        rdpfstorage_resetstats<4>(irdpftriples, i);
+        rdpfstorage_resetstats<5>(irdpftriples, i);
     }
 }
 
@@ -376,11 +391,16 @@ MPCServerIO::MPCServerIO(ProcessingMode mode,
         std::deque<tcp::socket> &p1socks) :
     MPCIO(2, mode, p0socks.size())
 {
-    rdpfstorage_init<1>(rdpfpairs, player, mode, num_threads);
-    rdpfstorage_init<2>(rdpfpairs, player, mode, num_threads);
-    rdpfstorage_init<3>(rdpfpairs, player, mode, num_threads);
-    rdpfstorage_init<4>(rdpfpairs, player, mode, num_threads);
-    rdpfstorage_init<5>(rdpfpairs, player, mode, num_threads);
+    rdpfstorage_init<1>(rdpfpairs, player, mode, num_threads, false);
+    rdpfstorage_init<2>(rdpfpairs, player, mode, num_threads, false);
+    rdpfstorage_init<3>(rdpfpairs, player, mode, num_threads, false);
+    rdpfstorage_init<4>(rdpfpairs, player, mode, num_threads, false);
+    rdpfstorage_init<5>(rdpfpairs, player, mode, num_threads, false);
+    rdpfstorage_init<1>(irdpfpairs, player, mode, num_threads, true);
+    rdpfstorage_init<2>(irdpfpairs, player, mode, num_threads, true);
+    rdpfstorage_init<3>(irdpfpairs, player, mode, num_threads, true);
+    rdpfstorage_init<4>(irdpfpairs, player, mode, num_threads, true);
+    rdpfstorage_init<5>(irdpfpairs, player, mode, num_threads, true);
     for (unsigned i=0; i<num_threads; ++i) {
         p0ios.emplace_back(std::move(p0socks[i]), "p0", i);
     }
@@ -396,11 +416,16 @@ void MPCServerIO::dump_precomp_stats(std::ostream &os)
             os << " ";
         }
         os << "T" << i;
-        rdpfstorage_dumpstats<1>(os, rdpfpairs, i);
-        rdpfstorage_dumpstats<2>(os, rdpfpairs, i);
-        rdpfstorage_dumpstats<3>(os, rdpfpairs, i);
-        rdpfstorage_dumpstats<4>(os, rdpfpairs, i);
-        rdpfstorage_dumpstats<5>(os, rdpfpairs, i);
+        rdpfstorage_dumpstats<1>(os, rdpfpairs, i, false);
+        rdpfstorage_dumpstats<2>(os, rdpfpairs, i, false);
+        rdpfstorage_dumpstats<3>(os, rdpfpairs, i, false);
+        rdpfstorage_dumpstats<4>(os, rdpfpairs, i, false);
+        rdpfstorage_dumpstats<5>(os, rdpfpairs, i, false);
+        rdpfstorage_dumpstats<1>(os, irdpfpairs, i, true);
+        rdpfstorage_dumpstats<2>(os, irdpfpairs, i, true);
+        rdpfstorage_dumpstats<3>(os, irdpfpairs, i, true);
+        rdpfstorage_dumpstats<4>(os, irdpfpairs, i, true);
+        rdpfstorage_dumpstats<5>(os, irdpfpairs, i, true);
     }
     os << "\n";
 }
@@ -413,6 +438,11 @@ void MPCServerIO::reset_precomp_stats()
         rdpfstorage_resetstats<3>(rdpfpairs, i);
         rdpfstorage_resetstats<4>(rdpfpairs, i);
         rdpfstorage_resetstats<5>(rdpfpairs, i);
+        rdpfstorage_resetstats<1>(irdpfpairs, i);
+        rdpfstorage_resetstats<2>(irdpfpairs, i);
+        rdpfstorage_resetstats<3>(irdpfpairs, i);
+        rdpfstorage_resetstats<4>(irdpfpairs, i);
+        rdpfstorage_resetstats<5>(irdpfpairs, i);
     }
 }
 

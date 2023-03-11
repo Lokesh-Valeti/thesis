@@ -62,13 +62,25 @@ RDPFTriple<WIDTH> MPCTIO::rdpftriple(yield_t &yield, nbits_t depth,
 
     MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
     if (mpcio.mode == MODE_ONLINE) {
-        std::get<WIDTH-1>(mpcpio.rdpftriples)[thread_num][depth-1].get(val);
+        if (incremental) {
+            std::get<WIDTH-1>(mpcpio.irdpftriples)
+                [thread_num][depth-1].get(val);
+        } else {
+            std::get<WIDTH-1>(mpcpio.rdpftriples)
+                [thread_num][depth-1].get(val);
+        }
     } else {
         val = RDPFTriple<WIDTH>(*this, yield, depth,
             incremental, keep_expansion);
         iostream_server() <<
             val.dpf[(mpcio.player == 0) ? 1 : 2];
-        std::get<WIDTH-1>(mpcpio.rdpftriples)[thread_num][depth-1].inc();
+        if (incremental) {
+            std::get<WIDTH-1>(mpcpio.irdpftriples)
+                [thread_num][depth-1].inc();
+        } else {
+            std::get<WIDTH-1>(mpcpio.rdpftriples)
+                [thread_num][depth-1].inc();
+        }
         yield();
     }
     return val;
@@ -85,13 +97,25 @@ RDPFPair<WIDTH> MPCTIO::rdpfpair(yield_t &yield, nbits_t depth,
 
     MPCServerIO &mpcsrvio = static_cast<MPCServerIO&>(mpcio);
     if (mpcio.mode == MODE_ONLINE) {
-        std::get<WIDTH-1>(mpcsrvio.rdpfpairs)[thread_num][depth-1].get(val);
+        if (incremental) {
+            std::get<WIDTH-1>(mpcsrvio.irdpfpairs)
+                [thread_num][depth-1].get(val);
+        } else {
+            std::get<WIDTH-1>(mpcsrvio.rdpfpairs)
+                [thread_num][depth-1].get(val);
+        }
     } else {
         RDPFTriple<WIDTH> trip(*this, yield, depth, incremental, true);
         yield();
         iostream_p0() >> val.dpf[0];
         iostream_p1() >> val.dpf[1];
-        std::get<WIDTH-1>(mpcsrvio.rdpfpairs)[thread_num][depth-1].inc();
+        if (incremental) {
+            std::get<WIDTH-1>(mpcsrvio.irdpfpairs)
+                [thread_num][depth-1].inc();
+        } else {
+            std::get<WIDTH-1>(mpcsrvio.rdpfpairs)
+                [thread_num][depth-1].inc();
+        }
     }
     return val;
 }

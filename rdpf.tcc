@@ -936,17 +936,18 @@ typename RDPF<WIDTH>::LeafNode
     return descend_to_leaf(node, curdepth-1, dir, aes_ops);
 }
 
-// Expand the DPF if it's not already expanded
+// Expand one leaf layer of the DPF if it's not already expanded
 //
-// This routine is slightly more efficient than repeatedly calling
-// StreamEval::next(), but it uses a lot more memory.
+// This routine is slightly more efficient (except for incremental
+// RDPFs) than repeatedly calling StreamEval::next(), but it uses a lot
+// more memory.
 template <nbits_t WIDTH>
-void RDPF<WIDTH>::expand(size_t &aes_ops)
+void RDPF<WIDTH>::expand_leaf_layer(nbits_t li_index, size_t &aes_ops)
 {
-    nbits_t depth = this->depth();
+    nbits_t depth = maxdepth - li_index;
     size_t num_leaves = size_t(1)<<depth;
-    if (li[maxdepth-depth].expansion.size() == num_leaves) return;
-    li[maxdepth-depth].expansion.resize(num_leaves);
+    if (li[li_index].expansion.size() == num_leaves) return;
+    li[li_index].expansion.resize(num_leaves);
     address_t index = 0;
     address_t lastindex = 0;
     DPFnode *path = new DPFnode[depth];
@@ -977,13 +978,27 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
             path[i+1] = descend(path[i], i, 0, aes_ops);
         }
         lastindex = index;
-        li[maxdepth-depth].expansion[index++] =
+        li[li_index].expansion[index++] =
             descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
-        li[maxdepth-depth].expansion[index++] =
+        li[li_index].expansion[index++] =
             descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
     }
 
     delete[] path;
+}
+
+// Expand the DPF if it's not already expanded
+//
+// This routine is slightly more efficient (except for incremental
+// RDPFs) than repeatedly calling StreamEval::next(), but it uses a lot
+// more memory.
+template <nbits_t WIDTH>
+void RDPF<WIDTH>::expand(size_t &aes_ops)
+{
+    nbits_t num_leaf_layers = li.size();
+    for (nbits_t li_index=0; li_index < num_leaf_layers; ++li_index) {
+        expand_leaf_layer(li_index, aes_ops);
+    }
 }
 
 // Construct three RDPFs of the given depth all with the same randomly

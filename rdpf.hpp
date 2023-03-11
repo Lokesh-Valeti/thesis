@@ -206,6 +206,9 @@ struct RDPF : public DPF {
         return a;
     }
 
+private:
+    // Expand one leaf layer of the DPF if it's not already expanded
+    void expand_leaf_layer(nbits_t li_index, size_t &aes_ops);
 };
 
 // Computational peers will generate triples of RDPFs with the _same_
