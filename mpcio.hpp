@@ -413,10 +413,11 @@ public:
     // Computational peers call:
     template <nbits_t WIDTH = 1>
     RDPFTriple<WIDTH> rdpftriple(yield_t &yield, nbits_t depth,
-        bool keep_expansion = true);
+        bool incremental = false, bool keep_expansion = true);
     // The server calls:
     template <nbits_t WIDTH = 1>
-    RDPFPair<WIDTH> rdpfpair(yield_t &yield, nbits_t depth);
+    RDPFPair<WIDTH> rdpfpair(yield_t &yield, nbits_t depth,
+        bool incremental = false);
     // Anyone can call:
     CDPF cdpf(yield_t &yield);
 

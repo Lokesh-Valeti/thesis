@@ -100,7 +100,8 @@ struct RDPF : public DPF {
     // 2^{depth+1}-2 local AES operations for P0,P1
     // 0 local AES operations for P2
     RDPF(MPCTIO &tio, yield_t &yield,
-        RegXS target, nbits_t depth, bool save_expansion = false);
+        RegXS target, nbits_t depth, bool incremental = false,
+        bool save_expansion = false);
 
     // Do we have a precomputed expansion?
     inline bool has_expansion() const { return expansion.size() > 0; }
@@ -251,7 +252,7 @@ struct RDPFTriple {
     // Construct three RDPFs of the given depth all with the same
     // randomly generated target index.
     RDPFTriple(MPCTIO &tio, yield_t &yield,
-        nbits_t depth, bool save_expansion = false);
+        nbits_t depth, bool incremental = false, bool save_expansion = false);
 
     // Descend the three RDPFs in lock step
     node descend(const node &parent, nbits_t parentdepth,

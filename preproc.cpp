@@ -165,40 +165,47 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                     if (subtype > 1) {
                         sprintf(prefix+strlen(prefix), "%d_", subtype);
                     }
+                    bool incremental = false;
                     auto tripfile = ofiles.open(prefix,
                         mpcio.player, thread_num, type);
                     for (unsigned int i=0; i<num; ++i) {
                         coroutines.emplace_back(
-                            [&tio, &opts, tripfile, type, subtype](yield_t &yield) {
+                            [&tio, &opts, incremental, tripfile, type,
+                                subtype](yield_t &yield) {
                                 yield();
                                 switch(subtype) {
                                 case 1: {
                                     RDPFTriple<1> rdpftrip =
-                                        tio.rdpftriple<1>(yield, type, opts.expand_rdpfs);
+                                        tio.rdpftriple<1>(yield, type,
+                                            incremental, opts.expand_rdpfs);
                                     tripfile.os() << rdpftrip;
                                     break;
                                 }
                                 case 2: {
                                     RDPFTriple<2> rdpftrip =
-                                        tio.rdpftriple<2>(yield, type, opts.expand_rdpfs);
+                                        tio.rdpftriple<2>(yield, type,
+                                            incremental, opts.expand_rdpfs);
                                     tripfile.os() << rdpftrip;
                                     break;
                                 }
                                 case 3: {
                                     RDPFTriple<3> rdpftrip =
-                                        tio.rdpftriple<3>(yield, type, opts.expand_rdpfs);
+                                        tio.rdpftriple<3>(yield, type,
+                                            incremental, opts.expand_rdpfs);
                                     tripfile.os() << rdpftrip;
                                     break;
                                 }
                                 case 4: {
                                     RDPFTriple<4> rdpftrip =
-                                        tio.rdpftriple<4>(yield, type, opts.expand_rdpfs);
+                                        tio.rdpftriple<4>(yield, type,
+                                            incremental, opts.expand_rdpfs);
                                     tripfile.os() << rdpftrip;
                                     break;
                                 }
                                 case 5: {
                                     RDPFTriple<5> rdpftrip =
-                                        tio.rdpftriple<5>(yield, type, opts.expand_rdpfs);
+                                        tio.rdpftriple<5>(yield, type,
+                                            incremental, opts.expand_rdpfs);
                                     tripfile.os() << rdpftrip;
                                     break;
                                 }

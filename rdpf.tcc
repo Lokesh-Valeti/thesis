@@ -818,7 +818,7 @@ static inline void create_level(MPCTIO &tio, yield_t &yield,
 // small optimization noted below.
 template <nbits_t WIDTH>
 RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
-    RegXS target, nbits_t depth, bool save_expansion)
+    RegXS target, nbits_t depth, bool incremental, bool save_expansion)
 {
     int player = tio.player();
     size_t &aes_ops = tio.aes_ops();
@@ -965,7 +965,7 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
 // generated target index.
 template <nbits_t WIDTH>
 RDPFTriple<WIDTH>::RDPFTriple(MPCTIO &tio, yield_t &yield,
-    nbits_t depth, bool save_expansion)
+    nbits_t depth, bool incremental, bool save_expansion)
 {
     // Pick a random XOR share of the target
     xs_target.randomize(depth);
@@ -975,9 +975,10 @@ RDPFTriple<WIDTH>::RDPFTriple(MPCTIO &tio, yield_t &yield,
     std::vector<coro_t> coroutines;
     for (int i=0;i<3;++i) {
         coroutines.emplace_back(
-            [this, &tio, depth, i, save_expansion](yield_t &yield) {
+            [this, &tio, depth, i, incremental,
+                save_expansion](yield_t &yield) {
                 dpf[i] = RDPF<WIDTH>(tio, yield, xs_target, depth,
-                    save_expansion);
+                    incremental, save_expansion);
             });
     }
     coroutines.emplace_back(
