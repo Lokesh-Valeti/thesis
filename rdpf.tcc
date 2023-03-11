@@ -228,9 +228,9 @@ T& operator>>(T &is, RDPF<WIDTH> &rdpf)
         rdpf.cw.push_back(cw);
     }
     if (read_expanded) {
-        rdpf.expansion.resize(1<<depth);
-        is.read((char *)rdpf.expansion.data(),
-            sizeof(rdpf.expansion[0])<<depth);
+        rdpf.li[0].expansion.resize(1<<depth);
+        is.read((char *)rdpf.li[0].expansion.data(),
+            sizeof(rdpf.li[0].expansion[0])<<depth);
     }
     value_t cfbits = 0;
     is.read((char *)&cfbits, BITBYTES(depth-1));
@@ -267,7 +267,7 @@ T& write_maybe_expanded(T &os, const RDPF<WIDTH> &rdpf,
     // If we're writing an expansion, add 64 to depth
     uint8_t expanded_depth = depth;
     bool write_expansion = false;
-    if (expanded && rdpf.expansion.size() == (size_t(1)<<depth)) {
+    if (expanded && rdpf.li[0].expansion.size() == (size_t(1)<<depth)) {
         write_expansion = true;
         expanded_depth += 64;
     }
@@ -276,8 +276,8 @@ T& write_maybe_expanded(T &os, const RDPF<WIDTH> &rdpf,
         os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));
     }
     if (write_expansion) {
-        os.write((const char *)rdpf.expansion.data(),
-            sizeof(rdpf.expansion[0])<<depth);
+        os.write((const char *)rdpf.li[0].expansion.data(),
+            sizeof(rdpf.li[0].expansion[0])<<depth);
     }
     os.write((const char *)&rdpf.cfbits, BITBYTES(depth-1));
     nbits_t num_leaflevels = 1;
@@ -849,8 +849,8 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
             curlevel = nextlevel;
             nextlevel = NULL;
             if (save_expansion && level == depth-1) {
-                expansion.resize(1<<depth);
-                leaflevel = expansion.data();
+                li[0].expansion.resize(1<<depth);
+                leaflevel = li[0].expansion.data();
             } else if (level == depth-1) {
                 leaflevel = new LeafNode[1<<depth];
             } else {
@@ -902,8 +902,8 @@ typename RDPF<WIDTH>::LeafNode
     RDPF<WIDTH>::leaf(address_t input, size_t &aes_ops) const
 {
     // If we have a precomputed expansion, just use it
-    if (expansion.size()) {
-        return expansion[input];
+    if (li[0].expansion.size()) {
+        return li[0].expansion[input];
     }
 
     DPFnode node = seed;
@@ -924,8 +924,8 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
 {
     nbits_t depth = this->depth();
     size_t num_leaves = size_t(1)<<depth;
-    if (expansion.size() == num_leaves) return;
-    expansion.resize(num_leaves);
+    if (li[0].expansion.size() == num_leaves) return;
+    li[0].expansion.resize(num_leaves);
     address_t index = 0;
     address_t lastindex = 0;
     DPFnode *path = new DPFnode[depth];
@@ -933,8 +933,8 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
     for (nbits_t i=1;i<depth;++i) {
         path[i] = descend(path[i-1], i-1, 0, aes_ops);
     }
-    expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
-    expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
+    li[0].expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
+    li[0].expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
     while(index < num_leaves) {
         // Invariant: lastindex and index will both be even, and
         // index=lastindex+2
@@ -954,8 +954,8 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
             path[i+1] = descend(path[i], i, 0, aes_ops);
         }
         lastindex = index;
-        expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
-        expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
+        li[0].expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
+        li[0].expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
     }
 
     delete[] path;

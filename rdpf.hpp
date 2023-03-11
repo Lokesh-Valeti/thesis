@@ -57,6 +57,8 @@ struct RDPF : public DPF {
         // XOR share of the scaling values M_xs such that the high words
         // of the WIDTH leaf values for P0 and P1 XOR to M_xs * e_{target}
         std::array<RegXS,WIDTH> scaled_xor;
+        // If we're saving the expansion, put it here
+        std::vector<LeafNode> expansion;
 
         LeafInfo() : unit_sum_inverse(0) {}
     };
@@ -82,9 +84,6 @@ struct RDPF : public DPF {
     // but therefore only the low bit gets used.
     value_t leaf_cfbits;
 
-    // If we're saving the expansion, put it here
-    std::vector<LeafNode> expansion;
-
     RDPF() {}
 
     // Construct a DPF with the given (XOR-shared) target location, and
@@ -104,11 +103,11 @@ struct RDPF : public DPF {
         bool save_expansion = false);
 
     // Do we have a precomputed expansion?
-    inline bool has_expansion() const { return expansion.size() > 0; }
+    inline bool has_expansion() const { return li[0].expansion.size() > 0; }
 
     // Get an element of the expansion
     inline LeafNode get_expansion(address_t index) const {
-        return expansion[index];
+        return li[0].expansion[index];
     }
 
     // The depth
@@ -238,7 +237,7 @@ struct RDPFTriple {
 
     // Do we have a precomputed expansion?
     inline bool has_expansion() const {
-        return dpf[0].expansion.size() > 0;
+        return dpf[0].li[0].expansion.size() > 0;
     }
 
     // Get an element of the expansion
@@ -362,7 +361,7 @@ struct RDPFPair {
 
     // Do we have a precomputed expansion?
     inline bool has_expansion() const {
-        return dpf[0].expansion.size() > 0;
+        return dpf[0].li[0].expansion.size() > 0;
     }
 
     // Get an element of the expansion
