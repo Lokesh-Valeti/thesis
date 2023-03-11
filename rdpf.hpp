@@ -103,15 +103,27 @@ struct RDPF : public DPF {
         bool save_expansion = false);
 
     // Do we have a precomputed expansion?
-    inline bool has_expansion() const { return li[0].expansion.size() > 0; }
+    inline bool has_expansion() const {
+        return li[maxdepth-curdepth].expansion.size() > 0;
+    }
 
     // Get an element of the expansion
     inline LeafNode get_expansion(address_t index) const {
-        return li[0].expansion[index];
+        return li[maxdepth-curdepth].expansion[index];
     }
 
     // The depth
     inline nbits_t depth() const { return curdepth; }
+
+    // Set the current depth for an incremental RDPF; 0 means to use
+    // maxdepth
+    inline void depth(nbits_t newdepth) {
+        if (newdepth > 0 && newdepth < maxdepth) {
+            curdepth = newdepth;
+        } else {
+            curdepth = maxdepth;
+        }
+    }
 
     // Get the leaf node for the given input
     //
@@ -143,7 +155,7 @@ struct RDPF : public DPF {
         if (whichhalf == 1) {
             lowword = -lowword;
         }
-        a.ashare = lowword * li[0].unit_sum_inverse;
+        a.ashare = lowword * li[maxdepth-curdepth].unit_sum_inverse;
         return a;
     }
 
@@ -229,6 +241,14 @@ struct RDPFTriple {
     // The depth
     inline nbits_t depth() const { return dpf[0].depth(); }
 
+    // Set the current depth for an incremental RDPFTriple; 0 means to
+    // use maxdepth
+    inline void depth(nbits_t newdepth) {
+        dpf[0].depth(newdepth);
+        dpf[1].depth(newdepth);
+        dpf[2].depth(newdepth);
+    }
+
     // The seed
     inline node get_seed() const {
         return std::make_tuple(dpf[0].get_seed(), dpf[1].get_seed(),
@@ -237,7 +257,8 @@ struct RDPFTriple {
 
     // Do we have a precomputed expansion?
     inline bool has_expansion() const {
-        return dpf[0].li[0].expansion.size() > 0;
+        int li_index = dpf[0].maxdepth - dpf[0].curdepth;
+        return dpf[0].li[li_index].expansion.size() > 0;
     }
 
     // Get an element of the expansion
@@ -271,17 +292,19 @@ struct RDPFTriple {
     // Additive share of the scaling value M_as such that the high words
     // of the leaf values for P0 and P1 add to M_as * e_{target}
     inline void scaled_value(RegASWT &v) const {
-        std::get<0>(v) = dpf[0].li[0].scaled_sum;
-        std::get<1>(v) = dpf[1].li[0].scaled_sum;
-        std::get<2>(v) = dpf[2].li[0].scaled_sum;
+        int li_index = dpf[0].maxdepth - dpf[0].curdepth;
+        std::get<0>(v) = dpf[0].li[li_index].scaled_sum;
+        std::get<1>(v) = dpf[1].li[li_index].scaled_sum;
+        std::get<2>(v) = dpf[2].li[li_index].scaled_sum;
     }
 
     // XOR share of the scaling value M_xs such that the high words
     // of the leaf values for P0 and P1 XOR to M_xs * e_{target}
     inline void scaled_value(RegXSWT &v) const {
-        std::get<0>(v) = dpf[0].li[0].scaled_xor;
-        std::get<1>(v) = dpf[1].li[0].scaled_xor;
-        std::get<2>(v) = dpf[2].li[0].scaled_xor;
+        int li_index = dpf[0].maxdepth - dpf[0].curdepth;
+        std::get<0>(v) = dpf[0].li[li_index].scaled_xor;
+        std::get<1>(v) = dpf[1].li[li_index].scaled_xor;
+        std::get<2>(v) = dpf[2].li[li_index].scaled_xor;
     }
 
     // Get the additive-shared unit vector entry from the leaf node
@@ -354,6 +377,13 @@ struct RDPFPair {
     // The depth
     inline nbits_t depth() const { return dpf[0].depth(); }
 
+    // Set the current depth for an incremental RDPFPair; 0 means to use
+    // maxdepth
+    inline void depth(nbits_t newdepth) {
+        dpf[0].depth(newdepth);
+        dpf[1].depth(newdepth);
+    }
+
     // The seed
     inline node get_seed() const {
         return std::make_tuple(dpf[0].get_seed(), dpf[1].get_seed());
@@ -361,7 +391,8 @@ struct RDPFPair {
 
     // Do we have a precomputed expansion?
     inline bool has_expansion() const {
-        return dpf[0].li[0].expansion.size() > 0;
+        int li_index = dpf[0].maxdepth - dpf[0].curdepth;
+        return dpf[0].li[li_index].expansion.size() > 0;
     }
 
     // Get an element of the expansion
