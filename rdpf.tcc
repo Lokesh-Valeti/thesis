@@ -857,6 +857,9 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
 
     li.resize(incremental ? depth : 1);
 
+    // Prefetch the right number of nodeselecttriples
+    tio.request_nodeselecttriples(yield, incremental ? 2*depth-1 : depth);
+
     // Construct each intermediate level
     while(level < depth) {
         LeafNode *leaflevel = NULL;

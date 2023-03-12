@@ -353,6 +353,15 @@ class MPCTIO {
     AndTriple last_andtriple;
     nbits_t last_andtriple_bits_remaining;
 
+    // We allow for prefetching of SelectTriple<DPFnode>s to save one
+    // network round per level when constructing RDPFs
+    std::deque<SelectTriple<DPFnode>> queued_nodeselecttriples;
+    // For P0 and P1, it should always be the case that
+    // remaining_nodesselecttriples equals
+    // queued_nodeselecttriples.size().  P2 does not store anything in
+    // queued_nodeselecttriples, however.
+    size_t remaining_nodesselecttriples;
+
 public:
     MPCTIO(MPCIO &mpcio, int thread_num, int num_threads = 1);
 
@@ -425,6 +434,7 @@ public:
     MultTriple multtriple(yield_t &yield);
     HalfTriple halftriple(yield_t &yield, bool tally=true);
     AndTriple andtriple(yield_t &yield);
+    void request_nodeselecttriples(yield_t &yield, size_t num);
     SelectTriple<DPFnode> nodeselecttriple(yield_t &yield);
     SelectTriple<value_t> valselecttriple(yield_t &yield);
     SelectTriple<bit_t> bitselecttriple(yield_t &yield);
