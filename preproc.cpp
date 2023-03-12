@@ -476,7 +476,7 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                                 stio.cdpf(yield);
                             });
                     }
-                } else if (!strcmp(type, "i")) {
+                } else if (!strcmp(type, "k")) {
                     unsigned char typetag = 0x8e;
                     unsigned char subtypetag = 0x00;
                     stio.queue_p0(&typetag, 1);
