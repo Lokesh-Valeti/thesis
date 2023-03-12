@@ -193,7 +193,7 @@ inline typename RDPF<WIDTH>::LeafNode RDPF<WIDTH>::descend_to_leaf(
     bool flag = get_lsb(parent);
     prg(prgout, parent, whichchild, aes_ops);
     if (flag) {
-        LeafNode CW = li[0].leaf_cw;
+        LeafNode CW = li[maxdepth-parentdepth-1].leaf_cw;
         LeafNode CWR = CW;
         bit_t cfbit = !!(leaf_cfbits &
             (value_t(1)<<(maxdepth-parentdepth-1)));
@@ -211,9 +211,15 @@ T& operator>>(T &is, RDPF<WIDTH> &rdpf)
     is.read((char *)&rdpf.seed, sizeof(rdpf.seed));
     rdpf.whichhalf = get_lsb(rdpf.seed);
     uint8_t depth;
-    // Add 64 to depth to indicate an expanded RDPF
+    // Add 64 to depth to indicate an expanded RDPF, and add 128 to
+    // indicate an incremental RDPF
     is.read((char *)&depth, sizeof(depth));
     bool read_expanded = false;
+    bool read_incremental = false;
+    if (depth > 128) {
+        read_incremental = true;
+        depth -= 128;
+    }
     if (depth > 64) {
         read_expanded = true;
         depth -= 64;
@@ -227,19 +233,22 @@ T& operator>>(T &is, RDPF<WIDTH> &rdpf)
         is.read((char *)&cw, sizeof(cw));
         rdpf.cw.push_back(cw);
     }
+    nbits_t num_leaflevels = read_incremental ? depth : 1;
+    rdpf.li.resize(num_leaflevels);
     if (read_expanded) {
-        rdpf.expansion.resize(1<<depth);
-        is.read((char *)rdpf.expansion.data(),
-            sizeof(rdpf.expansion[0])<<depth);
+        for(nbits_t i=0; i<num_leaflevels; ++i) {
+            nbits_t level = depth-i;
+            rdpf.li[i].expansion.resize(1<<level);
+            is.read((char *)rdpf.li[i].expansion.data(),
+                sizeof(rdpf.li[i].expansion[0])<<level);
+        }
     }
     value_t cfbits = 0;
     is.read((char *)&cfbits, BITBYTES(depth-1));
     rdpf.cfbits = cfbits;
-    nbits_t num_leaflevels = 1;
     value_t leaf_cfbits = 0;
     is.read((char *)&leaf_cfbits, BITBYTES(num_leaflevels));
     rdpf.leaf_cfbits = leaf_cfbits;
-    rdpf.li.resize(num_leaflevels);
     for (nbits_t i=0; i<num_leaflevels; ++i) {
         is.read((char *)&rdpf.li[i].leaf_cw,
             sizeof(rdpf.li[i].leaf_cw));
@@ -267,20 +276,27 @@ T& write_maybe_expanded(T &os, const RDPF<WIDTH> &rdpf,
     // If we're writing an expansion, add 64 to depth
     uint8_t expanded_depth = depth;
     bool write_expansion = false;
-    if (expanded && rdpf.expansion.size() == (size_t(1)<<depth)) {
+    if (expanded && rdpf.li[0].expansion.size() == (size_t(1)<<depth)) {
         write_expansion = true;
         expanded_depth += 64;
+    }
+    // If we're writing an incremental RDPF, add 128 to depth
+    if (rdpf.li.size() > 1) {
+        expanded_depth += 128;
     }
     os.write((const char *)&expanded_depth, sizeof(expanded_depth));
     for (uint8_t i=0; i<depth-1; ++i) {
         os.write((const char *)&rdpf.cw[i], sizeof(rdpf.cw[i]));
     }
+    nbits_t num_leaflevels = rdpf.li.size();
     if (write_expansion) {
-        os.write((const char *)rdpf.expansion.data(),
-            sizeof(rdpf.expansion[0])<<depth);
+        for(nbits_t i=0; i<num_leaflevels; ++i) {
+            nbits_t level = depth-i;
+            os.write((const char *)rdpf.li[i].expansion.data(),
+                sizeof(rdpf.li[i].expansion[0])<<level);
+        }
     }
     os.write((const char *)&rdpf.cfbits, BITBYTES(depth-1));
-    nbits_t num_leaflevels = 1;
     os.write((const char *)&rdpf.leaf_cfbits, BITBYTES(num_leaflevels));
     for (nbits_t i=0; i<num_leaflevels; ++i) {
         os.write((const char *)&rdpf.li[i].leaf_cw,
@@ -802,7 +818,7 @@ static inline void create_level(MPCTIO &tio, yield_t &yield,
             assert(low_sum & 1);
             li.unit_sum_inverse = inverse_value_t(low_sum);
         }
-    } else if (level == depth-1) {
+    } else if constexpr (!std::is_same_v<NT, DPFnode>) {
         yield();
     }
 }
@@ -818,7 +834,7 @@ static inline void create_level(MPCTIO &tio, yield_t &yield,
 // small optimization noted below.
 template <nbits_t WIDTH>
 RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
-    RegXS target, nbits_t depth, bool save_expansion)
+    RegXS target, nbits_t depth, bool incremental, bool save_expansion)
 {
     int player = tio.player();
     size_t &aes_ops = tio.aes_ops();
@@ -839,7 +855,7 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
     DPFnode *nextlevel = new DPFnode[1];
     nextlevel[0] = seed;
 
-    li.resize(1);
+    li.resize(incremental ? depth : 1);
 
     // Construct each intermediate level
     while(level < depth) {
@@ -848,20 +864,21 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
             delete[] curlevel;
             curlevel = nextlevel;
             nextlevel = NULL;
-            if (save_expansion && level == depth-1) {
-                expansion.resize(1<<depth);
-                leaflevel = expansion.data();
-            } else if (level == depth-1) {
-                leaflevel = new LeafNode[1<<depth];
-            } else {
+            if (save_expansion && (incremental || level == depth-1)) {
+                li[depth-1-level].expansion.resize(1<<(level+1));
+                leaflevel = li[depth-1-level].expansion.data();
+            } else if (incremental || level == depth-1) {
+                leaflevel = new LeafNode[1<<(level+1)];
+            }
+            if (level < depth-1) {
                 nextlevel = new DPFnode[1<<(level+1)];
             }
         }
-        // Invariant: curlevel has 2^level elements; nextlevel has
-        // 2^{level+1} DPFnode elements if we're not at the last level,
-        // and leaflevel has 2^{level+1} LeafNode elements if we are at
-        // a leaf level (the last level always, and all levels if we are
-        // making an incremental RDPF).
+        // Invariant: curlevel has 2^level DPFnode elements; nextlevel
+        // has 2^{level+1} DPFnode elements if we're not at the last
+        // level, and leaflevel has 2^{level+1} LeafNode elements if we
+        // are at a leaf level (the last level always, and all levels if
+        // we are making an incremental RDPF).
 
         // The bit-shared choice bit is bit (depth-level-1) of the
         // XOR-shared target index
@@ -870,20 +887,24 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
 
         if (level < depth-1) {
             DPFnode CW;
+            // This field is ignored when we're not expanding to a leaf
+            // level, but it needs to be an lvalue reference.
+            int noleafinfo = 0;
             create_level(tio, yield, curlevel, nextlevel, player, level,
-                depth, bs_choice, CW, cfbit, save_expansion, li[0],
+                depth, bs_choice, CW, cfbit, save_expansion, noleafinfo,
                 aes_ops);
             cfbits |= (value_t(cfbit)<<level);
             if (player < 2) {
                 cw.push_back(CW);
             }
-        } else {
+        }
+        if (incremental || level == depth-1) {
             LeafNode CW;
             create_level(tio, yield, curlevel, leaflevel, player, level,
-                depth, bs_choice, CW, cfbit, save_expansion, li[0],
-                aes_ops);
+                depth, bs_choice, CW, cfbit, save_expansion,
+                li[depth-level-1], aes_ops);
             leaf_cfbits |= (value_t(cfbit)<<(depth-level-1));
-            li[0].leaf_cw = CW;
+            li[depth-level-1].leaf_cw = CW;
         }
 
         if (!save_expansion) {
@@ -902,8 +923,8 @@ typename RDPF<WIDTH>::LeafNode
     RDPF<WIDTH>::leaf(address_t input, size_t &aes_ops) const
 {
     // If we have a precomputed expansion, just use it
-    if (expansion.size()) {
-        return expansion[input];
+    if (li[maxdepth-curdepth].expansion.size()) {
+        return li[maxdepth-curdepth].expansion[input];
     }
 
     DPFnode node = seed;
@@ -915,17 +936,18 @@ typename RDPF<WIDTH>::LeafNode
     return descend_to_leaf(node, curdepth-1, dir, aes_ops);
 }
 
-// Expand the DPF if it's not already expanded
+// Expand one leaf layer of the DPF if it's not already expanded
 //
-// This routine is slightly more efficient than repeatedly calling
-// StreamEval::next(), but it uses a lot more memory.
+// This routine is slightly more efficient (except for incremental
+// RDPFs) than repeatedly calling StreamEval::next(), but it uses a lot
+// more memory.
 template <nbits_t WIDTH>
-void RDPF<WIDTH>::expand(size_t &aes_ops)
+void RDPF<WIDTH>::expand_leaf_layer(nbits_t li_index, size_t &aes_ops)
 {
-    nbits_t depth = this->depth();
+    nbits_t depth = maxdepth - li_index;
     size_t num_leaves = size_t(1)<<depth;
-    if (expansion.size() == num_leaves) return;
-    expansion.resize(num_leaves);
+    if (li[li_index].expansion.size() == num_leaves) return;
+    li[li_index].expansion.resize(num_leaves);
     address_t index = 0;
     address_t lastindex = 0;
     DPFnode *path = new DPFnode[depth];
@@ -933,8 +955,10 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
     for (nbits_t i=1;i<depth;++i) {
         path[i] = descend(path[i-1], i-1, 0, aes_ops);
     }
-    expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
-    expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
+    li[maxdepth-depth].expansion[index++] =
+        descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
+    li[maxdepth-depth].expansion[index++] =
+        descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
     while(index < num_leaves) {
         // Invariant: lastindex and index will both be even, and
         // index=lastindex+2
@@ -954,18 +978,34 @@ void RDPF<WIDTH>::expand(size_t &aes_ops)
             path[i+1] = descend(path[i], i, 0, aes_ops);
         }
         lastindex = index;
-        expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
-        expansion[index++] = descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
+        li[li_index].expansion[index++] =
+            descend_to_leaf(path[depth-1], depth-1, 0, aes_ops);
+        li[li_index].expansion[index++] =
+            descend_to_leaf(path[depth-1], depth-1, 1, aes_ops);
     }
 
     delete[] path;
+}
+
+// Expand the DPF if it's not already expanded
+//
+// This routine is slightly more efficient (except for incremental
+// RDPFs) than repeatedly calling StreamEval::next(), but it uses a lot
+// more memory.
+template <nbits_t WIDTH>
+void RDPF<WIDTH>::expand(size_t &aes_ops)
+{
+    nbits_t num_leaf_layers = li.size();
+    for (nbits_t li_index=0; li_index < num_leaf_layers; ++li_index) {
+        expand_leaf_layer(li_index, aes_ops);
+    }
 }
 
 // Construct three RDPFs of the given depth all with the same randomly
 // generated target index.
 template <nbits_t WIDTH>
 RDPFTriple<WIDTH>::RDPFTriple(MPCTIO &tio, yield_t &yield,
-    nbits_t depth, bool save_expansion)
+    nbits_t depth, bool incremental, bool save_expansion)
 {
     // Pick a random XOR share of the target
     xs_target.randomize(depth);
@@ -975,9 +1015,10 @@ RDPFTriple<WIDTH>::RDPFTriple(MPCTIO &tio, yield_t &yield,
     std::vector<coro_t> coroutines;
     for (int i=0;i<3;++i) {
         coroutines.emplace_back(
-            [this, &tio, depth, i, save_expansion](yield_t &yield) {
+            [this, &tio, depth, i, incremental,
+                save_expansion](yield_t &yield) {
                 dpf[i] = RDPF<WIDTH>(tio, yield, xs_target, depth,
-                    save_expansion);
+                    incremental, save_expansion);
             });
     }
     coroutines.emplace_back(

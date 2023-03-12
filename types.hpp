@@ -748,8 +748,12 @@ struct ValSelectTripleName { static constexpr const char *name = "s"; };
 // header dependencies.
 template <nbits_t WIDTH> struct RDPFPair;
 struct RDPFPairName { static constexpr const char *name = "r"; };
+// Incremental RDPFs
+struct IRDPFPairName { static constexpr const char *name = "i"; };
 template <nbits_t WIDTH> struct RDPFTriple;
 struct RDPFTripleName { static constexpr const char *name = "r"; };
+// Incremental RDPFs
+struct IRDPFTripleName { static constexpr const char *name = "i"; };
 struct CDPF;
 struct CDPFName { static constexpr const char *name = "c"; };
 

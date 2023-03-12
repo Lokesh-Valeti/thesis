@@ -111,6 +111,26 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     RegAS &as_x, RegXS xs_x,
     nbits_t nbits = VALUE_BITS, bool tally = true);
 
+// P0 and P1 hold XOR shares x0 and x1 of x. x is at most nbits bits
+// long. Return x to P0 and P1 (and 0 to P2).
+//
+// Cost: 1 word sent in 1 message
+value_t mpc_reconstruct(MPCTIO &tio, yield_t &yield,
+    RegXS f, nbits_t nbits = VALUE_BITS);
+
+// P0 and P1 hold additive shares x0 and x1 of x. x is at most nbits
+// bits long. Return x to P0 and P1 (and 0 to P2).
+//
+// Cost: 1 word sent in 1 message
+value_t mpc_reconstruct(MPCTIO &tio, yield_t &yield,
+    RegAS x, nbits_t nbits = VALUE_BITS);
+
+// P0 and P1 hold bit shares f0 and f1 of f. Return f to P0 and P1 (and
+// 0 to P2).
+//
+// Cost: 1 word sent in 1 message
+bool mpc_reconstruct(MPCTIO &tio, yield_t &yield, RegBS x);
+
 // P0 and P1 hold bit shares of f, and DPFnode XOR shares x0,y0 and
 // x1,y1 of x and y.  Set z to x=x0^x1 if f=0 and to y=y0^y1 if f=1.
 //

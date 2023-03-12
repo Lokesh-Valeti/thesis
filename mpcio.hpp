@@ -223,12 +223,22 @@ struct MPCPeerIO : public MPCIO {
     using RDPFPrecomps =
         std::vector<std::array<
             PreCompStorage<RDPFTriple<WIDTH>, RDPFTripleName>,ADDRESS_MAX_BITS>>;
+    template <nbits_t WIDTH>
+    using IRDPFPrecomps =
+        std::vector<std::array<
+            PreCompStorage<RDPFTriple<WIDTH>, IRDPFTripleName>,ADDRESS_MAX_BITS>>;
     std::tuple<
         RDPFPrecomps<1>,
         RDPFPrecomps<2>,
         RDPFPrecomps<3>,
         RDPFPrecomps<4>,
         RDPFPrecomps<5>> rdpftriples;
+    std::tuple<
+        IRDPFPrecomps<1>,
+        IRDPFPrecomps<2>,
+        IRDPFPrecomps<3>,
+        IRDPFPrecomps<4>,
+        IRDPFPrecomps<5>> irdpftriples;
 
     MPCPeerIO(unsigned player, ProcessingMode mode,
             std::deque<tcp::socket> &peersocks,
@@ -255,12 +265,22 @@ struct MPCServerIO : public MPCIO {
     using RDPFPrecomps =
         std::vector<std::array<
             PreCompStorage<RDPFPair<WIDTH>, RDPFPairName>,ADDRESS_MAX_BITS>>;
+    template <nbits_t WIDTH>
+    using IRDPFPrecomps =
+        std::vector<std::array<
+            PreCompStorage<RDPFPair<WIDTH>, IRDPFPairName>,ADDRESS_MAX_BITS>>;
     std::tuple<
         RDPFPrecomps<1>,
         RDPFPrecomps<2>,
         RDPFPrecomps<3>,
         RDPFPrecomps<4>,
         RDPFPrecomps<5>> rdpfpairs;
+    std::tuple<
+        IRDPFPrecomps<1>,
+        IRDPFPrecomps<2>,
+        IRDPFPrecomps<3>,
+        IRDPFPrecomps<4>,
+        IRDPFPrecomps<5>> irdpfpairs;
 
     MPCServerIO(ProcessingMode mode,
             std::deque<tcp::socket> &p0socks,
@@ -413,10 +433,11 @@ public:
     // Computational peers call:
     template <nbits_t WIDTH = 1>
     RDPFTriple<WIDTH> rdpftriple(yield_t &yield, nbits_t depth,
-        bool keep_expansion = true);
+        bool incremental = false, bool keep_expansion = true);
     // The server calls:
     template <nbits_t WIDTH = 1>
-    RDPFPair<WIDTH> rdpfpair(yield_t &yield, nbits_t depth);
+    RDPFPair<WIDTH> rdpfpair(yield_t &yield, nbits_t depth,
+        bool incremental = false);
     // Anyone can call:
     CDPF cdpf(yield_t &yield);
 

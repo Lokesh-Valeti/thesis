@@ -265,6 +265,64 @@ void mpc_xs_to_as(MPCTIO &tio, yield_t &yield,
     as_x.ashare = (xs_x.xshare - as_C) & mask;
 }
 
+// P0 and P1 hold XOR shares x0 and x1 of x. x is at most nbits bits
+// long. Return x to P0 and P1 (and 0 to P2).
+//
+// Cost: 1 word sent in 1 message
+value_t mpc_reconstruct(MPCTIO &tio, yield_t &yield,
+    RegXS x, nbits_t nbits)
+{
+    RegXS res;
+    size_t nbytes = BITBYTES(nbits);
+    if (tio.player() < 2) {
+        tio.queue_peer(&x, nbytes);
+        yield();
+        tio.recv_peer(&res, nbytes);
+        res ^= x;
+    } else {
+        yield();
+    }
+    return res.xshare;
+}
+
+// P0 and P1 hold additive shares x0 and x1 of x. x is at most nbits
+// bits long. Return x to P0 and P1 (and 0 to P2).
+//
+// Cost: 1 word sent in 1 message
+value_t mpc_reconstruct(MPCTIO &tio, yield_t &yield,
+    RegAS x, nbits_t nbits)
+{
+    RegAS res;
+    size_t nbytes = BITBYTES(nbits);
+    if (tio.player() < 2) {
+        tio.queue_peer(&x, nbytes);
+        yield();
+        tio.recv_peer(&res, nbytes);
+        res += x;
+    } else {
+        yield();
+    }
+    return res.ashare;
+}
+
+// P0 and P1 hold bit shares f0 and f1 of f. Return f to P0 and P1 (and
+// 0 to P2).
+//
+// Cost: 1 word sent in 1 message
+bool mpc_reconstruct(MPCTIO &tio, yield_t &yield, RegBS f)
+{
+    RegBS res;
+    if (tio.player() < 2) {
+        tio.queue_peer(&f, 1);
+        yield();
+        tio.recv_peer(&res, 1);
+        res ^= f;
+    } else {
+        yield();
+    }
+    return res.bshare;
+}
+
 // P0 and P1 hold bit shares of f, and DPFnode XOR shares x0,y0 and
 // x1,y1 of x and y.  Set z to x=x0^x1 if f=0 and to y=y0^y1 if f=1.
 //
