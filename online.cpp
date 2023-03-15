@@ -9,6 +9,7 @@
 #include "shapes.hpp"
 #include "node.hpp"
 #include "bst.hpp"
+#include "avl.hpp"
 
 static void online_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
@@ -1620,6 +1621,10 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "bst")) {
         ++args;
         bst(mpcio, opts, args);
+    } else if (!strcmp(*args, "avl")) {
+        ++args;
+        //avl(mpcio, opts, args);
+        avl_tests(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
