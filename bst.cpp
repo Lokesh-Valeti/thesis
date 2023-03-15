@@ -74,6 +74,13 @@ std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, Node n1, Node 
     return {lteq, gt};
 }
 
+std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1, RegAS k2) {
+    CDPF cdpf = tio.cdpf(yield);
+    auto [lt, eq, gt] = cdpf.compare(tio, yield, k2 - k1, tio.aes_ops());
+    RegBS lteq = lt^eq;
+    return {lteq, gt};
+}
+
 // Assuming pointer of 64 bits is split as:
 // - 32 bits Left ptr
 // - 32 bits Right ptr
@@ -416,7 +423,6 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
           ret_struct.F_r^=1;
         return success;
     } else {
-        bool player0 = tio.player()==0;
         Node node = A[ptr];
         // Compare key
 
@@ -510,7 +516,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
 
         // Case 4: finding successor (fs) and node has no more left children (l0)
         // This is the successor node then.
-        // Go left (to end the traversal without triggering flags on the real path to the right.
+        // Go right (since no more left) 
         mpc_and(tio, yield, F_c4, fs, l0);
         mpc_select(tio, yield, c_prime, F_c4, c_prime, l0);
 
@@ -609,11 +615,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
             return 0;
         }
         else{
-            num_items--;
-            
-            //Add deleted (empty) location into the empty_locations vector for reuse in next insert()
-            empty_locations.emplace_back(ret_struct.N_d);
-
+            num_items--; 
             /*
             printf("In delete's swap portion\n");
             Node del_node = A.reconstruct(A[ret_struct.N_d]);
@@ -632,6 +634,11 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
             A[ret_struct.N_d].NODE_VALUE = del_node.value;
             A[ret_struct.N_s].NODE_KEY = zero_as;
             A[ret_struct.N_s].NODE_VALUE = zero_xs;
+
+            RegXS empty_loc;
+            mpc_select(tio, yield, empty_loc, ret_struct.F_ss, ret_struct.N_d, ret_struct.N_s);
+            //Add deleted (empty) location into the empty_locations vector for reuse in next insert()
+            empty_locations.emplace_back(empty_loc);
         }
 
       return 1;
