@@ -7,6 +7,11 @@
 #include "mpcio.hpp"
 #include "options.hpp"
 
+// Some simple utility functions:
+bool reconstruct_RegBS(MPCTIO &tio, yield_t &yield, RegBS flag);
+size_t reconstruct_RegAS(MPCTIO &tio, yield_t &yield, RegAS variable);
+size_t reconstruct_RegXS(MPCTIO &tio, yield_t &yield, RegXS variable);
+
 struct Node {
     RegAS key;
     RegXS pointers;
@@ -114,6 +119,11 @@ struct Node {
     }
 };
 
+void newnode(Node &a);
+
+std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, Node n1, Node n2);
+std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1, RegAS k2);
+
 // I/O operations (for sending over the network)
 
 template <typename T>
@@ -177,6 +187,10 @@ class BST {
         delete oram;
     };
 
+    size_t numEmptyLocations(){
+      return(empty_locations.size());
+    };
+
     void initialize(int num_players, size_t size);
     void insert(MPCTIO &tio, yield_t &yield, Node &node);
 
@@ -194,9 +208,6 @@ class BST {
     std::tuple<bool, address_t> check_bst(const std::vector<Node> &R,
         value_t node, value_t min_key, value_t max_key);
     void print_oram(MPCTIO &tio, yield_t &yield);
-    size_t numEmptyLocations(){
-      return(empty_locations.size());
-    };
 };
 
 /*
