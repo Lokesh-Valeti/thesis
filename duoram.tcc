@@ -177,62 +177,75 @@ Duoram<T>::Flat::Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield,
     this->set_shape_size(len);
 }
 
-// Bitonic sort the elements from start to start+(1<<depth)-1, in
+// Bitonic sort the elements from start to start+len-1, in
 // increasing order if dir=0 or decreasing order if dir=1. Note that
 // the elements must be at most 63 bits long each for the notion of
 // ">" to make consistent sense.
 template <typename T>
-void Duoram<T>::Flat::bitonic_sort(address_t start, nbits_t depth, bool dir)
+void Duoram<T>::Flat::bitonic_sort(address_t start, address_t len, bool dir)
 {
-    if (depth == 0) return;
-    if (depth == 1) {
+    if (len < 2) return;
+    if (len == 2) {
         osort(start, start+1, dir);
         return;
     }
-    // Recurse on the first half (increasing order) and the second half
-    // (decreasing order) in parallel
+    address_t leftlen, rightlen;
+    leftlen = (len+1) >> 1;
+    rightlen = len >> 1;
+
+    // Recurse on the first half (opposite to the desired order)
+    // and the second half (desired order) in parallel
     run_coroutines(this->yield,
-        [this, start, depth](yield_t &yield) {
+        [this, start, leftlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.bitonic_sort(start, depth-1, 0);
+            Acoro.bitonic_sort(start, leftlen, !dir);
         },
-        [this, start, depth](yield_t &yield) {
+        [this, start, leftlen, rightlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.bitonic_sort(start+(1<<(depth-1)), depth-1, 1);
+            Acoro.bitonic_sort(start+leftlen, rightlen, dir);
         });
     // Merge the two into the desired order
-    butterfly(start, depth, dir);
+    butterfly(start, len, dir);
 }
 
 // Internal function to aid bitonic_sort
 template <typename T>
-void Duoram<T>::Flat::butterfly(address_t start, nbits_t depth, bool dir)
+void Duoram<T>::Flat::butterfly(address_t start, address_t len, bool dir)
 {
-    if (depth == 0) return;
-    if (depth == 1) {
+    if (len < 2) return;
+    if (len == 2) {
         osort(start, start+1, dir);
         return;
     }
-    // Sort pairs of elements half the width apart in parallel
-    address_t halfwidth = address_t(1)<<(depth-1);
+    address_t leftlen, rightlen, offset, num_swaps;
+    // leftlen = (len+1) >> 1;
+    leftlen = 1;
+    while(2*leftlen < len) {
+        leftlen *= 2;
+    }
+    rightlen = len - leftlen;
+    offset = leftlen;
+    num_swaps = rightlen;
+
+    // Sort pairs of elements offset apart in parallel
     std::vector<coro_t> coroutines;
-    for (address_t i=0; i<halfwidth;++i) {
+    for (address_t i=0; i<num_swaps;++i) {
         coroutines.emplace_back(
-            [this, start, halfwidth, dir, i](yield_t &yield) {
+            [this, start, offset, dir, i](yield_t &yield) {
                 Flat Acoro = context(yield);
-                Acoro.osort(start+i, start+i+halfwidth, dir);
+                Acoro.osort(start+i, start+i+offset, dir);
             });
     }
     run_coroutines(this->yield, coroutines);
     // Recurse on each half in parallel
     run_coroutines(this->yield,
-        [this, start, depth, dir](yield_t &yield) {
+        [this, start, leftlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.butterfly(start, depth-1, dir);
+            Acoro.butterfly(start, leftlen, dir);
         },
-        [this, start, halfwidth, depth, dir](yield_t &yield) {
+        [this, start, leftlen, rightlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.butterfly(start+halfwidth, depth-1, dir);
+            Acoro.butterfly(start+leftlen, rightlen, dir);
         });
 }
 

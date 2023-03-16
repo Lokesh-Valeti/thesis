@@ -266,7 +266,7 @@ class Duoram<T>::Flat : public Duoram<T>::Shape {
     }
 
     // Internal function to aid bitonic_sort
-    void butterfly(address_t start, nbits_t depth, bool dir);
+    void butterfly(address_t start, address_t len, bool dir);
 
 public:
     // Constructor.  len=0 means the maximum size (the parent's size
@@ -338,11 +338,11 @@ public:
     template<typename U,typename V>
     void osort(const U &idx1, const V &idx2, bool dir=0);
 
-    // Bitonic sort the elements from start to start+(1<<depth)-1, in
+    // Bitonic sort the elements from start to start+len-1, in
     // increasing order if dir=0 or decreasing order if dir=1. Note that
     // the elements must be at most 63 bits long each for the notion of
     // ">" to make consistent sense.
-    void bitonic_sort(address_t start, nbits_t depth, bool dir=0);
+    void bitonic_sort(address_t start, address_t len, bool dir=0);
 
     // Assuming the memory is already sorted, do an oblivious binary
     // search for the largest index containing the value at most the

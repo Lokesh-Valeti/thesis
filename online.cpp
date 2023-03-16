@@ -1066,13 +1066,18 @@ static void sort_test(MPCIO &mpcio,
         depth = atoi(*args);
         ++args;
     }
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
+    }
 
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth] {
+        boost::asio::post(pool, [&mpcio, thread_num, depth, len] {
             MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth] (yield_t &yield) {
+            run_coroutines(tio, [&tio, depth, len] (yield_t &yield) {
                 address_t size = address_t(1)<<depth;
                 // size_t &aes_ops = tio.aes_ops();
                 Duoram<RegAS> oram(tio.player(), size);
@@ -1090,14 +1095,26 @@ static void sort_test(MPCIO &mpcio,
                         });
                 }
                 run_coroutines(yield, coroutines);
-                A.bitonic_sort(0, depth);
+                A.bitonic_sort(0, len);
                 if (depth <= 10) {
                     oram.dump();
-                    auto check = A.reconstruct();
-                    if (tio.player() == 0) {
-                        for (address_t i=0;i<size;++i) {
+                }
+                auto check = A.reconstruct();
+                bool fail = false;
+                if (tio.player() == 0) {
+                    for (address_t i=0;i<size;++i) {
+                        if (depth <= 10) {
                             printf("%04x %016lx\n", i, check[i].share());
                         }
+                        if (i>0 && i<len &&
+                            check[i].share() < check[i-1].share()) {
+                            fail = true;
+                        }
+                    }
+                    if (fail) {
+                        printf("FAIL\n");
+                    } else {
+                        printf("PASS\n");
                     }
                 }
             });
@@ -1118,6 +1135,11 @@ static void bsearch_test(MPCIO &mpcio,
         depth = atoi(*args);
         ++args;
     }
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
+    }
     if (*args) {
         target = strtoull(*args, NULL, 16);
         ++args;
@@ -1126,9 +1148,9 @@ static void bsearch_test(MPCIO &mpcio,
     int num_threads = opts.num_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, target] {
+        boost::asio::post(pool, [&mpcio, thread_num, depth, len, target] {
             MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth, target] (yield_t &yield) {
+            run_coroutines(tio, [&tio, depth, len, target] (yield_t &yield) {
                 address_t size = address_t(1)<<depth;
                 RegAS tshare;
                 if (tio.player() == 2) {
@@ -1163,7 +1185,7 @@ static void bsearch_test(MPCIO &mpcio,
                         });
                 }
                 run_coroutines(yield, coroutines);
-                A.bitonic_sort(0, depth);
+                A.bitonic_sort(0, len);
 
                 // Binary search for the target
                 RegAS tindex = A.obliv_binary_search(tshare);
