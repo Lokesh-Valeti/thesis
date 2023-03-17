@@ -650,12 +650,16 @@ static void duoram_test(MPCIO &mpcio,
         ++args;
     }
     share &= ((address_t(1)<<depth)-1);
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
+    }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, depth, share] (yield_t &yield) {
-        size_t size = size_t(1)<<depth;
+    run_coroutines(tio, [&tio, depth, share, len] (yield_t &yield) {
         // size_t &aes_ops = tio.aes_ops();
-        Duoram<T> oram(tio.player(), size);
+        Duoram<T> oram(tio.player(), len);
         auto A = oram.flat(tio, yield);
         RegAS aidx, aidx2, aidx3;
         aidx.ashare = share;
@@ -713,7 +717,7 @@ static void duoram_test(MPCIO &mpcio,
             oram.dump();
             auto check = A.reconstruct();
             if (tio.player() == 0) {
-                for (address_t i=0;i<size;++i) {
+                for (address_t i=0;i<len;++i) {
                     printf("%04x %016lx\n", i, check[i].share());
                 }
             }
