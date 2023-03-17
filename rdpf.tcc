@@ -145,7 +145,7 @@ inline V ParallelEval<T>::reduce(V init, W process)
     size_t thread_aes_ops[num_threads];
     V accums[num_threads];
     boost::asio::thread_pool pool(num_threads);
-    address_t threadstart = start;
+    address_t threadstart = 0;
     address_t threadchunk = num_evals / num_threads;
     address_t threadextra = num_evals % num_threads;
     nbits_t depth = rdpf.depth();
