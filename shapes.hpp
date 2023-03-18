@@ -20,7 +20,7 @@ class Duoram<T>::Pad : public Duoram<T>::Shape {
     address_t padded_size;
 
     inline size_t indexmap(size_t idx) const override {
-        return this->parent.indexmap(idx);
+        return idx;
     }
 
     Pad &operator=(const Pad &) = delete;
@@ -52,11 +52,9 @@ public:
     // duoram.p0_blind[indexmap(idx)], etc.)
     inline std::tuple<T&,T&> get_server(size_t idx,
         std::nullopt_t null = std::nullopt) const override {
-        if (idx < this->parent.shape_size) {
-            size_t physaddr = indexmap(idx);
-            return std::tie(
-                this->duoram.p0_blind[physaddr],
-                this->duoram.p1_blind[physaddr]);
+        size_t parindex = indexmap(idx);
+        if (parindex < this->parent.shape_size) {
+            return this->parent.get_server(parindex, null);
         } else {
             return std::tie(*zerop, *zerop);
         }
@@ -67,12 +65,9 @@ public:
     // it gets duoram.database[indexmap(idx)], etc.)
     inline std::tuple<T&,T&,T&> get_comp(size_t idx,
         std::nullopt_t null = std::nullopt) const override {
-        if (idx < this->parent.shape_size) {
-            size_t physaddr = indexmap(idx);
-            return std::tie(
-                this->duoram.database[physaddr],
-                this->duoram.blind[physaddr],
-                this->duoram.peer_blinded_db[physaddr]);
+        size_t parindex = indexmap(idx);
+        if (parindex < this->parent.shape_size) {
+            return this->parent.get_comp(parindex, null);
         } else {
             return std::tie(*padvalp, *zerop, *peerpadvalp);
         }
@@ -130,7 +125,7 @@ class Duoram<T>::Stride : public Duoram<T>::Shape {
 
     inline size_t indexmap(size_t idx) const override {
         size_t paridx = offset + idx*stride;
-        return this->parent.indexmap(paridx);
+        return paridx;
     }
 
 public:

@@ -82,7 +82,8 @@ public:
 
 template <typename T>
 class Duoram<T>::Shape {
-    // Subclasses should be able to access _other_ Shapes' indexmap
+    // Subclasses should be able to access _other_ Shapes'
+    // get_{comp,server} functions
     friend class Flat;
     friend class Pad;
     friend class Stride;
@@ -165,12 +166,8 @@ protected:
         explicitmode(copy_from.explicitmode) {}
 
     // The index-mapping function. Input the index relative to this
-    // shape, and output the corresponding physical address.  The
-    // strategy is to map the index relative to this shape to the index
-    // relative to the parent shape, call the parent's indexmap function
-    // on that (unless this is the topmost shape), and return what it
-    // returns.  If this is the topmost shape, just return what you
-    // would have passed to the parent's indexmap.
+    // shape, and output the corresponding index relative to the parent
+    // shape.
     //
     // This is a pure virtual function; all subclasses of Shape must
     // implement it, and of course Shape itself therefore cannot be
@@ -178,50 +175,62 @@ protected:
     virtual size_t indexmap(size_t idx) const = 0;
 
     // Get a pair (for the server) of references to the underlying
-    // Duoram entries at share virtual index idx.  (That is, it gets
-    // duoram.p0_blind[indexmap(idx)], etc.)
+    // Duoram entries at share virtual index idx.
     virtual inline std::tuple<T&,T&> get_server(size_t idx,
         std::nullopt_t null = std::nullopt) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.p0_blind[physaddr],
-            duoram.p1_blind[physaddr]);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.p0_blind[parindex],
+                duoram.p1_blind[parindex]);
+        } else {
+            return this->parent.get_server(parindex, null);
+        }
     }
 
     // Get a triple (for the computational players) of references to the
-    // underlying Duoram entries at share virtual index idx.  (That is,
-    // it gets duoram.database[indexmap(idx)], etc.)
+    // underlying Duoram entries at share virtual index idx.
     virtual inline std::tuple<T&,T&,T&> get_comp(size_t idx,
         std::nullopt_t null = std::nullopt) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.database[physaddr],
-            duoram.blind[physaddr],
-            duoram.peer_blinded_db[physaddr]);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.database[parindex],
+                duoram.blind[parindex],
+                duoram.peer_blinded_db[parindex]);
+        } else {
+            return this->parent.get_comp(parindex, null);
+        }
     }
 
     // Get a pair (for the server) of references to a particular field
     // of the underlying Duoram entries at share virtual index idx.
-    // (That is, it gets duoram.p0_blind[indexmap(idx)].field, etc.)
     template <typename FT>
     inline std::tuple<FT&,FT&> get_server(size_t idx, FT T::*field) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.p0_blind[physaddr].*field,
-            duoram.p1_blind[physaddr].*field);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.p0_blind[parindex].*field,
+                duoram.p1_blind[parindex].*field);
+        } else {
+            return this->parent.get_server(parindex, field);
+        }
     }
 
     // Get a triple (for the computational players) of references to a
     // particular field to the underlying Duoram entries at share
-    // virtual index idx.  (That is, it gets
-    // duoram.database[indexmap(idx)].field, etc.)
+    // virtual index idx.
     template <typename FT>
     inline std::tuple<FT&,FT&,FT&> get_comp(size_t idx, FT T::*field) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.database[physaddr].*field,
-            duoram.blind[physaddr].*field,
-            duoram.peer_blinded_db[physaddr].*field);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.database[parindex].*field,
+                duoram.blind[parindex].*field,
+                duoram.peer_blinded_db[parindex].*field);
+        } else {
+            return this->parent.get_comp(parindex, field);
+        }
     }
 
 public:
@@ -262,11 +271,7 @@ class Duoram<T>::Flat : public Duoram<T>::Shape {
 
     inline size_t indexmap(size_t idx) const {
         size_t paridx = idx + start;
-        if (&(this->parent) == this) {
-            return paridx;
-        } else {
-            return this->parent.indexmap(paridx);
-        }
+        return paridx;
     }
 
     // Internal function to aid bitonic_sort
