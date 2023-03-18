@@ -51,7 +51,7 @@ cdpf.o: bitutils.hpp cdpf.hpp mpcio.hpp types.hpp corotypes.hpp mpcio.tcc
 cdpf.o: coroutine.hpp dpf.hpp prg.hpp aes.hpp cdpf.tcc
 duoram.o: duoram.hpp types.hpp bitutils.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 duoram.o: coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
-duoram.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc
+duoram.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc shapes.hpp shapes.tcc
 cell.o: types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 cell.o: coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
 cell.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc cell.hpp options.hpp

@@ -1077,55 +1077,48 @@ static void sort_test(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, len] {
-            MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth, len] (yield_t &yield) {
-                address_t size = address_t(1)<<depth;
-                // size_t &aes_ops = tio.aes_ops();
-                Duoram<RegAS> oram(tio.player(), size);
-                auto A = oram.flat(tio, yield);
-                A.explicitonly(true);
-                // Initialize the memory to random values in parallel
-                std::vector<coro_t> coroutines;
-                for (address_t i=0; i<size; ++i) {
-                    coroutines.emplace_back(
-                        [&A, i](yield_t &yield) {
-                            auto Acoro = A.context(yield);
-                            RegAS v;
-                            v.randomize(62);
-                            Acoro[i] += v;
-                        });
-                }
-                run_coroutines(yield, coroutines);
-                A.bitonic_sort(0, len);
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&tio, depth, len] (yield_t &yield) {
+        address_t size = address_t(1)<<depth;
+        // size_t &aes_ops = tio.aes_ops();
+        Duoram<RegAS> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+        A.explicitonly(true);
+        // Initialize the memory to random values in parallel
+        std::vector<coro_t> coroutines;
+        for (address_t i=0; i<size; ++i) {
+            coroutines.emplace_back(
+                [&A, i](yield_t &yield) {
+                    auto Acoro = A.context(yield);
+                    RegAS v;
+                    v.randomize(62);
+                    Acoro[i] += v;
+                });
+        }
+        run_coroutines(yield, coroutines);
+        A.bitonic_sort(0, len);
+        if (depth <= 10) {
+            oram.dump();
+        }
+        auto check = A.reconstruct();
+        bool fail = false;
+        if (tio.player() == 0) {
+            for (address_t i=0;i<size;++i) {
                 if (depth <= 10) {
-                    oram.dump();
+                    printf("%04x %016lx\n", i, check[i].share());
                 }
-                auto check = A.reconstruct();
-                bool fail = false;
-                if (tio.player() == 0) {
-                    for (address_t i=0;i<size;++i) {
-                        if (depth <= 10) {
-                            printf("%04x %016lx\n", i, check[i].share());
-                        }
-                        if (i>0 && i<len &&
-                            check[i].share() < check[i-1].share()) {
-                            fail = true;
-                        }
-                    }
-                    if (fail) {
-                        printf("FAIL\n");
-                    } else {
-                        printf("PASS\n");
-                    }
+                if (i>0 && i<len &&
+                    check[i].share() < check[i-1].share()) {
+                    fail = true;
                 }
-            });
-        });
-    }
-    pool.join();
+            }
+            if (fail) {
+                printf("FAIL\n");
+            } else {
+                printf("PASS\n");
+            }
+        }
+    });
 }
 
 static void pad_test(MPCIO &mpcio,
@@ -1156,7 +1149,7 @@ static void pad_test(MPCIO &mpcio,
             A[i] = v;
         }
         A.explicitonly(false);
-        // Add 0 to A[0], which reblinds the whole database
+        // Obliviously add 0 to A[0], which reblinds the whole database
         RegAS z;
         A[z] += z;
         auto check = A.reconstruct();
@@ -1179,8 +1172,12 @@ static void pad_test(MPCIO &mpcio,
         }
         printf("\n");
         for (address_t i=0; i<maxsize; ++i) {
+            value_t offset = 0xdeadbeef;
+            if (player) {
+                offset = -offset;
+            }
             RegAS ind;
-            ind.set(player*i);
+            ind.set(player*i+offset);
             RegAS v = P[ind];
             if (depth <= 10) {
                 value_t vval = mpc_reconstruct(tio, yield, v);
@@ -1214,74 +1211,85 @@ static void bsearch_test(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, len, target] {
-            MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth, len, target] (yield_t &yield) {
-                address_t size = address_t(1)<<depth;
-                RegAS tshare;
-                if (tio.player() == 2) {
-                    // Send shares of the target to the computational
-                    // players
-                    RegAS tshare0, tshare1;
-                    tshare0.randomize();
-                    tshare1.set(target-tshare0.share());
-                    tio.iostream_p0() << tshare0;
-                    tio.iostream_p1() << tshare1;
-                    printf("Using target = %016lx\n", target);
-                    yield();
-                } else {
-                    // Get the share of the target
-                    tio.iostream_server() >> tshare;
-                }
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&tio, depth, len, target] (yield_t &yield) {
+        RegAS tshare;
+        if (tio.player() == 2) {
+            // Send shares of the target to the computational
+            // players
+            RegAS tshare0, tshare1;
+            tshare0.randomize();
+            tshare1.set(target-tshare0.share());
+            tio.iostream_p0() << tshare0;
+            tio.iostream_p1() << tshare1;
+            printf("Using target = %016lx\n", target);
+            yield();
+        } else {
+            // Get the share of the target
+            tio.iostream_server() >> tshare;
+        }
 
-                // Create a random database and sort it
-                // size_t &aes_ops = tio.aes_ops();
-                Duoram<RegAS> oram(tio.player(), size);
-                auto A = oram.flat(tio, yield);
-                A.explicitonly(true);
-                // Initialize the memory to random values in parallel
-                std::vector<coro_t> coroutines;
-                for (address_t i=0; i<size; ++i) {
-                    coroutines.emplace_back(
-                        [&A, i](yield_t &yield) {
-                            auto Acoro = A.context(yield);
-                            RegAS v;
-                            v.randomize(62);
-                            Acoro[i] += v;
-                        });
-                }
-                run_coroutines(yield, coroutines);
-                A.bitonic_sort(0, len);
+        // Create a random database and sort it
+        // size_t &aes_ops = tio.aes_ops();
+        Duoram<RegAS> oram(tio.player(), len);
+        auto A = oram.flat(tio, yield);
+        A.explicitonly(true);
+        // Initialize the memory to random values in parallel
+        std::vector<coro_t> coroutines;
+        for (address_t i=0; i<len; ++i) {
+            coroutines.emplace_back(
+                [&A, i](yield_t &yield) {
+                    auto Acoro = A.context(yield);
+                    RegAS v;
+                    v.randomize(62);
+                    Acoro[i] += v;
+                });
+        }
+        run_coroutines(yield, coroutines);
+        A.bitonic_sort(0, len);
+        A.explicitonly(false);
 
-                // Binary search for the target
-                RegAS tindex = A.obliv_binary_search(tshare);
+        // Binary search for the target
+        RegAS tindex = A.obliv_binary_search(tshare);
 
-                // Check the answer
-                if (tio.player() == 1) {
-                    tio.iostream_peer() << tindex;
-                } else if (tio.player() == 0) {
-                    RegAS peer_tindex;
-                    tio.iostream_peer() >> peer_tindex;
-                    tindex += peer_tindex;
-                }
+        // Check the answer
+        size_t size = size_t(1) << depth;
+        value_t checkindex = mpc_reconstruct(tio, yield, tindex);
+        value_t checktarget = mpc_reconstruct(tio, yield, tshare);
+        auto check = A.reconstruct();
+        bool fail = false;
+        if (tio.player() == 0) {
+            for (address_t i=0;i<len;++i) {
                 if (depth <= 10) {
-                    auto check = A.reconstruct();
-                    if (tio.player() == 0) {
-                        for (address_t i=0;i<size;++i) {
-                            printf("%04x %016lx\n", i, check[i].share());
-                        }
+                    printf("%c%04x %016lx\n",
+                        (i == checkindex ? '*' : ' '),
+                        i, check[i].share());
+                }
+                if (i>0 && i<len &&
+                    check[i].share() < check[i-1].share()) {
+                    fail = true;
+                }
+                if (i == checkindex) {
+                    // check[i] should be >= target, and check[i-1]
+                    // should be < target
+                    if ((i < len && check[i].share() < checktarget) ||
+                        (i > 0 && check[i-1].share() >= checktarget)) {
+                        fail = true;
                     }
                 }
-                if (tio.player() == 0) {
-                    printf("Found index = %lx\n", tindex.share());
-                }
-            });
-        });
-    }
-    pool.join();
+            }
+            printf("Target = %016lx\n", checktarget);
+            printf("Found index = %02lx\n", checkindex);
+            if (checkindex > size) {
+                fail = true;
+            }
+            if (fail) {
+                printf("FAIL\n");
+            } else {
+                printf("PASS\n");
+            }
+        }
+    });
 }
 
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)

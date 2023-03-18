@@ -349,10 +349,10 @@ public:
     void bitonic_sort(address_t start, address_t len, bool dir=0);
 
     // Assuming the memory is already sorted, do an oblivious binary
-    // search for the largest index containing the value at most the
-    // given one.  (The answer will be 0 if all of the memory elements
-    // are greate than the target.) This Flat must be a power of 2 size.
-    // Only available for additive shared databases for now.
+    // search for the smallest index containing the value at least the
+    // given one.  (The answer will be the length of the Flat if all
+    // elements are smaller than the target.) Only available for additive
+    // shared databases for now.
     RegAS obliv_binary_search(RegAS &target);
 };
 

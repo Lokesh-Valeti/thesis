@@ -1,7 +1,8 @@
 #ifndef __SHAPES_TCC__
 #define __SHAPES_TCC__
 
-// Constructor for the Pad shape.
+// Constructor for the Pad shape. The parent must _not_ be in
+// explicit-only mode.
 template <typename T>
 Duoram<T>::Pad::Pad(Shape &parent, MPCTIO &tio, yield_t &yield,
     address_t padded_size, size_t padval) :

@@ -12,6 +12,8 @@
 
 template <typename T>
 class Duoram<T>::Pad : public Duoram<T>::Shape {
+    // These are pointers because we need to be able to return a
+    // (non-const) T& even from a const Pad.
     T *padvalp;
     T *peerpadvalp;
     T *zerop;
@@ -24,7 +26,8 @@ class Duoram<T>::Pad : public Duoram<T>::Shape {
     Pad &operator=(const Pad &) = delete;
 
 public:
-    // Constructor
+    // Constructor for the Pad shape. The parent must _not_ be in
+    // explicit-only mode.
     Pad(Shape &parent, MPCTIO &tio, yield_t &yield,
         address_t padded_size, value_t padval = 0x7fffffffffffffff);
 
@@ -65,7 +68,7 @@ public:
     inline std::tuple<T&,T&,T&> get_comp(size_t idx,
         std::nullopt_t null = std::nullopt) const override {
         if (idx < this->parent.shape_size) {
-        size_t physaddr = indexmap(idx);
+            size_t physaddr = indexmap(idx);
             return std::tie(
                 this->duoram.database[physaddr],
                 this->duoram.blind[physaddr],
