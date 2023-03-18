@@ -58,6 +58,8 @@ public:
     class Shape;
     // These are the different Shapes that exist
     class Flat;
+    class Pad;
+    class Stride;
 
     // Pass the player number and desired size
     Duoram(int player, size_t size);
@@ -82,6 +84,8 @@ template <typename T>
 class Duoram<T>::Shape {
     // Subclasses should be able to access _other_ Shapes' indexmap
     friend class Flat;
+    friend class Pad;
+    friend class Stride;
 
     // When you index into a shape (A[x]), you get one of these types,
     // depending on the type of x (the index), _not_ on the type T (the
@@ -176,7 +180,7 @@ protected:
     // Get a pair (for the server) of references to the underlying
     // Duoram entries at share virtual index idx.  (That is, it gets
     // duoram.p0_blind[indexmap(idx)], etc.)
-    inline std::tuple<T&,T&> get_server(size_t idx,
+    virtual inline std::tuple<T&,T&> get_server(size_t idx,
         std::nullopt_t null = std::nullopt) const {
         size_t physaddr = indexmap(idx);
         return std::tie(
@@ -187,7 +191,7 @@ protected:
     // Get a triple (for the computational players) of references to the
     // underlying Duoram entries at share virtual index idx.  (That is,
     // it gets duoram.database[indexmap(idx)], etc.)
-    inline std::tuple<T&,T&,T&> get_comp(size_t idx,
+    virtual inline std::tuple<T&,T&,T&> get_comp(size_t idx,
         std::nullopt_t null = std::nullopt) const {
         size_t physaddr = indexmap(idx);
         return std::tie(

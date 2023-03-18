@@ -6,6 +6,7 @@
 #include "duoram.hpp"
 #include "cdpf.hpp"
 #include "cell.hpp"
+#include "shapes.hpp"
 
 
 static void online_test(MPCIO &mpcio,
@@ -1127,6 +1128,70 @@ static void sort_test(MPCIO &mpcio,
     pool.join();
 }
 
+static void pad_test(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
+    }
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, len] (yield_t &yield) {
+        int player = tio.player();
+        Duoram<RegAS> oram(player, len);
+        auto A = oram.flat(tio, yield);
+        // Initialize the ORAM in explicit mode
+        A.explicitonly(true);
+        for (address_t i=0; i<len; ++i) {
+            RegAS v;
+            v.set((player*0xffff+1)*i);
+            A[i] = v;
+        }
+        A.explicitonly(false);
+        // Add 0 to A[0], which reblinds the whole database
+        RegAS z;
+        A[z] += z;
+        auto check = A.reconstruct();
+        if (player == 0) {
+            for (address_t i=0;i<len;++i) {
+                if (depth <= 10) {
+                    printf("%04x %016lx\n", i, check[i].share());
+                }
+            }
+            printf("\n");
+        }
+        address_t maxsize = address_t(1)<<depth;
+        Duoram<RegAS>::Pad P(A, tio, yield, maxsize);
+        for (address_t i=0; i<maxsize; ++i) {
+            RegAS v = P[i];
+            if (depth <= 10) {
+                value_t vval = mpc_reconstruct(tio, yield, v);
+                printf("%04x %016lx %016lx\n", i, v.share(), vval);
+            }
+        }
+        printf("\n");
+        for (address_t i=0; i<maxsize; ++i) {
+            RegAS ind;
+            ind.set(player*i);
+            RegAS v = P[ind];
+            if (depth <= 10) {
+                value_t vval = mpc_reconstruct(tio, yield, v);
+                printf("%04x %016lx %016lx\n", i, v.share(), vval);
+            }
+        }
+        printf("\n");
+    });
+}
+
+
 static void bsearch_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -1292,6 +1357,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "sorttest")) {
         ++args;
         sort_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "padtest")) {
+        ++args;
+        pad_test(mpcio, opts, args);
     } else if (!strcmp(*args, "bsearch")) {
         ++args;
         bsearch_test(mpcio, opts, args);
