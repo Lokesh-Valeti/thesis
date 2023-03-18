@@ -145,14 +145,8 @@ class AVL {
     std::tuple<RegBS, RegBS, RegBS, RegBS> updateBalanceDel(MPCTIO &tio, yield_t &yield,
         RegBS bal_l, RegBS bal_r, RegBS bal_upd, RegBS child_dir);
 
-    /*
-    bool del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
-        Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL,
-        del_return &ret_struct);
-
     bool lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key,
         Duoram<Node>::Flat &A, int TTL, RegBS isDummy, Node *ret_node);
-    */
 
   public:
     AVL(int num_players, size_t size) {

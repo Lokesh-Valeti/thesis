@@ -644,8 +644,8 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
     }
 }
 
-/*
-bool BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>::Flat &A,
+
+bool AVL::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>::Flat &A,
     int TTL, RegBS isDummy, Node *ret_node) {
     if(TTL==0) {
         // Reconstruct and return isDummy
@@ -663,8 +663,8 @@ bool BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>
     // Depending on [lteq, gt] select the next ptr/index as
     // upper 32 bits of cnode.pointers if lteq
     // lower 32 bits of cnode.pointers if gt
-    RegXS left = extractLeftPtr(cnode.pointers);
-    RegXS right = extractRightPtr(cnode.pointers);
+    RegXS left = getAVLLeftPtr(cnode.pointers);
+    RegXS right = getAVLRightPtr(cnode.pointers);
 
     RegXS next_ptr;
     mpc_select(tio, yield, next_ptr, gt, left, right, 32);
@@ -690,7 +690,6 @@ bool AVL::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
     bool found = lookup(tio, yield, root, key, A, num_items, isDummy, ret_node);
     return found;
 }
-*/
 
 
 std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
@@ -838,6 +837,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         p_bal_r = getRightBal(node.pointers);
         auto [new_p_bal_l, new_p_bal_r, new_bal_upd, imb] =
             updateBalanceDel(tio, yield, p_bal_l, p_bal_r, bal_upd, c_prime);
+        
         /*
         // Reconstruct and Debug Block
         bool rec_new_bal_upd, rec_imb, rec_bal_upd;
@@ -852,6 +852,10 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         rec_F_c3 = reconstruct_RegBS(tio, yield, F_c3);
         rec_F_c4 = reconstruct_RegBS(tio, yield, F_c4);
         printf("Current Key = %lu\n", rec_ckey);
+        size_t rec_p_left_0, rec_p_right_0;
+        rec_p_left_0 = reconstruct_RegXS(tio, yield, getAVLLeftPtr(node.pointers));
+        rec_p_right_0 = reconstruct_RegXS(tio, yield, getAVLRightPtr(node.pointers));
+        printf("parent_ptrs (after read): left = %lu, right = %lu\n", rec_p_left_0, rec_p_right_0);
         printf("F_c1 = %d, F_c2 = %d, F_c3 = %d, F_c4 = %d\n", rec_F_c1, rec_F_c2, rec_F_c3, rec_F_c4);
         printf("bal_upd = %d, new_bal_upd = %d, imb= %d\n", rec_bal_upd, rec_new_bal_upd, rec_imb);
         */
@@ -917,7 +921,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         mpc_select(tio, yield, cs_ndpc, c_prime, cs_right, cs_left);
 
         // We need to double rotate (LR or RL case) if cs_bal_dpc is 1
-        F_dr = cs_bal_dpc;
+        mpc_and(tio, yield, F_dr, imb, cs_bal_dpc);
         mpc_select(tio, yield, gcs_ptr, cs_bal_dpc, cs_ndpc, cs_dpc, AVL_PTR_SIZE);
         Node gcs_node = A[gcs_ptr];
 
@@ -940,6 +944,17 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         // and ret_struct.ret_ptr.
         rotate(tio, yield, null, ptr, node.pointers, new_cs,
             new_cs_pointers, s0, not_c_prime, imb, s1);
+
+        /*
+        size_t rec_p_left_1, rec_p_right_1;
+        bool rec_flag_imb, rec_flag_dr;
+        rec_flag_imb = reconstruct_RegBS(tio, yield, imb);
+        rec_flag_dr = reconstruct_RegBS(tio, yield, F_dr);
+        rec_p_left_1 = reconstruct_RegXS(tio, yield, getAVLLeftPtr(node.pointers));
+        rec_p_right_1 = reconstruct_RegXS(tio, yield, getAVLRightPtr(node.pointers));
+        printf("flag_imb = %d, flag_dr = %d\n", rec_flag_imb, rec_flag_dr);
+        printf("parent_ptrs (after rotations): left = %lu, right = %lu\n", rec_p_left_1, rec_p_right_1);
+        */
 
         // If imb (we do some rotation), then update F_r, and ret_ptr, to
         // fix the gp->p link (The F_r clauses later, and this are mutually
@@ -1052,7 +1067,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         setLeftBal(node.pointers, new_p_bal_l);
         setRightBal(node.pointers, new_p_bal_r);
         A[ptr].NODE_POINTERS = node.pointers;
-
+ 
         // Update the return structure
         // F_dh = Delete Here flag,
         // F_sf = successor found (no more left children while trying to find successor)
@@ -1104,7 +1119,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         bool rec_bal_upd_set = reconstruct_RegBS(tio, yield, bal_upd);
         printf("after bal_upd select from rec_F_rs = %d, rec_bal_upd = %d\n",
             rec_F_rs, rec_bal_upd_set);
-        */
+        */ 
 
         // Swap deletion node with successor node done outside of recursive traversal.
         return {key_found, bal_upd};
@@ -1138,27 +1153,27 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
         else{
             num_items--;
 
-            /*
+            
             printf("In delete's swap portion\n");
-            Node del_node = A.reconstruct(A[ret_struct.N_d]);
-            Node suc_node = A.reconstruct(A[ret_struct.N_s]);
+            Node rec_del_node = A.reconstruct(A[ret_struct.N_d]);
+            Node rec_suc_node = A.reconstruct(A[ret_struct.N_s]);
             printf("del_node key = %ld, suc_node key = %ld\n",
-                del_node.key.ashare, suc_node.key.ashare);
+                rec_del_node.key.ashare, rec_suc_node.key.ashare);
             printf("flag_s = %d\n", ret_struct.F_ss.bshare);
-            */
+            
             Node del_node = A[ret_struct.N_d];
             Node suc_node = A[ret_struct.N_s];
             RegAS zero_as; RegXS zero_xs;
             // Update root if needed
             mpc_select(tio, yield, root, ret_struct.F_r, root, ret_struct.ret_ptr);
 
-            /*
+            
             bool rec_F_ss = reconstruct_RegBS(tio, yield, ret_struct.F_ss);
             size_t rec_del_key = reconstruct_RegAS(tio, yield, del_node.key);
             size_t rec_suc_key = reconstruct_RegAS(tio, yield, suc_node.key);
             printf("rec_F_ss = %d, del_node.key = %lu, suc_nod.key = %lu\n",
                 rec_F_ss, rec_del_key, rec_suc_key);
-            */
+            
             mpc_select(tio, yield, del_node.key, ret_struct.F_ss, del_node.key, suc_node.key);
             mpc_select(tio, yield, del_node.value, ret_struct.F_ss, del_node.value, suc_node.value);
             A[ret_struct.N_d].NODE_KEY = del_node.key;
@@ -1232,12 +1247,34 @@ void avl(MPCIO &mpcio,
         tree.pretty_print(tio, yield);
         tree.check_avl(tio, yield);
 
+        tree.pretty_print(tio, yield);
         del_key.set(12 * tio.player());
         printf("Delete 12\n");
         tree.del(tio, yield, del_key);
         tree.print_oram(tio, yield);
         tree.pretty_print(tio, yield);
         tree.check_avl(tio, yield);
+        
+        RegAS lookup_key;
+        Node lookup;
+        bool success;
+        lookup_key.set(8 * tio.player());
+        success = tree.lookup(tio, yield, lookup_key, &lookup);
+        if(success) {
+            printf("Lookup 8 success\n");
+        }
+        else {
+            printf("Lookup 8 failed\n");
+        }
+
+        lookup_key.set(12 * tio.player());
+        success = tree.lookup(tio, yield, lookup_key, &lookup);
+        if(success) {
+            printf("Lookup 12 success\n");
+        }
+        else {
+            printf("Lookup 12 failed\n");
+        }
 
     });
 }
