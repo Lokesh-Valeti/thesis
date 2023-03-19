@@ -1,6 +1,8 @@
 #ifndef __DUORAM_HPP__
 #define __DUORAM_HPP__
 
+#include <optional>
+
 #include "types.hpp"
 #include "mpcio.hpp"
 #include "coroutine.hpp"
@@ -22,10 +24,8 @@
 // on a Shape shared with other threads or coroutines.
 
 // This is templated, because you can have a Duoram of additively shared
-// (RegAS) or XOR shared (RegXS) elements, or std::arrays of those to
-// get "wide" memory cells.
-
-// The initial implementation is focused on additive shares.
+// (RegAS) or XOR shared (RegXS) elements, or more complex cell types
+// (see cell.hpp for example).
 
 template <typename T>
 class Duoram {
@@ -61,6 +61,10 @@ public:
     class Pad;
     class Stride;
 
+    // Oblivious indices for use in related-index ORAM accesses
+    template <typename U, nbits_t WIDTH>
+    class OblivIndex;
+
     // Pass the player number and desired size
     Duoram(int player, size_t size);
 
@@ -87,6 +91,9 @@ class Duoram<T>::Shape {
     friend class Flat;
     friend class Pad;
     friend class Stride;
+
+    template <typename U, nbits_t WIDTH>
+    friend class OblivIndex;
 
     // When you index into a shape (A[x]), you get one of these types,
     // depending on the type of x (the index), _not_ on the type T (the
@@ -361,6 +368,49 @@ public:
     RegAS obliv_binary_search(RegAS &target);
 };
 
+// Oblivious indices for use in related-index ORAM accesses.
+
+template <typename T>
+template <typename U, nbits_t WIDTH>
+class Duoram<T>::OblivIndex {
+    template <typename Ux,typename FT,typename FST,typename Sh,nbits_t WIDTHx>
+    friend class Shape::MemRefS;
+
+    int player;
+    std::optional<RDPFTriple<WIDTH>> dt;
+    std::optional<RDPFPair<WIDTH>> dp;
+    nbits_t curdepth, maxdepth;
+    nbits_t next_windex;
+    bool incremental;
+    U idx;
+
+public:
+    // Non-incremental constructor
+    OblivIndex(MPCTIO &tio, yield_t &yield, const U &idx, nbits_t depth) :
+        player(tio.player()), curdepth(depth), maxdepth(depth),
+        next_windex(0), incremental(false), idx(idx)
+    {
+        if (player < 2) {
+            dt = tio.rdpftriple(yield, depth);
+        } else {
+            dp = tio.rdpfpair(yield, depth);
+        }
+    }
+
+    // Incremental constructor: only for U=RegXS
+    OblivIndex(MPCTIO &tio, yield_t &yield, nbits_t depth) :
+        player(tio.player()), curdepth(0), maxdepth(depth),
+        next_windex(0), incremental(true), idx(RegXS())
+    {
+        if (player < 2) {
+            dt = tio.rdpftriple(yield, depth, true);
+        } else {
+            dp = tio.rdpfpair(yield, depth, true);
+        }
+    }
+
+};
+
 // An additive or XOR shared memory reference.  You get one of these
 // from a Shape A and an additively shared RegAS index x, or an XOR
 // shared RegXS index x, with A[x].  Then you perform operations on this
@@ -378,7 +428,16 @@ template <typename T>
 template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
 class Duoram<T>::Shape::MemRefS {
     Sh &shape;
-    U idx;
+    // oblividx is a reference to the OblivIndex we're using.  In the
+    // common case, we own the actual OblivIndex, and it's stored in
+    // our_oblividx, and oblividx is a pointer to that.  Sometimes
+    // (for example incremental ORAM accesses), the caller will own (and
+    // modify between uses) the OblivIndex.  In that case, oblividx will
+    // be a pointer to the caller's OblivIndex object, and
+    // our_oblividx will be nullopt.
+    std::optional<Duoram<T>::OblivIndex<U,WIDTH>> our_oblividx;
+    Duoram<T>::OblivIndex<U,WIDTH> *oblividx;
+
     FST fieldsel;
 
 private:
@@ -391,12 +450,17 @@ private:
 
 public:
     MemRefS<U,FT,FST,Sh,WIDTH>(Sh &shape, const U &idx, FST fieldsel) :
-        shape(shape), idx(idx), fieldsel(fieldsel) {}
+        shape(shape), fieldsel(fieldsel) {
+        our_oblividx.emplace(shape.tio, shape.yield, idx,
+            shape.addr_size);
+        oblividx = &(*our_oblividx);
+    }
 
     // Create a MemRefExpl for accessing a partcular field of T
     template <typename SFT>
     MemRefS<U,SFT,SFT T::*,Sh,WIDTH> field(SFT T::*subfieldsel) {
-        auto res = MemRefS<U,SFT,SFT T::*,Sh,WIDTH>(this->shape, idx, subfieldsel);
+        auto res = MemRefS<U,SFT,SFT T::*,Sh,WIDTH>(this->shape,
+            oblividx->idx, subfieldsel);
         return res;
     }
 

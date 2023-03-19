@@ -291,7 +291,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
         // Compute the index offset
         U indoffset;
         dt.get_target(indoffset);
-        indoffset -= idx;
+        indoffset -= oblividx->idx;
 
         // We only need two of the DPFs for reading
         RDPFPair<1> dp(std::move(dt), 0, player == 0 ? 2 : 1);
@@ -401,7 +401,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         // Compute the index and message offsets
         U indoffset;
         dt.get_target(indoffset);
-        indoffset -= idx;
+        indoffset -= oblividx->idx;
         RDPF<1>::W<FT> MW;
         MW[0] = M;
         auto Moffset = std::make_tuple(MW, MW, MW);
@@ -506,7 +506,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
     &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::oram_update(const FT& M,
         const prac_template_false &)
 {
-    T::update(shape, shape.yield, idx, M);
+    T::update(shape, shape.yield, oblividx->idx, M);
     return *this;
 }
 
