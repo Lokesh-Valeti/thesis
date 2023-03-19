@@ -102,8 +102,8 @@ class Duoram<T>::Shape {
     // a particular field of T, then FT will be the type of the field
     // (RegAS or RegXS) and FST will be a pointer-to-member T::* type
     // pointing to that field.  Sh is the specific Shape subtype used to
-    // create the MemRefS.
-    template <typename U, typename FT, typename FST, typename Sh>
+    // create the MemRefS.  WIDTH is the RDPF width to use.
+    template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
     class MemRefS;
     // When x is unshared explicit value.  FT and FST are as above.
     template <typename FT, typename FST>
@@ -299,17 +299,17 @@ public:
     }
 
     // Index into this Flat in various ways
-    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Flat>
+    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Flat,1>
             operator[](const RegAS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegAS,T,std::nullopt_t,Flat>
+            template MemRefS<RegAS,T,std::nullopt_t,Flat,1>
             res(*this, idx, std::nullopt);
         return res;
     }
-    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Flat>
+    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Flat,1>
             operator[](const RegXS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegXS,T,std::nullopt_t,Flat>
+            template MemRefS<RegXS,T,std::nullopt_t,Flat,1>
             res(*this, idx, std::nullopt);
         return res;
     }
@@ -372,10 +372,10 @@ public:
 // particular field of T, then FT will be the type of the field (RegAS
 // or RegXS) and FST will be a pointer-to-member T::* type pointing to
 // that field.  Sh is the specific Shape subtype used to create the
-// MemRefS.
+// MemRefS.  WIDTH is the RDPF width to use.
 
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
 class Duoram<T>::Shape::MemRefS {
     Sh &shape;
     U idx;
@@ -384,19 +384,19 @@ class Duoram<T>::Shape::MemRefS {
 private:
     // Oblivious update to a shared index of Duoram memory, only for
     // FT = RegAS or RegXS
-    MemRefS<U,FT,FST,Sh> &oram_update(const FT& M, const prac_template_true&);
+    MemRefS<U,FT,FST,Sh,WIDTH> &oram_update(const FT& M, const prac_template_true&);
     // Oblivious update to a shared index of Duoram memory, for
     // FT not RegAS or RegXS
-    MemRefS<U,FT,FST,Sh> &oram_update(const FT& M, const prac_template_false&);
+    MemRefS<U,FT,FST,Sh,WIDTH> &oram_update(const FT& M, const prac_template_false&);
 
 public:
-    MemRefS<U,FT,FST,Sh>(Sh &shape, const U &idx, FST fieldsel) :
+    MemRefS<U,FT,FST,Sh,WIDTH>(Sh &shape, const U &idx, FST fieldsel) :
         shape(shape), idx(idx), fieldsel(fieldsel) {}
 
     // Create a MemRefExpl for accessing a partcular field of T
     template <typename SFT>
-    MemRefS<U,SFT,SFT T::*,Sh> field(SFT T::*subfieldsel) {
-        auto res = MemRefS<U,SFT,SFT T::*,Sh>(this->shape, idx, subfieldsel);
+    MemRefS<U,SFT,SFT T::*,Sh,WIDTH> field(SFT T::*subfieldsel) {
+        auto res = MemRefS<U,SFT,SFT T::*,Sh,WIDTH>(this->shape, idx, subfieldsel);
         return res;
     }
 
@@ -404,10 +404,10 @@ public:
     operator FT();
 
     // Oblivious update to a shared index of Duoram memory
-    MemRefS<U,FT,FST,Sh> &operator+=(const FT& M);
+    MemRefS<U,FT,FST,Sh,WIDTH> &operator+=(const FT& M);
 
     // Oblivious write to a shared index of Duoram memory
-    MemRefS<U,FT,FST,Sh> &operator=(const FT& M);
+    MemRefS<U,FT,FST,Sh,WIDTH> &operator=(const FT& M);
 };
 
 // An explicit memory reference.  You get one of these from a Shape A

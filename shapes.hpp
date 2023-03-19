@@ -74,17 +74,17 @@ public:
     }
 
     // Index into this Pad in various ways
-    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Pad>
+    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Pad,1>
             operator[](const RegAS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegAS,T,std::nullopt_t,Pad>
+            template MemRefS<RegAS,T,std::nullopt_t,Pad,1>
             res(*this, idx, std::nullopt);
         return res;
     }
-    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Pad>
+    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Pad,1>
             operator[](const RegXS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegXS,T,std::nullopt_t,Pad>
+            template MemRefS<RegXS,T,std::nullopt_t,Pad,1>
             res(*this, idx, std::nullopt);
         return res;
     }
@@ -149,17 +149,17 @@ public:
     }
 
     // Index into this Stride in various ways
-    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Stride>
+    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Stride,1>
             operator[](const RegAS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegAS,T,std::nullopt_t,Stride>
+            template MemRefS<RegAS,T,std::nullopt_t,Stride,1>
             res(*this, idx, std::nullopt);
         return res;
     }
-    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Stride>
+    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Stride,1>
             operator[](const RegXS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegXS,T,std::nullopt_t,Stride>
+            template MemRefS<RegXS,T,std::nullopt_t,Stride,1>
             res(*this, idx, std::nullopt);
         return res;
     }

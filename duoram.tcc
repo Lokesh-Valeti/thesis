@@ -273,11 +273,11 @@ inline address_t IfRegXS<RegXS>(address_t val) { return val; }
 // a particular field of T, then FT will be the type of the field (RegAS
 // or RegXS) and FST will be a pointer-to-member T::* type pointing to
 // that field.  Sh is the specific Shape subtype used to create the
-// MemRefS.
+// MemRefS.  WIDTH is the RDPF width to use.
 
 template <typename T>
-template <typename U,typename FT,typename FST,typename Sh>
-Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
+template <typename U,typename FT,typename FST,typename Sh,nbits_t WIDTH>
+Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
 {
     FT res;
     Sh &shape = this->shape;
@@ -385,9 +385,9 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
 // Oblivious update to a shared index of Duoram memory, only for
 // FT = RegAS or RegXS.  The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::oram_update(const FT& M,
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::oram_update(const FT& M,
         const prac_template_true &)
 {
     Sh &shape = this->shape;
@@ -501,9 +501,9 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 // Oblivious update to a shared index of Duoram memory, only for
 // FT not RegAS or RegXS.  The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::oram_update(const FT& M,
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::oram_update(const FT& M,
         const prac_template_false &)
 {
     T::update(shape, shape.yield, idx, M);
@@ -513,9 +513,9 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 // Oblivious update to an additively or XOR shared index of Duoram
 // memory. The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator+=(const FT& M)
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator+=(const FT& M)
 {
     return oram_update(M, prac_basic_Reg_S<FT>());
 }
@@ -523,9 +523,9 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 // Oblivious write to an additively or XOR shared index of Duoram
 // memory. The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator=(const FT& M)
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator=(const FT& M)
 {
     FT oldval = *this;
     FT update = M - oldval;
