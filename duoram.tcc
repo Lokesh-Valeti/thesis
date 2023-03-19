@@ -286,7 +286,8 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple<1> dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
+        const RDPFTriple<1> &dt = *(oblividx->dt);
+        const nbits_t depth = dt.depth();
 
         // Compute the index offset
         U indoffset;
@@ -297,17 +298,17 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
         RDPF2of3<1> dp(dt, 0, player == 0 ? 2 : 1);
 
         // Send it to the peer and the server
-        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
-        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.queue_peer(&indoffset, BITBYTES(depth));
+        shape.tio.queue_server(&indoffset, BITBYTES(depth));
 
         shape.yield();
 
         // Receive the above from the peer
         U peerindoffset;
-        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(depth));
 
         // Reconstruct the total offset
-        auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
+        auto indshift = combine(indoffset, peerindoffset, depth);
 
         // Evaluate the DPFs and compute the dotproducts
         ParallelEval pe(dp, IfRegAS<U>(indshift), IfRegXS<U>(indshift),
@@ -335,16 +336,17 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
     } else {
         // The server does this
 
-        RDPFPair<1> dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
+        const RDPFPair<1> &dp = *(oblividx->dp);
+        const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
 
         shape.yield();
 
         // Receive the index offset from the computational players and
         // combine them
-        shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
-        shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
-        auto indshift = combine(p0indoffset, p1indoffset, shape.addr_size);
+        shape.tio.recv_p0(&p0indoffset, BITBYTES(depth));
+        shape.tio.recv_p1(&p1indoffset, BITBYTES(depth));
+        auto indshift = combine(p0indoffset, p1indoffset, depth);
 
         // Evaluate the DPFs to compute the cancellation terms
         std::tuple<FT,FT> init, gamma;
@@ -394,7 +396,8 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple<1> dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
+        const RDPFTriple<1> &dt = *(oblividx->dt);
+        const nbits_t depth = dt.depth();
 
         // Compute the index and message offsets
         U indoffset;
@@ -409,9 +412,9 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
 
         // Send them to the peer, and everything except the first offset
         // to the server
-        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.queue_peer(&indoffset, BITBYTES(depth));
         shape.tio.iostream_peer() << Moffset;
-        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.queue_server(&indoffset, BITBYTES(depth));
         shape.tio.iostream_server() << std::get<1>(Moffset) <<
             std::get<2>(Moffset);
 
@@ -420,11 +423,11 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         // Receive the above from the peer
         U peerindoffset;
         RDPFTriple<1>::WTriple<FT> peerMoffset;
-        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(depth));
         shape.tio.iostream_peer() >> peerMoffset;
 
         // Reconstruct the total offsets
-        auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
+        auto indshift = combine(indoffset, peerindoffset, depth);
         auto Mshift = combine(Moffset, peerMoffset);
 
         // Evaluate the DPFs and add them to the database
@@ -456,7 +459,8 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
     } else {
         // The server does this
 
-        RDPFPair<1> dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
+        const RDPFPair<1> &dp = *(oblividx->dp);
+        const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
         RDPFPair<1>::WPair<FT> p0Moffset, p1Moffset;
 
@@ -464,11 +468,11 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
 
         // Receive the index and message offsets from the computational
         // players and combine them
-        shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_p0(&p0indoffset, BITBYTES(depth));
         shape.tio.iostream_p0() >> p0Moffset;
-        shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_p1(&p1indoffset, BITBYTES(depth));
         shape.tio.iostream_p1() >> p1Moffset;
-        auto indshift = combine(p0indoffset, p1indoffset, shape.addr_size);
+        auto indshift = combine(p0indoffset, p1indoffset, depth);
         auto Mshift = combine(p0Moffset, p1Moffset);
 
         // Evaluate the DPFs and subtract them from the blinds

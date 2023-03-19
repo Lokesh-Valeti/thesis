@@ -289,8 +289,11 @@ struct RDPFTriple {
     // outputs so that the appropriate one can be selected with a
     // parameter
 
+    // Only RegXS, not RegAS, indices are used with incremental RDPFs
     inline void get_target(RegAS &target) const { target = as_target; }
-    inline void get_target(RegXS &target) const { target = xs_target; }
+    inline void get_target(RegXS &target) const {
+        target = xs_target >> (dpf[0].maxdepth - dpf[0].curdepth);
+    }
 
     // Additive share of the scaling value M_as such that the high words
     // of the leaf values for P0 and P1 add to M_as * e_{target}

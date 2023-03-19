@@ -464,6 +464,11 @@ public:
         assert(incremental);
         idx.xshare = (idx.xshare << 1) | value_t(bit.bshare);
         ++curdepth;
+        if (player < 2) {
+            dt->depth(curdepth);
+        } else {
+            dp->depth(curdepth);
+        }
     }
 
     // Get a copy of the index

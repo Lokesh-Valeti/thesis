@@ -260,8 +260,11 @@ static void rdpf_test(MPCIO &mpcio,
                     RDPF<WIDTH> &dpf = dt.dpf[i];
                     for (nbits_t level=min_level; level<=depth; ++level) {
                         if (incremental) {
-                            printf("Level = %u\n\n", level);
-                            dpf.depth(level);
+                            printf("Level = %u\n", level);
+                            dt.depth(level);
+                            RegXS tshare;
+                            dt.get_target(tshare);
+                            printf("Target share = %lx\n\n", tshare.share());
                         }
                         typename RDPF<WIDTH>::RegXSW peer_scaled_xor;
                         typename RDPF<WIDTH>::RegASW peer_scaled_sum;
@@ -1228,8 +1231,10 @@ static void bsearch_test(MPCIO &mpcio,
     }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, depth, len, target, basic] (yield_t &yield) {
+    run_coroutines(tio, [&tio, &mpcio, depth, len, target, basic] (yield_t &yield) {
         RegAS tshare;
+        std::cout << "\n===== SETUP =====\n";
+
         if (tio.player() == 2) {
             // Send shares of the target to the computational
             // players
@@ -1245,6 +1250,12 @@ static void bsearch_test(MPCIO &mpcio,
             tio.iostream_server() >> tshare;
         }
 
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== SORT RANDOM DATABASE =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
         // Create a random database and sort it
         // size_t &aes_ops = tio.aes_ops();
         Duoram<RegAS> oram(tio.player(), len);
@@ -1265,6 +1276,12 @@ static void bsearch_test(MPCIO &mpcio,
         A.bitonic_sort(0, len);
         A.explicitonly(false);
 
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== BINARY SEARCH =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
         // Binary search for the target
         value_t checkindex;
         if (basic) {
@@ -1275,6 +1292,12 @@ static void bsearch_test(MPCIO &mpcio,
             checkindex = mpc_reconstruct(tio, yield, tindex);
         }
 
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== CHECK ANSWER =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
         // Check the answer
         size_t size = size_t(1) << depth;
         value_t checktarget = mpc_reconstruct(tio, yield, tshare);
@@ -1300,6 +1323,10 @@ static void bsearch_test(MPCIO &mpcio,
                     }
                 }
             }
+            if (checkindex == len && check[len-1].share() >= checktarget) {
+                fail = true;
+            }
+
             printf("Target = %016lx\n", checktarget);
             printf("Found index = %02lx\n", checkindex);
             if (checkindex > size) {
