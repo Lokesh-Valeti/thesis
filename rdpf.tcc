@@ -1099,3 +1099,29 @@ typename RDPFPair<WIDTH>::LeafNode RDPFPair<WIDTH>::descend_to_leaf(
     C1 = dpf[1].descend_to_leaf(P1, parentdepth, whichchild, aes_ops);
     return std::make_tuple(C0,C1);
 }
+
+template <nbits_t WIDTH>
+typename RDPF2of3<WIDTH>::node RDPF2of3<WIDTH>::descend(
+    const RDPF2of3<WIDTH>::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &aes_ops) const
+{
+    auto [P0, P1] = parent;
+    DPFnode C0, C1;
+    C0 = dpf0.descend(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf1.descend(P1, parentdepth, whichchild, aes_ops);
+    return std::make_tuple(C0,C1);
+}
+
+template <nbits_t WIDTH>
+typename RDPF2of3<WIDTH>::LeafNode RDPF2of3<WIDTH>::descend_to_leaf(
+    const RDPF2of3<WIDTH>::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &aes_ops) const
+{
+    auto [P0, P1] = parent;
+    typename RDPF<WIDTH>::LeafNode C0, C1;
+    C0 = dpf0.descend_to_leaf(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf1.descend_to_leaf(P1, parentdepth, whichchild, aes_ops);
+    return std::make_tuple(C0,C1);
+}

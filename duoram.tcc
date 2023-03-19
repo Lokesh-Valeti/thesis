@@ -294,9 +294,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
         indoffset -= oblividx->idx;
 
         // We only need two of the DPFs for reading
-        RDPFPair<1> dp(std::move(dt), 0, player == 0 ? 2 : 1);
-        // The RDPFTriple dt is now broken, since we've moved things out
-        // of it.
+        RDPF2of3<1> dp(dt, 0, player == 0 ? 2 : 1);
 
         // Send it to the peer and the server
         shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
