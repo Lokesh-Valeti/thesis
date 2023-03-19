@@ -1206,7 +1206,7 @@ static void pad_test(MPCIO &mpcio,
 
 
 static void bsearch_test(MPCIO &mpcio,
-    const PRACOptions &opts, char **args)
+    const PRACOptions &opts, char **args, bool basic)
 {
     value_t target;
     arc4random_buf(&target, sizeof(target));
@@ -1228,7 +1228,7 @@ static void bsearch_test(MPCIO &mpcio,
     }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, depth, len, target] (yield_t &yield) {
+    run_coroutines(tio, [&tio, depth, len, target, basic] (yield_t &yield) {
         RegAS tshare;
         if (tio.player() == 2) {
             // Send shares of the target to the computational
@@ -1266,11 +1266,17 @@ static void bsearch_test(MPCIO &mpcio,
         A.explicitonly(false);
 
         // Binary search for the target
-        RegAS tindex = A.obliv_binary_search(tshare);
+        value_t checkindex;
+        if (basic) {
+            RegAS tindex = A.basic_binary_search(tshare);
+            checkindex = mpc_reconstruct(tio, yield, tindex);
+        } else {
+            RegXS tindex = A.binary_search(tshare);
+            checkindex = mpc_reconstruct(tio, yield, tindex);
+        }
 
         // Check the answer
         size_t size = size_t(1) << depth;
-        value_t checkindex = mpc_reconstruct(tio, yield, tindex);
         value_t checktarget = mpc_reconstruct(tio, yield, tshare);
         auto check = A.reconstruct();
         bool fail = false;
@@ -1384,9 +1390,12 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "padtest")) {
         ++args;
         pad_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "bbsearch")) {
+        ++args;
+        bsearch_test(mpcio, opts, args, true);
     } else if (!strcmp(*args, "bsearch")) {
         ++args;
-        bsearch_test(mpcio, opts, args);
+        bsearch_test(mpcio, opts, args, false);
     } else if (!strcmp(*args, "duoram")) {
         ++args;
         if (opts.use_xor_db) {

@@ -407,7 +407,14 @@ public:
     // given one.  (The answer will be the length of the Flat if all
     // elements are smaller than the target.) Only available for additive
     // shared databases for now.
-    RegAS obliv_binary_search(RegAS &target);
+
+    // The basic version uses log(N) ORAM reads of size N, where N is
+    // the smallest power of 2 strictly larger than the Flat size
+    RegAS basic_binary_search(RegAS &target);
+    // This version does 1 ORAM read of size 2, 1 of size 4, 1 of size
+    // 8, ..., 1 of size N/2, where N is the smallest power of 2
+    // strictly larger than the Flat size
+    RegXS binary_search(RegAS &target);
 };
 
 // Oblivious indices for use in related-index ORAM accesses.
@@ -451,6 +458,16 @@ public:
         }
     }
 
+    // Incrementally append a (shared) bit to the oblivious index
+    void incr(RegBS bit)
+    {
+        assert(incremental);
+        idx.xshare = (idx.xshare << 1) | value_t(bit.bshare);
+        ++curdepth;
+    }
+
+    // Get a copy of the index
+    U index() { return idx; }
 };
 
 // An additive or XOR shared memory reference.  You get one of these
