@@ -320,6 +320,14 @@ public:
             res(*this, idx, std::nullopt);
         return res;
     }
+    template <typename U, nbits_t WIDTH>
+    typename Duoram::Shape::template MemRefS<U,T,std::nullopt_t,Flat,WIDTH>
+            operator[](OblivIndex<U,WIDTH> &obidx) {
+        typename Duoram<T>::Shape::
+            template MemRefS<RegXS,T,std::nullopt_t,Flat,1>
+            res(*this, obidx, std::nullopt);
+        return res;
+    }
     typename Duoram::Shape::template MemRefExpl<T,std::nullopt_t>
             operator[](address_t idx) {
         typename Duoram<T>::Shape::
@@ -454,6 +462,11 @@ public:
         our_oblividx.emplace(shape.tio, shape.yield, idx,
             shape.addr_size);
         oblividx = &(*our_oblividx);
+    }
+
+    MemRefS<U,FT,FST,Sh,WIDTH>(Sh &shape, OblivIndex<U,WIDTH> &obidx, FST fieldsel) :
+        shape(shape), fieldsel(fieldsel) {
+        oblividx = &obidx;
     }
 
     // Create a MemRefExpl for accessing a partcular field of T

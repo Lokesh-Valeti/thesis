@@ -680,6 +680,14 @@ static void duoram_test(MPCIO &mpcio,
         } else {
             N.set(0x0000beef);
         }
+        RegXS oxidx;
+        oxidx.xshare = share+3*tio.player();
+        T O;
+        if (tio.player() == 0) {
+            O.set(0x31410000);
+        } else {
+            O.set(0x00005926);
+        }
         // Writing and reading with additively shared indices
         printf("Additive Updating\n");
         A[aidx] += M;
@@ -690,8 +698,14 @@ static void duoram_test(MPCIO &mpcio,
         A[xidx] += N;
         printf("XOR Reading\n");
         T Ax = A[xidx];
-        T Ae;
+        // Writing and reading with OblivIndex indices
+        typename Duoram<T>::OblivIndex<RegXS,1> oidx(tio, yield, oxidx, depth);
+        printf("OblivIndex Updating\n");
+        A[oidx] += O;
+        printf("OblivIndex Reading\n");
+        T Ox = A[oidx];
         // Writing and reading with explicit indices
+        T Ae;
         if (depth > 2) {
             printf("Explicit Updating\n");
             A[5] += Aa;
@@ -726,10 +740,12 @@ static void duoram_test(MPCIO &mpcio,
         auto checkread = A.reconstruct(Aa);
         auto checkreade = A.reconstruct(Ae);
         auto checkreadx = A.reconstruct(Ax);
+        auto checkreado = A.reconstruct(Ox);
         if (tio.player() == 0) {
             printf("Read AS value = %016lx\n", checkread.share());
             printf("Read AX value = %016lx\n", checkreadx.share());
             printf("Read Ex value = %016lx\n", checkreade.share());
+            printf("Read OI value = %016lx\n", checkreado.share());
         }
         for (auto &v : Av) {
             auto checkv = A.reconstruct(v);
