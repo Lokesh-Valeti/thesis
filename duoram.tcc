@@ -286,7 +286,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
     if (player < 2) {
         // Computational players do this
 
-        const RDPFTriple<1> &dt = *(oblividx->dt);
+        const RDPFTriple<WIDTH> &dt = *(oblividx->dt);
         const nbits_t depth = dt.depth();
 
         // Compute the index offset
@@ -295,7 +295,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
         indoffset -= oblividx->idx;
 
         // We only need two of the DPFs for reading
-        RDPF2of3<1> dp(dt, 0, player == 0 ? 2 : 1);
+        RDPF2of3<WIDTH> dp(dt, 0, player == 0 ? 2 : 1);
 
         // Send it to the peer and the server
         shape.tio.queue_peer(&indoffset, BITBYTES(depth));
@@ -316,7 +316,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
             shape.tio.aes_ops());
         FT init;
         res = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair<1>::LeafNode &leaf) {
+                address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs, which will each be of type T
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -336,7 +336,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
     } else {
         // The server does this
 
-        const RDPFPair<1> &dp = *(oblividx->dp);
+        const RDPFPair<WIDTH> &dp = *(oblividx->dp);
         const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
 
@@ -354,7 +354,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         gamma = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair<1>::LeafNode &leaf) {
+                address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs, each of type FT
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -396,17 +396,17 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
     if (player < 2) {
         // Computational players do this
 
-        const RDPFTriple<1> &dt = *(oblividx->dt);
+        const RDPFTriple<WIDTH> &dt = *(oblividx->dt);
         const nbits_t depth = dt.depth();
 
         // Compute the index and message offsets
         U indoffset;
         dt.get_target(indoffset);
         indoffset -= oblividx->idx;
-        RDPF<1>::W<FT> MW;
+        typename RDPF<WIDTH>::W<FT> MW;
         MW[0] = M;
         auto Moffset = std::make_tuple(MW, MW, MW);
-        RDPFTriple<1>::WTriple<FT> scaled_val;
+        typename RDPFTriple<WIDTH>::WTriple<FT> scaled_val;
         dt.scaled_value(scaled_val);
         Moffset -= scaled_val;
 
@@ -422,7 +422,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
 
         // Receive the above from the peer
         U peerindoffset;
-        RDPFTriple<1>::WTriple<FT> peerMoffset;
+        typename RDPFTriple<WIDTH>::WTriple<FT> peerMoffset;
         shape.tio.recv_peer(&peerindoffset, BITBYTES(depth));
         shape.tio.iostream_peer() >> peerMoffset;
 
@@ -436,9 +436,9 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
             shape.tio.aes_ops());
         int init = 0;
         pe.reduce(init, [this, &dt, &shape, &Mshift, player] (int thread_num,
-                address_t i, const RDPFTriple<1>::LeafNode &leaf) {
+                address_t i, const typename RDPFTriple<WIDTH>::LeafNode &leaf) {
             // The values from the three DPFs
-            RDPFTriple<1>::WTriple<FT> scaled;
+            typename RDPFTriple<WIDTH>::WTriple<FT> scaled;
             std::tuple<FT,FT,FT> unit;
             dt.scaled(scaled, leaf);
             dt.unit(unit, leaf);
@@ -459,10 +459,10 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
     } else {
         // The server does this
 
-        const RDPFPair<1> &dp = *(oblividx->dp);
+        const RDPFPair<WIDTH> &dp = *(oblividx->dp);
         const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
-        RDPFPair<1>::WPair<FT> p0Moffset, p1Moffset;
+        typename RDPFPair<WIDTH>::WPair<FT> p0Moffset, p1Moffset;
 
         shape.yield();
 
@@ -481,9 +481,9 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
             shape.tio.aes_ops());
         int init = 0;
         pe.reduce(init, [this, &dp, &shape, &Mshift] (int thread_num,
-                address_t i, const RDPFPair<1>::LeafNode &leaf) {
+                address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs
-            RDPFPair<1>::WPair<FT> scaled;
+            typename RDPFPair<WIDTH>::WPair<FT> scaled;
             std::tuple<FT,FT> unit;
             dp.scaled(scaled, leaf);
             dp.unit(unit, leaf);

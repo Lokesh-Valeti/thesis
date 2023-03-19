@@ -529,7 +529,7 @@ public:
     template <typename SFT>
     MemRefS<U,SFT,SFT T::*,Sh,WIDTH> field(SFT T::*subfieldsel) {
         auto res = MemRefS<U,SFT,SFT T::*,Sh,WIDTH>(this->shape,
-            oblividx->idx, subfieldsel);
+            *oblividx, subfieldsel);
         return res;
     }
 
