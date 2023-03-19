@@ -699,7 +699,7 @@ static void duoram_test(MPCIO &mpcio,
         printf("XOR Reading\n");
         T Ax = A[xidx];
         // Writing and reading with OblivIndex indices
-        typename Duoram<T>::OblivIndex<RegXS,1> oidx(tio, yield, oxidx, depth);
+        auto oidx = A.oblivindex(oxidx);
         printf("OblivIndex Updating\n");
         A[oidx] += O;
         printf("OblivIndex Reading\n");

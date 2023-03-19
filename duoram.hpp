@@ -256,6 +256,40 @@ public:
     // next oblivious read or write.  Bitonic sort is a prime example.
     void explicitonly(bool enable);
 
+    // Create an OblivIndex, non-incrementally (supply the shares of the
+    // index directly) or incrementally (the bits of the index will be
+    // supplied later, one at a time)
+
+    // Non-incremental, RegXS index
+    OblivIndex<RegXS,1> oblivindex(const RegXS &idx, nbits_t depth=0) {
+        if (depth == 0) {
+            depth = this->addr_size;
+        }
+        typename Duoram<T>::OblivIndex<RegXS,1>
+            res(this->tio, this->yield, idx, depth);
+        return res;
+    }
+
+    // Non-incremental, RegAS index
+    OblivIndex<RegAS,1> oblivindex(const RegAS &idx, nbits_t depth=0) {
+        if (depth == 0) {
+            depth = this->addr_size;
+        }
+        typename Duoram<T>::OblivIndex<RegAS,1>
+            res(this->tio, this->yield, idx, depth);
+        return res;
+    }
+
+    // Incremental (requires RegXS index, supplied bit-by-bit later)
+    OblivIndex<RegXS,1> oblivindex(nbits_t depth=0) {
+        if (depth == 0) {
+            depth = this->addr_size;
+        }
+        typename Duoram<T>::OblivIndex<RegXS,1>
+            res(this->tio, this->yield, depth);
+        return res;
+    }
+
     // For debugging or checking your answers (using this in general is
     // of course insecure)
 
