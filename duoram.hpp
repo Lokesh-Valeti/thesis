@@ -242,7 +242,7 @@ protected:
 
 public:
     // Get the size
-    inline size_t size() { return shape_size; }
+    inline size_t size() const { return shape_size; }
 
     // Enable or disable explicit-only mode.  Only using [] with
     // explicit (address_t) indices are allowed in this mode.  Using []
@@ -324,6 +324,11 @@ public:
     Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield, size_t start = 0,
         size_t len = 0);
 
+    // Constructor.  len=0 means the maximum size (the parent's size
+    // minus start).
+    Flat(const Shape &parent, MPCTIO &tio, yield_t &yield, size_t start = 0,
+        size_t len = 0);
+
     // Copy the given Flat except for the tio and yield
     Flat(const Flat &copy_from, MPCTIO &tio, yield_t &yield) :
         Shape(copy_from, tio, yield), start(copy_from.start),
@@ -358,7 +363,7 @@ public:
     typename Duoram::Shape::template MemRefS<U,T,std::nullopt_t,Flat,WIDTH>
             operator[](OblivIndex<U,WIDTH> &obidx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegXS,T,std::nullopt_t,Flat,1>
+            template MemRefS<RegXS,T,std::nullopt_t,Flat,WIDTH>
             res(*this, obidx, std::nullopt);
         return res;
     }
@@ -440,9 +445,9 @@ public:
         next_windex(0), incremental(false), idx(idx)
     {
         if (player < 2) {
-            dt = tio.rdpftriple(yield, depth);
+            dt = tio.rdpftriple<WIDTH>(yield, depth);
         } else {
-            dp = tio.rdpfpair(yield, depth);
+            dp = tio.rdpfpair<WIDTH>(yield, depth);
         }
     }
 
@@ -473,6 +478,9 @@ public:
 
     // Get a copy of the index
     U index() { return idx; }
+
+    // Get the next wide-RDPF index
+    nbits_t windex() { assert(next_windex < WIDTH); return next_windex++; }
 };
 
 // An additive or XOR shared memory reference.  You get one of these

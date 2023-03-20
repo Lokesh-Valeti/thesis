@@ -1341,6 +1341,118 @@ static void bsearch_test(MPCIO &mpcio,
     });
 }
 
+template <typename T>
+static void related(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth = 5;
+
+    // The depth of the (complete) binary tree
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    // The layer at which to choose a random parent node (and its two
+    // children along with it)
+    nbits_t layer = depth-1;
+    if (*args) {
+        layer = atoi(*args);
+        ++args;
+    }
+    assert(layer < depth);
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, layer] (yield_t &yield) {
+        size_t size = size_t(1)<<(depth+1);
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+
+        // Initialize A with words with random top halves, and
+        // sequential bottom halves (just so we can more easily eyeball
+        // the right answers)
+        A.explicitonly(true);
+        for (address_t i=0;i<size;++i) {
+            T v;
+            v.randomize();
+            value_t vv = v.share();
+            vv &= 0x3fffffff00000000;
+            vv += (i * tio.player());
+            v.set(vv);
+            A[i] = v;
+        }
+        A.explicitonly(false);
+
+        // We use this layout for the tree:
+        // A[0] is unused
+        // A[1] is the root (layer 0)
+        // A[2..3] is layer 1
+        // A[4..7] is layer 2
+        // ...
+        // A[(1<<j)..((2<<j)-1)] is layer j
+        //
+        // So the parent of x is at location (x/2) and the children of x
+        // are at locations 2*x and 2*x+1
+
+        // Pick a random index _within_ the given layer (i.e., the
+        // offset from the beginning of the layer, not the absolute
+        // location in A)
+        RegXS idx;
+        idx.randomize(layer);
+        // Create the OblivIndex. RegXS is the type of the common index
+        // (idx), 3 is the maximum number of related updates to support
+        // (which equals the width of the underlying RDPF, currently
+        // maximum 5), layer is the depth of the underlying RDPF (the
+        // bit length of idx).
+        typename Duoram<T>::OblivIndex<RegXS,3> oidx(tio, yield, idx, layer);
+
+        // This is the (known) layer containing the (unknown) parent
+        // node
+        typename Duoram<T>::Flat P(A, tio, yield, 1<<layer, 1<<layer);
+        // This is the layer below that one, containing all possible
+        // children
+        typename Duoram<T>::Flat C(A, tio, yield, 2<<layer, 2<<layer);
+        // These are the subsets of C containing the left children and
+        // the right children respectively
+        typename Duoram<T>::Stride L(C, tio, yield, 0, 2);
+        typename Duoram<T>::Stride R(C, tio, yield, 1, 2);
+
+        T parent, left, right;
+
+        // Do three related reads.  In this version, only one DPF will
+        // be used, but it will still be _evaluated_ three times.
+        parent = P[oidx];
+        left = L[oidx];
+        right = R[oidx];
+
+        // The operation is just a simple rotation: the value in the
+        // parent moves to the left child, the left child moves to the
+        // right child, and the right child becomes the parent
+
+        // Do three related updates.  As above, only one (wide) DPF will
+        // be used (the same one as for the reads in fact), but it will
+        // still be _evaluated_ three more times.
+        P[oidx] += right-parent;
+        L[oidx] += parent-left;
+        R[oidx] += left-right;
+
+        // Check the answer
+        auto check = A.reconstruct();
+        if (depth <= 10) {
+            oram.dump();
+            if (tio.player() == 0) {
+                for (address_t i=0;i<size;++i) {
+                    printf("%04x %016lx\n", i, check[i].share());
+                }
+            }
+        }
+        value_t pval = mpc_reconstruct(tio, yield, parent);
+        value_t lval = mpc_reconstruct(tio, yield, left);
+        value_t rval = mpc_reconstruct(tio, yield, right);
+        printf("parent = %016lx\nleft   = %016lx\nright  = %016lx\n",
+            pval, lval, rval);
+    });
+}
+
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     MPCTIO tio(mpcio, 0);
@@ -1429,6 +1541,13 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
             duoram<RegXS>(mpcio, opts, args);
         } else {
             duoram<RegAS>(mpcio, opts, args);
+        }
+    } else if (!strcmp(*args, "related")) {
+        ++args;
+        if (opts.use_xor_db) {
+            related<RegXS>(mpcio, opts, args);
+        } else {
+            related<RegAS>(mpcio, opts, args);
         }
     } else if (!strcmp(*args, "cell")) {
         ++args;

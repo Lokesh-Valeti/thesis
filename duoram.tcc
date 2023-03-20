@@ -177,6 +177,25 @@ Duoram<T>::Flat::Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield,
     this->set_shape_size(len);
 }
 
+// Constructor for the Flat shape.  len=0 means the maximum size (the
+// parent's size minus start).
+template <typename T>
+Duoram<T>::Flat::Flat(const Shape &parent, MPCTIO &tio, yield_t &yield,
+    size_t start, size_t len) : Shape(parent, parent.duoram, tio, yield)
+{
+    size_t parentsize = parent.size();
+    if (start > parentsize) {
+        start = parentsize;
+    }
+    this->start = start;
+    size_t maxshapesize = parentsize - start;
+    if (len > maxshapesize || len == 0) {
+        len = maxshapesize;
+    }
+    this->len = len;
+    this->set_shape_size(len);
+}
+
 // Bitonic sort the elements from start to start+len-1, in
 // increasing order if dir=0 or decreasing order if dir=1. Note that
 // the elements must be at most 63 bits long each for the notion of
@@ -397,6 +416,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         // Computational players do this
 
         const RDPFTriple<WIDTH> &dt = *(oblividx->dt);
+        const nbits_t windex = oblividx->windex();
         const nbits_t depth = dt.depth();
 
         // Compute the index and message offsets
@@ -404,7 +424,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         dt.get_target(indoffset);
         indoffset -= oblividx->idx;
         typename RDPF<WIDTH>::W<FT> MW;
-        MW[0] = M;
+        MW[windex] = M;
         auto Moffset = std::make_tuple(MW, MW, MW);
         typename RDPFTriple<WIDTH>::WTriple<FT> scaled_val;
         dt.scaled_value(scaled_val);
@@ -435,7 +455,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         int init = 0;
-        pe.reduce(init, [this, &dt, &shape, &Mshift, player] (int thread_num,
+        pe.reduce(init, [this, &dt, &shape, &Mshift, player, windex] (int thread_num,
                 address_t i, const typename RDPFTriple<WIDTH>::LeafNode &leaf) {
             // The values from the three DPFs
             typename RDPFTriple<WIDTH>::WTriple<FT> scaled;
@@ -446,13 +466,13 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i,fieldsel);
-            DB += V0[0];
+            DB += V0[windex];
             if (player == 0) {
-                BL -= V1[0];
-                PBD += V2[0]-V0[0];
+                BL -= V1[windex];
+                PBD += V2[windex]-V0[windex];
             } else {
-                BL -= V2[0];
-                PBD += V1[0]-V0[0];
+                BL -= V2[windex];
+                PBD += V1[windex]-V0[windex];
             }
             return 0;
         });
@@ -460,6 +480,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         // The server does this
 
         const RDPFPair<WIDTH> &dp = *(oblividx->dp);
+        const nbits_t windex = oblividx->windex();
         const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
         typename RDPFPair<WIDTH>::WPair<FT> p0Moffset, p1Moffset;
@@ -480,7 +501,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         int init = 0;
-        pe.reduce(init, [this, &dp, &shape, &Mshift] (int thread_num,
+        pe.reduce(init, [this, &dp, &shape, &Mshift, windex] (int thread_num,
                 address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs
             typename RDPFPair<WIDTH>::WPair<FT> scaled;
@@ -492,8 +513,8 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
             // appropriate cells in the two blinded databases, so we can
             // subtract the pair directly.
             auto [BL0, BL1] = shape.get_server(i,fieldsel);
-            BL0 -= V0[0];
-            BL1 -= V1[0];
+            BL0 -= V0[windex];
+            BL1 -= V1[windex];
             return 0;
         });
     }

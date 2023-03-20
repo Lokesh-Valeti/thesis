@@ -92,7 +92,7 @@ public:
     typename Duoram::Shape::template MemRefS<U,T,std::nullopt_t,Pad,WIDTH>
             operator[](OblivIndex<U,WIDTH> &obidx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegXS,T,std::nullopt_t,Pad,1>
+            template MemRefS<RegXS,T,std::nullopt_t,Pad,WIDTH>
             res(*this, obidx, std::nullopt);
         return res;
     }
@@ -175,7 +175,7 @@ public:
     typename Duoram::Shape::template MemRefS<U,T,std::nullopt_t,Stride,WIDTH>
             operator[](OblivIndex<U,WIDTH> &obidx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegXS,T,std::nullopt_t,Stride,1>
+            template MemRefS<RegXS,T,std::nullopt_t,Stride,WIDTH>
             res(*this, obidx, std::nullopt);
         return res;
     }
