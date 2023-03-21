@@ -22,6 +22,11 @@ void cell(MPCIO &mpcio,
         size_t size = size_t(1)<<depth;
         Duoram<Cell> oram(tio.player(), size);
         auto A = oram.flat(tio, yield);
+        Cell init;
+        init.key.set(0xffffffffffffffff);
+        init.pointers.set(0xeeeeeeeeeeeeeeee);
+        init.value.set(0xdddddddddddddddd);
+        A.init(init);
         Cell c;
         c.key.set(0x0102030405060708);
         c.pointers.set(0x1112131415161718);

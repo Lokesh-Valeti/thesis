@@ -246,15 +246,30 @@ public:
     inline size_t size() const { return shape_size; }
 
     // Initialize the contents of the Shape to a constant.  This method
-    // does no communication; all the operations are local.
+    // does no communication; all the operations are local.  This only
+    // works for T=RegXS or RegAS.
     void init(size_t value) {
+        T v;
+        v.set(value);
+        init([v] (size_t i) { return v; });
+    }
+
+    // As above, but for general T
+    void init(const T &value) {
         init([value] (size_t i) { return value; });
     }
 
-    // Pass a function f: size_t -> size_t, and initialize element i of
-    // the Shape to f(i) for each i.  This method does no communication;
-    // all the operations are local.  This function _must_ be
-    // deterministic.
+    // As above, but use the default initializer for T (probably sets
+    // everything to 0).
+    void init() {
+        T deflt;
+        init(deflt);
+    }
+
+    // Pass a function f: size_t -> size_t, and initialize element i of the
+    // Shape to f(i) for each i.  This method does no communication; all
+    // the operations are local.  This function must be deterministic
+    // and public.  Only works for T=RegAS or RegXS.
     void init(std::function<size_t(size_t)> f) {
         int player = tio.player();
         if (player < 2) {
@@ -274,6 +289,33 @@ public:
                 auto [BL0, BL1] = get_server(i);
                 BL0.set(0);
                 BL1.set(0);
+            }
+        }
+    }
+
+    // Pass a function f: size_t -> T, and initialize element i of the
+    // Shape to f(i) for each i.  This method does no communication; all
+    // the operations are local.  This function must be deterministic
+    // and public.
+    void init(std::function<T(size_t)> f) {
+        int player = tio.player();
+        if (player < 2) {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [DB, BL, PBD] = get_comp(i);
+                BL = T();
+                if (player) {
+                    DB = f(i);
+                    PBD = T();
+                } else {
+                    DB = T();
+                    PBD = f(i);
+                }
+            }
+        } else {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [BL0, BL1] = get_server(i);
+                BL0 = T();
+                BL1 = T();
             }
         }
     }
