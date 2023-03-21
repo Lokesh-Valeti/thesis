@@ -2,6 +2,7 @@
 #define __DUORAM_HPP__
 
 #include <optional>
+#include <functional>
 
 #include "types.hpp"
 #include "mpcio.hpp"
@@ -243,6 +244,39 @@ protected:
 public:
     // Get the size
     inline size_t size() const { return shape_size; }
+
+    // Initialize the contents of the Shape to a constant.  This method
+    // does no communication; all the operations are local.
+    void init(size_t value) {
+        init([value] (size_t i) { return value; });
+    }
+
+    // Pass a function f: size_t -> size_t, and initialize element i of
+    // the Shape to f(i) for each i.  This method does no communication;
+    // all the operations are local.  This function _must_ be
+    // deterministic.
+    void init(std::function<size_t(size_t)> f) {
+        int player = tio.player();
+        if (player < 2) {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [DB, BL, PBD] = get_comp(i);
+                BL.set(0);
+                if (player) {
+                    DB.set(f(i));
+                    PBD.set(0);
+                } else {
+                    DB.set(0);
+                    PBD.set(f(i));
+                }
+            }
+        } else {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [BL0, BL1] = get_server(i);
+                BL0.set(0);
+                BL1.set(0);
+            }
+        }
+    }
 
     // Enable or disable explicit-only mode.  Only using [] with
     // explicit (address_t) indices are allowed in this mode.  Using []

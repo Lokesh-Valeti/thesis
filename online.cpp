@@ -1367,20 +1367,9 @@ static void related(MPCIO &mpcio,
         Duoram<T> oram(tio.player(), size);
         auto A = oram.flat(tio, yield);
 
-        // Initialize A with words with random top halves, and
-        // sequential bottom halves (just so we can more easily eyeball
-        // the right answers)
-        A.explicitonly(true);
-        for (address_t i=0;i<size;++i) {
-            T v;
-            v.randomize();
-            value_t vv = v.share();
-            vv &= 0x3fffffff00000000;
-            vv += (i * tio.player());
-            v.set(vv);
-            A[i] = v;
-        }
-        A.explicitonly(false);
+        // Initialize A with words with sequential top and bottom halves
+        // (just so we can more easily eyeball the right answers)
+        A.init([] (size_t i) { return i * 0x100000001; } );
 
         // We use this layout for the tree:
         // A[0] is unused
