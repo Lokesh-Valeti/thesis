@@ -204,6 +204,99 @@ public:
     }
 };
 
+
+// A Path is a Shape that represents a path from the root of a complete
+// binary tree down to a given node.
+
+// We assume this layout for the tree (the _parent_ shape of the Path):
+// A[0] is unused
+// A[1] is the root (layer 0)
+// A[2..3] is layer 1
+// A[4..7] is layer 2
+// ...
+// A[(1<<j)..((2<<j)-1)] is layer j
+//
+// So the parent of x is at location (x/2) and the children of x
+// are at locations 2*x and 2*x+1
+
+template <typename T>
+class Duoram<T>::Path : public Duoram<T>::Shape {
+    size_t target_node;
+
+    inline size_t indexmap(size_t idx) const override {
+        size_t paridx = target_node >> (this->shape_size - idx - 1);
+        return paridx;
+    }
+
+public:
+    // Constructor
+    Path(Shape &parent, MPCTIO &tio, yield_t &yield,
+        size_t target_node);
+
+    // Copy the given Path except for the tio and yield
+    Path(const Path &copy_from, MPCTIO &tio, yield_t &yield) :
+        Shape(copy_from, tio, yield),
+        target_node(copy_from.target_node) {}
+
+    // Update the context (MPCTIO and yield if you've started a new
+    // thread, or just yield if you've started a new coroutine in the
+    // same thread).  Returns a new Shape with an updated context.
+    Path context(MPCTIO &new_tio, yield_t &new_yield) const {
+        return Path(*this, new_tio, new_yield);
+    }
+    Path context(yield_t &new_yield) const {
+        return Path(*this, this->tio, new_yield);
+    }
+
+    // Index into this Path in various ways
+    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Path,1>
+            operator[](const RegAS &idx) {
+        typename Duoram<T>::Shape::
+            template MemRefS<RegAS,T,std::nullopt_t,Path,1>
+            res(*this, idx, std::nullopt);
+        return res;
+    }
+    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Path,1>
+            operator[](const RegXS &idx) {
+        typename Duoram<T>::Shape::
+            template MemRefS<RegXS,T,std::nullopt_t,Path,1>
+            res(*this, idx, std::nullopt);
+        return res;
+    }
+    template <typename U, nbits_t WIDTH>
+    typename Duoram::Shape::template MemRefS<U,T,std::nullopt_t,Path,WIDTH>
+            operator[](OblivIndex<U,WIDTH> &obidx) {
+        typename Duoram<T>::Shape::
+            template MemRefS<RegXS,T,std::nullopt_t,Path,WIDTH>
+            res(*this, obidx, std::nullopt);
+        return res;
+    }
+    typename Duoram::Shape::template MemRefExpl<T,std::nullopt_t>
+            operator[](address_t idx) {
+        typename Duoram<T>::Shape::
+            template MemRefExpl<T,std::nullopt_t>
+            res(*this, idx, std::nullopt);
+        return res;
+    }
+    template <typename U>
+    Duoram::Shape::MemRefInd<U, Path>
+            operator[](const std::vector<U> &indcs) {
+        typename Duoram<T>::Shape::
+            template MemRefInd<U,Path>
+            res(*this, indcs);
+        return res;
+    }
+    template <typename U, size_t N>
+    Duoram::Shape::MemRefInd<U, Path>
+            operator[](const std::array<U,N> &indcs) {
+        typename Duoram<T>::Shape::
+            template MemRefInd<U,Path>
+            res(*this, indcs);
+        return res;
+    }
+};
+
+
 #include "shapes.tcc"
 
 #endif

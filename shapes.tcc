@@ -61,4 +61,25 @@ Duoram<T>::Stride::Stride(Shape &parent, MPCTIO &tio, yield_t &yield,
     this->set_shape_size(numelements);
 }
 
+// Constructor for the Path shape.
+template <typename T>
+Duoram<T>::Path::Path(Shape &parent, MPCTIO &tio, yield_t &yield,
+    size_t target_node) :
+    Shape(parent, parent.duoram, tio, yield)
+{
+    size_t parentsize = parent.size();
+    assert(target_node > 0 && target_node < parentsize);
+    this->target_node = target_node;
+
+    // How many nodes are there on the path from the root (index 1) to
+    // the target node?  Recall that the parent of the node at index x
+    // is just the node at index (x>>1).
+    size_t path_num_nodes = 1, cur_node = target_node;
+    while (cur_node > 1) {
+        cur_node >>= 1;
+        ++path_num_nodes;
+    }
+    this->set_shape_size(path_num_nodes);
+}
+
 #endif

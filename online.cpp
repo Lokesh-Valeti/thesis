@@ -1442,6 +1442,71 @@ static void related(MPCIO &mpcio,
     });
 }
 
+template <typename T>
+static void path(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth = 5;
+
+    // The depth of the (complete) binary tree
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    // The target node
+    size_t target_node = 3 << (depth-1);
+    if (*args) {
+        target_node = atoi(*args);
+        ++args;
+    }
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, target_node] (yield_t &yield) {
+        size_t size = size_t(1)<<(depth+1);
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+
+        // Initialize A with words with sequential top and bottom halves
+        // (just so we can more easily eyeball the right answers)
+        A.init([] (size_t i) { return i * 0x100000001; } );
+
+        // We use this layout for the tree:
+        // A[0] is unused
+        // A[1] is the root (layer 0)
+        // A[2..3] is layer 1
+        // A[4..7] is layer 2
+        // ...
+        // A[(1<<j)..((2<<j)-1)] is layer j
+        //
+        // So the parent of x is at location (x/2) and the children of x
+        // are at locations 2*x and 2*x+1
+
+        // Create a Path from the root to the target node
+        typename Duoram<T>::Path P(A, tio, yield, target_node);
+
+        // Re-initialize that path to something recognizable
+        P.init([] (size_t i) { return 0xff + i * 0x1000000010000; } );
+
+        // ORAM update along that path
+        RegXS idx;
+        idx.set(tio.player() * arc4random_uniform(P.size()));
+        T val;
+        val.set(tio.player() * 0xaaaa00000000);
+        P[idx] += val;
+
+        // Check the answer
+        auto check = A.reconstruct();
+        if (depth <= 10) {
+            oram.dump();
+            if (tio.player() == 0) {
+                for (address_t i=0;i<size;++i) {
+                    printf("%04x %016lx\n", i, check[i].share());
+                }
+            }
+        }
+    });
+}
+
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     MPCTIO tio(mpcio, 0);
@@ -1537,6 +1602,13 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
             related<RegXS>(mpcio, opts, args);
         } else {
             related<RegAS>(mpcio, opts, args);
+        }
+    } else if (!strcmp(*args, "path")) {
+        ++args;
+        if (opts.use_xor_db) {
+            path<RegXS>(mpcio, opts, args);
+        } else {
+            path<RegAS>(mpcio, opts, args);
         }
     } else if (!strcmp(*args, "cell")) {
         ++args;
