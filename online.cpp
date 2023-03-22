@@ -1494,6 +1494,11 @@ static void path(MPCIO &mpcio,
         val.set(tio.player() * 0xaaaa00000000);
         P[idx] += val;
 
+        // Binary search along that path
+        T lookup;
+        lookup.set(tio.player() * 0x3000000000000);
+        RegXS foundidx = P.binary_search(lookup);
+
         // Check the answer
         auto check = A.reconstruct();
         if (depth <= 10) {
@@ -1504,6 +1509,8 @@ static void path(MPCIO &mpcio,
                 }
             }
         }
+        value_t found = mpc_reconstruct(tio, yield, foundidx);
+        printf("foundidx = %lu\n", found);
     });
 }
 
@@ -1605,11 +1612,7 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
         }
     } else if (!strcmp(*args, "path")) {
         ++args;
-        if (opts.use_xor_db) {
-            path<RegXS>(mpcio, opts, args);
-        } else {
-            path<RegAS>(mpcio, opts, args);
-        }
+        path<RegAS>(mpcio, opts, args);
     } else if (!strcmp(*args, "cell")) {
         ++args;
         cell(mpcio, opts, args);

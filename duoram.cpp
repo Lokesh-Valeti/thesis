@@ -3,21 +3,21 @@
 
 // Assuming the memory is already sorted, do an oblivious binary
 // search for the smallest index containing the value at least the
-// given one.  (The answer will be the length of the Flat if all
+// given one.  (The answer will be the length of the Shape if all
 // elements are smaller than the target.) Only available for additive
 // shared databases for now.
 
 // The basic version uses log(N) ORAM reads of size N, where N is the
-// smallest power of 2 strictly larger than the Flat size
+// smallest power of 2 strictly larger than the Shape size
 template <>
-RegAS Duoram<RegAS>::Flat::basic_binary_search(RegAS &target)
+RegAS Duoram<RegAS>::Shape::basic_binary_search(RegAS &target)
 {
     if (this->shape_size == 0) {
         RegAS zero;
         return zero;
     }
     // Create a Pad of the smallest power of 2 size strictly greater
-    // than the Flat size
+    // than the Shape size
     address_t padsize = 1;
     nbits_t depth = 0;
     while (padsize <= this->shape_size) {
@@ -74,16 +74,16 @@ RegAS Duoram<RegAS>::Flat::basic_binary_search(RegAS &target)
 
 // This version does 1 ORAM read of size 2, 1 of size 4, 1 of size
 // 8, ..., 1 of size N/2, where N is the smallest power of 2 strictly
-// larger than the Flat size
+// larger than the Shape size
 template <>
-RegXS Duoram<RegAS>::Flat::binary_search(RegAS &target)
+RegXS Duoram<RegAS>::Shape::binary_search(RegAS &target)
 {
     if (this->shape_size == 0) {
         RegXS zero;
         return zero;
     }
     // Create a Pad of the smallest power of 2 size strictly greater
-    // than the Flat size
+    // than the Shape size
     address_t padsize = 1;
     nbits_t depth = 0;
     while (padsize <= this->shape_size) {
@@ -99,7 +99,7 @@ RegXS Duoram<RegAS>::Flat::binary_search(RegAS &target)
     auto [lt, eq, gt] = cdpf.compare(this->tio, this->yield,
         val-target, tio.aes_ops());
     if (depth == 1) {
-        // There was only one item in the Flat, and mid will equal 0, so
+        // There was only one item in the Shape, and mid will equal 0, so
         // val is (a share of) that item, P[0].  If val >= target, the
         // answer is here or to the left, so it must be 0.  If val <
         // target, the answer is strictly to the right, so it must be 1.

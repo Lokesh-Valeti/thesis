@@ -322,6 +322,20 @@ public:
         }
     }
 
+    // Assuming the Shape is already sorted, do an oblivious binary
+    // search for the smallest index containing the value at least the
+    // given one.  (The answer will be the length of the Shape if all
+    // elements are smaller than the target.) Only available for additive
+    // shared databases for now.
+
+    // The basic version uses log(N) ORAM reads of size N, where N is
+    // the smallest power of 2 strictly larger than the Shape size
+    RegAS basic_binary_search(RegAS &target);
+    // This version does 1 ORAM read of size 2, 1 of size 4, 1 of size
+    // 8, ..., 1 of size N/2, where N is the smallest power of 2
+    // strictly larger than the Shape size
+    RegXS binary_search(RegAS &target);
+
     // Enable or disable explicit-only mode.  Only using [] with
     // explicit (address_t) indices are allowed in this mode.  Using []
     // with RegAS or RegXS indices will automatically turn off this
@@ -484,20 +498,6 @@ public:
     // the elements must be at most 63 bits long each for the notion of
     // ">" to make consistent sense.
     void bitonic_sort(address_t start, address_t len, bool dir=0);
-
-    // Assuming the memory is already sorted, do an oblivious binary
-    // search for the smallest index containing the value at least the
-    // given one.  (The answer will be the length of the Flat if all
-    // elements are smaller than the target.) Only available for additive
-    // shared databases for now.
-
-    // The basic version uses log(N) ORAM reads of size N, where N is
-    // the smallest power of 2 strictly larger than the Flat size
-    RegAS basic_binary_search(RegAS &target);
-    // This version does 1 ORAM read of size 2, 1 of size 4, 1 of size
-    // 8, ..., 1 of size N/2, where N is the smallest power of 2
-    // strictly larger than the Flat size
-    RegXS binary_search(RegAS &target);
 };
 
 // Oblivious indices for use in related-index ORAM accesses.
