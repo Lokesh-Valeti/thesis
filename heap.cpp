@@ -223,6 +223,54 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
 /*
 
 */
+
+RegXS MinHeap::restore_heap_property_optimization1(MPCTIO tio, yield_t & yield, RegXS index) {
+    RegAS smallest;
+    auto HeapArray = oram.flat(tio, yield);
+    RegAS parent = HeapArray[index];
+    RegXS leftchildindex = index;
+    leftchildindex = index << 1;
+
+    RegXS rightchildindex;
+    rightchildindex.xshare = leftchildindex.xshare ^ (tio.player());
+
+    RegAS leftchild = HeapArray[leftchildindex];
+    RegAS rightchild = HeapArray[rightchildindex];
+    RegAS sum = parent + leftchild + rightchild;
+    CDPF cdpf = tio.cdpf(yield);
+    auto[lt, eq, gt] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
+
+    RegXS smallerindex;
+    //mpc_select(tio, yield, smallerindex, lt, rightchildindex, leftchildindex, 64); 
+
+    smallerindex = leftchildindex ^ lt;
+    //smallerindex stores either the index of the left or child (whichever has the smaller value) 
+
+    RegAS smallerchild;
+    mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild, 64);
+    // the value smallerchild holds smaller of left and right child 
+    RegAS largerchild = sum - parent - smallerchild;
+    CDPF cdpf0 = tio.cdpf(yield);
+    auto[lt0, eq0, gt0] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
+    //comparison between the smallerchild and the parent
+    RegBS lt0lt;
+    mpc_and(tio, yield, lt0lt, lt, lt0);
+    mpc_select(tio, yield, smallest, lt0, parent, smallerchild, 64);
+    // smallest holds smaller of left/right child and parent
+
+    RegAS otherchild;
+    //mpc_select(tio, yield, otherchild, gt0, parent, smallerchild, 64);
+    otherchild = sum - smallest - largerchild;
+    // otherchild holds max(min(leftchild, rightchild), parent)
+
+    HeapArray[index] = smallest;
+    HeapArray[smallerindex] = otherchild;
+
+    //verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
+
+    return smallerindex;
+}
+
 RegXS MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield) {
     size_t index = 1;
     auto HeapArray = oram.flat(tio, yield);

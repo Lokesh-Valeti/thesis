@@ -21,9 +21,10 @@ class MinHeap {
     int insert(MPCTIO tio, yield_t & yield, RegAS val);
     int verify_heap_property(MPCTIO tio, yield_t & yield);
     RegXS restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index);
+    RegXS restore_heap_property_optimization1(MPCTIO tio, yield_t & yield, RegXS index);
     RegXS restore_heap_property_at_root(MPCTIO tio, yield_t & yield);
 };
 
-// void MinHeap(MPCIO &mpcio,
-//    const PRACOptions &opts, char **args);
+void Heap(MPCIO &mpcio,
+   const PRACOptions &opts, char **args);
 #endif
