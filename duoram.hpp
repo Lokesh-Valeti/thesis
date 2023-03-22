@@ -357,7 +357,7 @@ public:
         if (depth == 0) {
             depth = this->addr_size;
         }
-        typename Duoram<T>::OblivIndex<RegXS,1>
+        typename Duoram<T>::template OblivIndex<RegXS,1>
             res(this->tio, this->yield, idx, depth);
         return res;
     }
@@ -367,7 +367,7 @@ public:
         if (depth == 0) {
             depth = this->addr_size;
         }
-        typename Duoram<T>::OblivIndex<RegAS,1>
+        typename Duoram<T>::template OblivIndex<RegAS,1>
             res(this->tio, this->yield, idx, depth);
         return res;
     }
@@ -377,7 +377,7 @@ public:
         if (depth == 0) {
             depth = this->addr_size;
         }
-        typename Duoram<T>::OblivIndex<RegXS,1>
+        typename Duoram<T>::template OblivIndex<RegXS,1>
             res(this->tio, this->yield, depth);
         return res;
     }

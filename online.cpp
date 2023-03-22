@@ -1392,7 +1392,7 @@ static void related(MPCIO &mpcio,
         // (which equals the width of the underlying RDPF, currently
         // maximum 5), layer is the depth of the underlying RDPF (the
         // bit length of idx).
-        typename Duoram<T>::OblivIndex<RegXS,3> oidx(tio, yield, idx, layer);
+        typename Duoram<T>::template OblivIndex<RegXS,3> oidx(tio, yield, idx, layer);
 
         // This is the (known) layer containing the (unknown) parent
         // node

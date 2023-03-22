@@ -423,10 +423,10 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         U indoffset;
         dt.get_target(indoffset);
         indoffset -= oblividx->idx;
-        typename RDPF<WIDTH>::W<FT> MW;
+        typename RDPF<WIDTH>::template W<FT> MW;
         MW[windex] = M;
         auto Moffset = std::make_tuple(MW, MW, MW);
-        typename RDPFTriple<WIDTH>::WTriple<FT> scaled_val;
+        typename RDPFTriple<WIDTH>::template WTriple<FT> scaled_val;
         dt.scaled_value(scaled_val);
         Moffset -= scaled_val;
 
@@ -442,7 +442,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
 
         // Receive the above from the peer
         U peerindoffset;
-        typename RDPFTriple<WIDTH>::WTriple<FT> peerMoffset;
+        typename RDPFTriple<WIDTH>::template WTriple<FT> peerMoffset;
         shape.tio.recv_peer(&peerindoffset, BITBYTES(depth));
         shape.tio.iostream_peer() >> peerMoffset;
 
@@ -458,7 +458,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         pe.reduce(init, [this, &dt, &shape, &Mshift, player, windex] (int thread_num,
                 address_t i, const typename RDPFTriple<WIDTH>::LeafNode &leaf) {
             // The values from the three DPFs
-            typename RDPFTriple<WIDTH>::WTriple<FT> scaled;
+            typename RDPFTriple<WIDTH>::template WTriple<FT> scaled;
             std::tuple<FT,FT,FT> unit;
             dt.scaled(scaled, leaf);
             dt.unit(unit, leaf);
@@ -483,7 +483,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         const nbits_t windex = oblividx->windex();
         const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
-        typename RDPFPair<WIDTH>::WPair<FT> p0Moffset, p1Moffset;
+        typename RDPFPair<WIDTH>::template WPair<FT> p0Moffset, p1Moffset;
 
         shape.yield();
 
@@ -504,7 +504,7 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
         pe.reduce(init, [this, &dp, &shape, &Mshift, windex] (int thread_num,
                 address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs
-            typename RDPFPair<WIDTH>::WPair<FT> scaled;
+            typename RDPFPair<WIDTH>::template WPair<FT> scaled;
             std::tuple<FT,FT> unit;
             dp.scaled(scaled, leaf);
             dp.unit(unit, leaf);
