@@ -1253,7 +1253,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
         bst(mpcio, opts, args);
     } else if (!strcmp(*args, "avl")) {
         ++args;
-        //avl(mpcio, opts, args);
+        avl(mpcio, opts, args);
+    } else if (!strcmp(*args, "avl_tests")) {
+        ++args;
         avl_tests(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
