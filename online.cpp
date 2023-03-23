@@ -7,6 +7,7 @@
 #include "cdpf.hpp"
 #include "cell.hpp"
 #include "heap.hpp"
+#include "shapes.hpp"
 
 
 static void online_test(MPCIO &mpcio,
@@ -260,8 +261,11 @@ static void rdpf_test(MPCIO &mpcio,
                     RDPF<WIDTH> &dpf = dt.dpf[i];
                     for (nbits_t level=min_level; level<=depth; ++level) {
                         if (incremental) {
-                            printf("Level = %u\n\n", level);
-                            dpf.depth(level);
+                            printf("Level = %u\n", level);
+                            dt.depth(level);
+                            RegXS tshare;
+                            dt.get_target(tshare);
+                            printf("Target share = %lx\n\n", tshare.share());
                         }
                         typename RDPF<WIDTH>::RegXSW peer_scaled_xor;
                         typename RDPF<WIDTH>::RegASW peer_scaled_sum;
@@ -651,12 +655,16 @@ static void duoram_test(MPCIO &mpcio,
         ++args;
     }
     share &= ((address_t(1)<<depth)-1);
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
+    }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, depth, share] (yield_t &yield) {
-        size_t size = size_t(1)<<depth;
+    run_coroutines(tio, [&tio, depth, share, len] (yield_t &yield) {
         // size_t &aes_ops = tio.aes_ops();
-        Duoram<T> oram(tio.player(), size);
+        Duoram<T> oram(tio.player(), len);
         auto A = oram.flat(tio, yield);
         RegAS aidx, aidx2, aidx3;
         aidx.ashare = share;
@@ -676,6 +684,14 @@ static void duoram_test(MPCIO &mpcio,
         } else {
             N.set(0x0000beef);
         }
+        RegXS oxidx;
+        oxidx.xshare = share+3*tio.player();
+        T O;
+        if (tio.player() == 0) {
+            O.set(0x31410000);
+        } else {
+            O.set(0x00005926);
+        }
         // Writing and reading with additively shared indices
         printf("Additive Updating\n");
         A[aidx] += M;
@@ -686,8 +702,14 @@ static void duoram_test(MPCIO &mpcio,
         A[xidx] += N;
         printf("XOR Reading\n");
         T Ax = A[xidx];
-        T Ae;
+        // Writing and reading with OblivIndex indices
+        auto oidx = A.oblivindex(oxidx);
+        printf("OblivIndex Updating\n");
+        A[oidx] += O;
+        printf("OblivIndex Reading\n");
+        T Ox = A[oidx];
         // Writing and reading with explicit indices
+        T Ae;
         if (depth > 2) {
             printf("Explicit Updating\n");
             A[5] += Aa;
@@ -714,7 +736,7 @@ static void duoram_test(MPCIO &mpcio,
             oram.dump();
             auto check = A.reconstruct();
             if (tio.player() == 0) {
-                for (address_t i=0;i<size;++i) {
+                for (address_t i=0;i<len;++i) {
                     printf("%04x %016lx\n", i, check[i].share());
                 }
             }
@@ -722,10 +744,12 @@ static void duoram_test(MPCIO &mpcio,
         auto checkread = A.reconstruct(Aa);
         auto checkreade = A.reconstruct(Ae);
         auto checkreadx = A.reconstruct(Ax);
+        auto checkreado = A.reconstruct(Ox);
         if (tio.player() == 0) {
             printf("Read AS value = %016lx\n", checkread.share());
             printf("Read AX value = %016lx\n", checkreadx.share());
             printf("Read Ex value = %016lx\n", checkreade.share());
+            printf("Read OI value = %016lx\n", checkreado.share());
         }
         for (auto &v : Av) {
             auto checkv = A.reconstruct(v);
@@ -1067,48 +1091,126 @@ static void sort_test(MPCIO &mpcio,
         depth = atoi(*args);
         ++args;
     }
-
-    int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth] {
-            MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth] (yield_t &yield) {
-                address_t size = address_t(1)<<depth;
-                // size_t &aes_ops = tio.aes_ops();
-                Duoram<RegAS> oram(tio.player(), size);
-                auto A = oram.flat(tio, yield);
-                A.explicitonly(true);
-                // Initialize the memory to random values in parallel
-                std::vector<coro_t> coroutines;
-                for (address_t i=0; i<size; ++i) {
-                    coroutines.emplace_back(
-                        [&A, i](yield_t &yield) {
-                            auto Acoro = A.context(yield);
-                            RegAS v;
-                            v.randomize(62);
-                            Acoro[i] += v;
-                        });
-                }
-                run_coroutines(yield, coroutines);
-                A.bitonic_sort(0, depth);
-                if (depth <= 10) {
-                    oram.dump();
-                    auto check = A.reconstruct();
-                    if (tio.player() == 0) {
-                        for (address_t i=0;i<size;++i) {
-                            printf("%04x %016lx\n", i, check[i].share());
-                        }
-                    }
-                }
-            });
-        });
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
     }
-    pool.join();
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&tio, depth, len] (yield_t &yield) {
+        address_t size = address_t(1)<<depth;
+        // size_t &aes_ops = tio.aes_ops();
+        Duoram<RegAS> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+        A.explicitonly(true);
+        // Initialize the memory to random values in parallel
+        std::vector<coro_t> coroutines;
+        for (address_t i=0; i<size; ++i) {
+            coroutines.emplace_back(
+                [&A, i](yield_t &yield) {
+                    auto Acoro = A.context(yield);
+                    RegAS v;
+                    v.randomize(62);
+                    Acoro[i] += v;
+                });
+        }
+        run_coroutines(yield, coroutines);
+        A.bitonic_sort(0, len);
+        if (depth <= 10) {
+            oram.dump();
+        }
+        auto check = A.reconstruct();
+        bool fail = false;
+        if (tio.player() == 0) {
+            for (address_t i=0;i<size;++i) {
+                if (depth <= 10) {
+                    printf("%04x %016lx\n", i, check[i].share());
+                }
+                if (i>0 && i<len &&
+                    check[i].share() < check[i-1].share()) {
+                    fail = true;
+                }
+            }
+            if (fail) {
+                printf("FAIL\n");
+            } else {
+                printf("PASS\n");
+            }
+        }
+    });
 }
 
-static void bsearch_test(MPCIO &mpcio,
+static void pad_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
+{
+    nbits_t depth=6;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
+    }
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, len] (yield_t &yield) {
+        int player = tio.player();
+        Duoram<RegAS> oram(player, len);
+        auto A = oram.flat(tio, yield);
+        // Initialize the ORAM in explicit mode
+        A.explicitonly(true);
+        for (address_t i=0; i<len; ++i) {
+            RegAS v;
+            v.set((player*0xffff+1)*i);
+            A[i] = v;
+        }
+        A.explicitonly(false);
+        // Obliviously add 0 to A[0], which reblinds the whole database
+        RegAS z;
+        A[z] += z;
+        auto check = A.reconstruct();
+        if (player == 0) {
+            for (address_t i=0;i<len;++i) {
+                if (depth <= 10) {
+                    printf("%04x %016lx\n", i, check[i].share());
+                }
+            }
+            printf("\n");
+        }
+        address_t maxsize = address_t(1)<<depth;
+        Duoram<RegAS>::Pad P(A, tio, yield, maxsize);
+        for (address_t i=0; i<maxsize; ++i) {
+            RegAS v = P[i];
+            if (depth <= 10) {
+                value_t vval = mpc_reconstruct(tio, yield, v);
+                printf("%04x %016lx %016lx\n", i, v.share(), vval);
+            }
+        }
+        printf("\n");
+        for (address_t i=0; i<maxsize; ++i) {
+            value_t offset = 0xdeadbeef;
+            if (player) {
+                offset = -offset;
+            }
+            RegAS ind;
+            ind.set(player*i+offset);
+            RegAS v = P[ind];
+            if (depth <= 10) {
+                value_t vval = mpc_reconstruct(tio, yield, v);
+                printf("%04x %016lx %016lx\n", i, v.share(), vval);
+            }
+        }
+        printf("\n");
+    });
+}
+
+
+static void bsearch_test(MPCIO &mpcio,
+    const PRACOptions &opts, char **args, bool basic)
 {
     value_t target;
     arc4random_buf(&target, sizeof(target));
@@ -1119,79 +1221,298 @@ static void bsearch_test(MPCIO &mpcio,
         depth = atoi(*args);
         ++args;
     }
+    address_t len = (1<<depth);
+    if (*args) {
+        len = atoi(*args);
+        ++args;
+    }
     if (*args) {
         target = strtoull(*args, NULL, 16);
         ++args;
     }
 
-    int num_threads = opts.num_threads;
-    boost::asio::thread_pool pool(num_threads);
-    for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
-        boost::asio::post(pool, [&mpcio, thread_num, depth, target] {
-            MPCTIO tio(mpcio, thread_num);
-            run_coroutines(tio, [&tio, depth, target] (yield_t &yield) {
-                address_t size = address_t(1)<<depth;
-                RegAS tshare;
-                if (tio.player() == 2) {
-                    // Send shares of the target to the computational
-                    // players
-                    RegAS tshare0, tshare1;
-                    tshare0.randomize();
-                    tshare1.set(target-tshare0.share());
-                    tio.iostream_p0() << tshare0;
-                    tio.iostream_p1() << tshare1;
-                    printf("Using target = %016lx\n", target);
-                    yield();
-                } else {
-                    // Get the share of the target
-                    tio.iostream_server() >> tshare;
-                }
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&tio, &mpcio, depth, len, target, basic] (yield_t &yield) {
+        RegAS tshare;
+        std::cout << "\n===== SETUP =====\n";
 
-                // Create a random database and sort it
-                // size_t &aes_ops = tio.aes_ops();
-                Duoram<RegAS> oram(tio.player(), size);
-                auto A = oram.flat(tio, yield);
-                A.explicitonly(true);
-                // Initialize the memory to random values in parallel
-                std::vector<coro_t> coroutines;
-                for (address_t i=0; i<size; ++i) {
-                    coroutines.emplace_back(
-                        [&A, i](yield_t &yield) {
-                            auto Acoro = A.context(yield);
-                            RegAS v;
-                            v.randomize(62);
-                            Acoro[i] += v;
-                        });
-                }
-                run_coroutines(yield, coroutines);
-                A.bitonic_sort(0, depth);
+        if (tio.player() == 2) {
+            // Send shares of the target to the computational
+            // players
+            RegAS tshare0, tshare1;
+            tshare0.randomize();
+            tshare1.set(target-tshare0.share());
+            tio.iostream_p0() << tshare0;
+            tio.iostream_p1() << tshare1;
+            printf("Using target = %016lx\n", target);
+            yield();
+        } else {
+            // Get the share of the target
+            tio.iostream_server() >> tshare;
+        }
 
-                // Binary search for the target
-                RegAS tindex = A.obliv_binary_search(tshare);
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
 
-                // Check the answer
-                if (tio.player() == 1) {
-                    tio.iostream_peer() << tindex;
-                } else if (tio.player() == 0) {
-                    RegAS peer_tindex;
-                    tio.iostream_peer() >> peer_tindex;
-                    tindex += peer_tindex;
-                }
+        std::cout << "\n===== SORT RANDOM DATABASE =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        // Create a random database and sort it
+        // size_t &aes_ops = tio.aes_ops();
+        Duoram<RegAS> oram(tio.player(), len);
+        auto A = oram.flat(tio, yield);
+        A.explicitonly(true);
+        // Initialize the memory to random values in parallel
+        std::vector<coro_t> coroutines;
+        for (address_t i=0; i<len; ++i) {
+            coroutines.emplace_back(
+                [&A, i](yield_t &yield) {
+                    auto Acoro = A.context(yield);
+                    RegAS v;
+                    v.randomize(62);
+                    Acoro[i] += v;
+                });
+        }
+        run_coroutines(yield, coroutines);
+        A.bitonic_sort(0, len);
+        A.explicitonly(false);
+
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== BINARY SEARCH =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        // Binary search for the target
+        value_t checkindex;
+        if (basic) {
+            RegAS tindex = A.basic_binary_search(tshare);
+            checkindex = mpc_reconstruct(tio, yield, tindex);
+        } else {
+            RegXS tindex = A.binary_search(tshare);
+            checkindex = mpc_reconstruct(tio, yield, tindex);
+        }
+
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        std::cout << "\n===== CHECK ANSWER =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        // Check the answer
+        size_t size = size_t(1) << depth;
+        value_t checktarget = mpc_reconstruct(tio, yield, tshare);
+        auto check = A.reconstruct();
+        bool fail = false;
+        if (tio.player() == 0) {
+            for (address_t i=0;i<len;++i) {
                 if (depth <= 10) {
-                    auto check = A.reconstruct();
-                    if (tio.player() == 0) {
-                        for (address_t i=0;i<size;++i) {
-                            printf("%04x %016lx\n", i, check[i].share());
-                        }
+                    printf("%c%04x %016lx\n",
+                        (i == checkindex ? '*' : ' '),
+                        i, check[i].share());
+                }
+                if (i>0 && i<len &&
+                    check[i].share() < check[i-1].share()) {
+                    fail = true;
+                }
+                if (i == checkindex) {
+                    // check[i] should be >= target, and check[i-1]
+                    // should be < target
+                    if ((i < len && check[i].share() < checktarget) ||
+                        (i > 0 && check[i-1].share() >= checktarget)) {
+                        fail = true;
                     }
                 }
-                if (tio.player() == 0) {
-                    printf("Found index = %lx\n", tindex.share());
-                }
-            });
-        });
+            }
+            if (checkindex == len && check[len-1].share() >= checktarget) {
+                fail = true;
+            }
+
+            printf("Target = %016lx\n", checktarget);
+            printf("Found index = %02lx\n", checkindex);
+            if (checkindex > size) {
+                fail = true;
+            }
+            if (fail) {
+                printf("FAIL\n");
+            } else {
+                printf("PASS\n");
+            }
+        }
+    });
+}
+
+template <typename T>
+static void related(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth = 5;
+
+    // The depth of the (complete) binary tree
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
     }
-    pool.join();
+    // The layer at which to choose a random parent node (and its two
+    // children along with it)
+    nbits_t layer = depth-1;
+    if (*args) {
+        layer = atoi(*args);
+        ++args;
+    }
+    assert(layer < depth);
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, layer] (yield_t &yield) {
+        size_t size = size_t(1)<<(depth+1);
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+
+        // Initialize A with words with sequential top and bottom halves
+        // (just so we can more easily eyeball the right answers)
+        A.init([] (size_t i) { return i * 0x100000001; } );
+
+        // We use this layout for the tree:
+        // A[0] is unused
+        // A[1] is the root (layer 0)
+        // A[2..3] is layer 1
+        // A[4..7] is layer 2
+        // ...
+        // A[(1<<j)..((2<<j)-1)] is layer j
+        //
+        // So the parent of x is at location (x/2) and the children of x
+        // are at locations 2*x and 2*x+1
+
+        // Pick a random index _within_ the given layer (i.e., the
+        // offset from the beginning of the layer, not the absolute
+        // location in A)
+        RegXS idx;
+        idx.randomize(layer);
+        // Create the OblivIndex. RegXS is the type of the common index
+        // (idx), 3 is the maximum number of related updates to support
+        // (which equals the width of the underlying RDPF, currently
+        // maximum 5), layer is the depth of the underlying RDPF (the
+        // bit length of idx).
+        typename Duoram<T>::template OblivIndex<RegXS,3> oidx(tio, yield, idx, layer);
+
+        // This is the (known) layer containing the (unknown) parent
+        // node
+        typename Duoram<T>::Flat P(A, tio, yield, 1<<layer, 1<<layer);
+        // This is the layer below that one, containing all possible
+        // children
+        typename Duoram<T>::Flat C(A, tio, yield, 2<<layer, 2<<layer);
+        // These are the subsets of C containing the left children and
+        // the right children respectively
+        typename Duoram<T>::Stride L(C, tio, yield, 0, 2);
+        typename Duoram<T>::Stride R(C, tio, yield, 1, 2);
+
+        T parent, left, right;
+
+        // Do three related reads.  In this version, only one DPF will
+        // be used, but it will still be _evaluated_ three times.
+        parent = P[oidx];
+        left = L[oidx];
+        right = R[oidx];
+
+        // The operation is just a simple rotation: the value in the
+        // parent moves to the left child, the left child moves to the
+        // right child, and the right child becomes the parent
+
+        // Do three related updates.  As above, only one (wide) DPF will
+        // be used (the same one as for the reads in fact), but it will
+        // still be _evaluated_ three more times.
+        P[oidx] += right-parent;
+        L[oidx] += parent-left;
+        R[oidx] += left-right;
+
+        // Check the answer
+        auto check = A.reconstruct();
+        if (depth <= 10) {
+            oram.dump();
+            if (tio.player() == 0) {
+                for (address_t i=0;i<size;++i) {
+                    printf("%04x %016lx\n", i, check[i].share());
+                }
+            }
+        }
+        value_t pval = mpc_reconstruct(tio, yield, parent);
+        value_t lval = mpc_reconstruct(tio, yield, left);
+        value_t rval = mpc_reconstruct(tio, yield, right);
+        printf("parent = %016lx\nleft   = %016lx\nright  = %016lx\n",
+            pval, lval, rval);
+    });
+}
+
+template <typename T>
+static void path(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth = 5;
+
+    // The depth of the (complete) binary tree
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    // The target node
+    size_t target_node = 3 << (depth-1);
+    if (*args) {
+        target_node = atoi(*args);
+        ++args;
+    }
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, target_node] (yield_t &yield) {
+        size_t size = size_t(1)<<(depth+1);
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+
+        // Initialize A with words with sequential top and bottom halves
+        // (just so we can more easily eyeball the right answers)
+        A.init([] (size_t i) { return i * 0x100000001; } );
+
+        // We use this layout for the tree:
+        // A[0] is unused
+        // A[1] is the root (layer 0)
+        // A[2..3] is layer 1
+        // A[4..7] is layer 2
+        // ...
+        // A[(1<<j)..((2<<j)-1)] is layer j
+        //
+        // So the parent of x is at location (x/2) and the children of x
+        // are at locations 2*x and 2*x+1
+
+        // Create a Path from the root to the target node
+        typename Duoram<T>::Path P(A, tio, yield, target_node);
+
+        // Re-initialize that path to something recognizable
+        P.init([] (size_t i) { return 0xff + i * 0x1000000010000; } );
+
+        // ORAM update along that path
+        RegXS idx;
+        idx.set(tio.player() * arc4random_uniform(P.size()));
+        T val;
+        val.set(tio.player() * 0xaaaa00000000);
+        P[idx] += val;
+
+        // Binary search along that path
+        T lookup;
+        lookup.set(tio.player() * 0x3000000000000);
+        RegXS foundidx = P.binary_search(lookup);
+
+        // Check the answer
+        auto check = A.reconstruct();
+        if (depth <= 10) {
+            oram.dump();
+            if (tio.player() == 0) {
+                for (address_t i=0;i<size;++i) {
+                    printf("%04x %016lx\n", i, check[i].share());
+                }
+            }
+        }
+        value_t found = mpc_reconstruct(tio, yield, foundidx);
+        printf("foundidx = %lu\n", found);
+    });
 }
 
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
@@ -1267,9 +1588,15 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "sorttest")) {
         ++args;
         sort_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "padtest")) {
+        ++args;
+        pad_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "bbsearch")) {
+        ++args;
+        bsearch_test(mpcio, opts, args, true);
     } else if (!strcmp(*args, "bsearch")) {
         ++args;
-        bsearch_test(mpcio, opts, args);
+        bsearch_test(mpcio, opts, args, false);
     } else if (!strcmp(*args, "duoram")) {
         ++args;
         if (opts.use_xor_db) {
@@ -1277,6 +1604,16 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
         } else {
             duoram<RegAS>(mpcio, opts, args);
         }
+    } else if (!strcmp(*args, "related")) {
+        ++args;
+        if (opts.use_xor_db) {
+            related<RegXS>(mpcio, opts, args);
+        } else {
+            related<RegAS>(mpcio, opts, args);
+        }
+    } else if (!strcmp(*args, "path")) {
+        ++args;
+        path<RegAS>(mpcio, opts, args);
     } else if (!strcmp(*args, "cell")) {
         ++args;
         cell(mpcio, opts, args);

@@ -177,62 +177,94 @@ Duoram<T>::Flat::Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield,
     this->set_shape_size(len);
 }
 
-// Bitonic sort the elements from start to start+(1<<depth)-1, in
+// Constructor for the Flat shape.  len=0 means the maximum size (the
+// parent's size minus start).
+template <typename T>
+Duoram<T>::Flat::Flat(const Shape &parent, MPCTIO &tio, yield_t &yield,
+    size_t start, size_t len) : Shape(parent, parent.duoram, tio, yield)
+{
+    size_t parentsize = parent.size();
+    if (start > parentsize) {
+        start = parentsize;
+    }
+    this->start = start;
+    size_t maxshapesize = parentsize - start;
+    if (len > maxshapesize || len == 0) {
+        len = maxshapesize;
+    }
+    this->len = len;
+    this->set_shape_size(len);
+}
+
+// Bitonic sort the elements from start to start+len-1, in
 // increasing order if dir=0 or decreasing order if dir=1. Note that
 // the elements must be at most 63 bits long each for the notion of
 // ">" to make consistent sense.
 template <typename T>
-void Duoram<T>::Flat::bitonic_sort(address_t start, nbits_t depth, bool dir)
+void Duoram<T>::Flat::bitonic_sort(address_t start, address_t len, bool dir)
 {
-    if (depth == 0) return;
-    if (depth == 1) {
+    if (len < 2) return;
+    if (len == 2) {
         osort(start, start+1, dir);
         return;
     }
-    // Recurse on the first half (increasing order) and the second half
-    // (decreasing order) in parallel
+    address_t leftlen, rightlen;
+    leftlen = (len+1) >> 1;
+    rightlen = len >> 1;
+
+    // Recurse on the first half (opposite to the desired order)
+    // and the second half (desired order) in parallel
     run_coroutines(this->yield,
-        [this, start, depth](yield_t &yield) {
+        [this, start, leftlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.bitonic_sort(start, depth-1, 0);
+            Acoro.bitonic_sort(start, leftlen, !dir);
         },
-        [this, start, depth](yield_t &yield) {
+        [this, start, leftlen, rightlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.bitonic_sort(start+(1<<(depth-1)), depth-1, 1);
+            Acoro.bitonic_sort(start+leftlen, rightlen, dir);
         });
     // Merge the two into the desired order
-    butterfly(start, depth, dir);
+    butterfly(start, len, dir);
 }
 
 // Internal function to aid bitonic_sort
 template <typename T>
-void Duoram<T>::Flat::butterfly(address_t start, nbits_t depth, bool dir)
+void Duoram<T>::Flat::butterfly(address_t start, address_t len, bool dir)
 {
-    if (depth == 0) return;
-    if (depth == 1) {
+    if (len < 2) return;
+    if (len == 2) {
         osort(start, start+1, dir);
         return;
     }
-    // Sort pairs of elements half the width apart in parallel
-    address_t halfwidth = address_t(1)<<(depth-1);
+    address_t leftlen, rightlen, offset, num_swaps;
+    // leftlen = (len+1) >> 1;
+    leftlen = 1;
+    while(2*leftlen < len) {
+        leftlen *= 2;
+    }
+    rightlen = len - leftlen;
+    offset = leftlen;
+    num_swaps = rightlen;
+
+    // Sort pairs of elements offset apart in parallel
     std::vector<coro_t> coroutines;
-    for (address_t i=0; i<halfwidth;++i) {
+    for (address_t i=0; i<num_swaps;++i) {
         coroutines.emplace_back(
-            [this, start, halfwidth, dir, i](yield_t &yield) {
+            [this, start, offset, dir, i](yield_t &yield) {
                 Flat Acoro = context(yield);
-                Acoro.osort(start+i, start+i+halfwidth, dir);
+                Acoro.osort(start+i, start+i+offset, dir);
             });
     }
     run_coroutines(this->yield, coroutines);
     // Recurse on each half in parallel
     run_coroutines(this->yield,
-        [this, start, depth, dir](yield_t &yield) {
+        [this, start, leftlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.butterfly(start, depth-1, dir);
+            Acoro.butterfly(start, leftlen, dir);
         },
-        [this, start, halfwidth, depth, dir](yield_t &yield) {
+        [this, start, leftlen, rightlen, dir](yield_t &yield) {
             Flat Acoro = context(yield);
-            Acoro.butterfly(start+halfwidth, depth-1, dir);
+            Acoro.butterfly(start+leftlen, rightlen, dir);
         });
 }
 
@@ -260,11 +292,11 @@ inline address_t IfRegXS<RegXS>(address_t val) { return val; }
 // a particular field of T, then FT will be the type of the field (RegAS
 // or RegXS) and FST will be a pointer-to-member T::* type pointing to
 // that field.  Sh is the specific Shape subtype used to create the
-// MemRefS.
+// MemRefS.  WIDTH is the RDPF width to use.
 
 template <typename T>
-template <typename U,typename FT,typename FST,typename Sh>
-Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
+template <typename U,typename FT,typename FST,typename Sh,nbits_t WIDTH>
+Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator FT()
 {
     FT res;
     Sh &shape = this->shape;
@@ -273,30 +305,29 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple<1> dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
+        const RDPFTriple<WIDTH> &dt = *(oblividx->dt);
+        const nbits_t depth = dt.depth();
 
         // Compute the index offset
         U indoffset;
         dt.get_target(indoffset);
-        indoffset -= idx;
+        indoffset -= oblividx->idx;
 
         // We only need two of the DPFs for reading
-        RDPFPair<1> dp(std::move(dt), 0, player == 0 ? 2 : 1);
-        // The RDPFTriple dt is now broken, since we've moved things out
-        // of it.
+        RDPF2of3<WIDTH> dp(dt, 0, player == 0 ? 2 : 1);
 
         // Send it to the peer and the server
-        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
-        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.queue_peer(&indoffset, BITBYTES(depth));
+        shape.tio.queue_server(&indoffset, BITBYTES(depth));
 
         shape.yield();
 
         // Receive the above from the peer
         U peerindoffset;
-        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(depth));
 
         // Reconstruct the total offset
-        auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
+        auto indshift = combine(indoffset, peerindoffset, depth);
 
         // Evaluate the DPFs and compute the dotproducts
         ParallelEval pe(dp, IfRegAS<U>(indshift), IfRegXS<U>(indshift),
@@ -304,7 +335,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
             shape.tio.aes_ops());
         FT init;
         res = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair<1>::LeafNode &leaf) {
+                address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs, which will each be of type T
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -324,16 +355,17 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
     } else {
         // The server does this
 
-        RDPFPair<1> dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
+        const RDPFPair<WIDTH> &dp = *(oblividx->dp);
+        const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
 
         shape.yield();
 
         // Receive the index offset from the computational players and
         // combine them
-        shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
-        shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
-        auto indshift = combine(p0indoffset, p1indoffset, shape.addr_size);
+        shape.tio.recv_p0(&p0indoffset, BITBYTES(depth));
+        shape.tio.recv_p1(&p1indoffset, BITBYTES(depth));
+        auto indshift = combine(p0indoffset, p1indoffset, depth);
 
         // Evaluate the DPFs to compute the cancellation terms
         std::tuple<FT,FT> init, gamma;
@@ -341,7 +373,7 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         gamma = pe.reduce(init, [this, &dp, &shape] (int thread_num,
-                address_t i, const RDPFPair<1>::LeafNode &leaf) {
+                address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs, each of type FT
             std::tuple<FT,FT> V;
             dp.unit(V, leaf);
@@ -372,9 +404,9 @@ Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator FT()
 // Oblivious update to a shared index of Duoram memory, only for
 // FT = RegAS or RegXS.  The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::oram_update(const FT& M,
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::oram_update(const FT& M,
         const prac_template_true &)
 {
     Sh &shape = this->shape;
@@ -383,24 +415,26 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
     if (player < 2) {
         // Computational players do this
 
-        RDPFTriple<1> dt = shape.tio.rdpftriple(shape.yield, shape.addr_size);
+        const RDPFTriple<WIDTH> &dt = *(oblividx->dt);
+        const nbits_t windex = oblividx->windex();
+        const nbits_t depth = dt.depth();
 
         // Compute the index and message offsets
         U indoffset;
         dt.get_target(indoffset);
-        indoffset -= idx;
-        RDPF<1>::W<FT> MW;
-        MW[0] = M;
+        indoffset -= oblividx->idx;
+        typename RDPF<WIDTH>::template W<FT> MW;
+        MW[windex] = M;
         auto Moffset = std::make_tuple(MW, MW, MW);
-        RDPFTriple<1>::WTriple<FT> scaled_val;
+        typename RDPFTriple<WIDTH>::template WTriple<FT> scaled_val;
         dt.scaled_value(scaled_val);
         Moffset -= scaled_val;
 
         // Send them to the peer, and everything except the first offset
         // to the server
-        shape.tio.queue_peer(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.queue_peer(&indoffset, BITBYTES(depth));
         shape.tio.iostream_peer() << Moffset;
-        shape.tio.queue_server(&indoffset, BITBYTES(shape.addr_size));
+        shape.tio.queue_server(&indoffset, BITBYTES(depth));
         shape.tio.iostream_server() << std::get<1>(Moffset) <<
             std::get<2>(Moffset);
 
@@ -408,12 +442,12 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 
         // Receive the above from the peer
         U peerindoffset;
-        RDPFTriple<1>::WTriple<FT> peerMoffset;
-        shape.tio.recv_peer(&peerindoffset, BITBYTES(shape.addr_size));
+        typename RDPFTriple<WIDTH>::template WTriple<FT> peerMoffset;
+        shape.tio.recv_peer(&peerindoffset, BITBYTES(depth));
         shape.tio.iostream_peer() >> peerMoffset;
 
         // Reconstruct the total offsets
-        auto indshift = combine(indoffset, peerindoffset, shape.addr_size);
+        auto indshift = combine(indoffset, peerindoffset, depth);
         auto Mshift = combine(Moffset, peerMoffset);
 
         // Evaluate the DPFs and add them to the database
@@ -421,10 +455,10 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         int init = 0;
-        pe.reduce(init, [this, &dt, &shape, &Mshift, player] (int thread_num,
-                address_t i, const RDPFTriple<1>::LeafNode &leaf) {
+        pe.reduce(init, [this, &dt, &shape, &Mshift, player, windex] (int thread_num,
+                address_t i, const typename RDPFTriple<WIDTH>::LeafNode &leaf) {
             // The values from the three DPFs
-            RDPFTriple<1>::WTriple<FT> scaled;
+            typename RDPFTriple<WIDTH>::template WTriple<FT> scaled;
             std::tuple<FT,FT,FT> unit;
             dt.scaled(scaled, leaf);
             dt.unit(unit, leaf);
@@ -432,32 +466,34 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             // References to the appropriate cells in our database, our
             // blind, and our copy of the peer's blinded database
             auto [DB, BL, PBD] = shape.get_comp(i,fieldsel);
-            DB += V0[0];
+            DB += V0[windex];
             if (player == 0) {
-                BL -= V1[0];
-                PBD += V2[0]-V0[0];
+                BL -= V1[windex];
+                PBD += V2[windex]-V0[windex];
             } else {
-                BL -= V2[0];
-                PBD += V1[0]-V0[0];
+                BL -= V2[windex];
+                PBD += V1[windex]-V0[windex];
             }
             return 0;
         });
     } else {
         // The server does this
 
-        RDPFPair<1> dp = shape.tio.rdpfpair(shape.yield, shape.addr_size);
+        const RDPFPair<WIDTH> &dp = *(oblividx->dp);
+        const nbits_t windex = oblividx->windex();
+        const nbits_t depth = dp.depth();
         U p0indoffset, p1indoffset;
-        RDPFPair<1>::WPair<FT> p0Moffset, p1Moffset;
+        typename RDPFPair<WIDTH>::template WPair<FT> p0Moffset, p1Moffset;
 
         shape.yield();
 
         // Receive the index and message offsets from the computational
         // players and combine them
-        shape.tio.recv_p0(&p0indoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_p0(&p0indoffset, BITBYTES(depth));
         shape.tio.iostream_p0() >> p0Moffset;
-        shape.tio.recv_p1(&p1indoffset, BITBYTES(shape.addr_size));
+        shape.tio.recv_p1(&p1indoffset, BITBYTES(depth));
         shape.tio.iostream_p1() >> p1Moffset;
-        auto indshift = combine(p0indoffset, p1indoffset, shape.addr_size);
+        auto indshift = combine(p0indoffset, p1indoffset, depth);
         auto Mshift = combine(p0Moffset, p1Moffset);
 
         // Evaluate the DPFs and subtract them from the blinds
@@ -465,10 +501,10 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             shape.shape_size, shape.tio.cpu_nthreads(),
             shape.tio.aes_ops());
         int init = 0;
-        pe.reduce(init, [this, &dp, &shape, &Mshift] (int thread_num,
-                address_t i, const RDPFPair<1>::LeafNode &leaf) {
+        pe.reduce(init, [this, &dp, &shape, &Mshift, windex] (int thread_num,
+                address_t i, const typename RDPFPair<WIDTH>::LeafNode &leaf) {
             // The values from the two DPFs
-            RDPFPair<1>::WPair<FT> scaled;
+            typename RDPFPair<WIDTH>::template WPair<FT> scaled;
             std::tuple<FT,FT> unit;
             dp.scaled(scaled, leaf);
             dp.unit(unit, leaf);
@@ -477,8 +513,8 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
             // appropriate cells in the two blinded databases, so we can
             // subtract the pair directly.
             auto [BL0, BL1] = shape.get_server(i,fieldsel);
-            BL0 -= V0[0];
-            BL1 -= V1[0];
+            BL0 -= V0[windex];
+            BL1 -= V1[windex];
             return 0;
         });
     }
@@ -488,21 +524,21 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 // Oblivious update to a shared index of Duoram memory, only for
 // FT not RegAS or RegXS.  The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::oram_update(const FT& M,
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::oram_update(const FT& M,
         const prac_template_false &)
 {
-    T::update(shape, shape.yield, idx, M);
+    T::update(shape, shape.yield, oblividx->idx, M);
     return *this;
 }
 
 // Oblivious update to an additively or XOR shared index of Duoram
 // memory. The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator+=(const FT& M)
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator+=(const FT& M)
 {
     return oram_update(M, prac_basic_Reg_S<FT>());
 }
@@ -510,9 +546,9 @@ typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
 // Oblivious write to an additively or XOR shared index of Duoram
 // memory. The template parameters are as above.
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
-typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh>
-    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh>::operator=(const FT& M)
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
+typename Duoram<T>::Shape::template MemRefS<U,FT,FST,Sh,WIDTH>
+    &Duoram<T>::Shape::MemRefS<U,FT,FST,Sh,WIDTH>::operator=(const FT& M)
 {
     FT oldval = *this;
     FT update = M - oldval;

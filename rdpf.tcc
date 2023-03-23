@@ -145,7 +145,7 @@ inline V ParallelEval<T>::reduce(V init, W process)
     size_t thread_aes_ops[num_threads];
     V accums[num_threads];
     boost::asio::thread_pool pool(num_threads);
-    address_t threadstart = start;
+    address_t threadstart = 0;
     address_t threadchunk = num_evals / num_threads;
     address_t threadextra = num_evals % num_threads;
     nbits_t depth = rdpf.depth();
@@ -857,6 +857,9 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
 
     li.resize(incremental ? depth : 1);
 
+    // Prefetch the right number of nodeselecttriples
+    tio.request_nodeselecttriples(yield, incremental ? 2*depth-1 : depth);
+
     // Construct each intermediate level
     while(level < depth) {
         LeafNode *leaflevel = NULL;
@@ -883,29 +886,44 @@ RDPF<WIDTH>::RDPF(MPCTIO &tio, yield_t &yield,
         // The bit-shared choice bit is bit (depth-level-1) of the
         // XOR-shared target index
         RegBS bs_choice = target.bit(depth-level-1);
-        bool cfbit;
 
+        // At each layer, we can create the next internal layer and the
+        // leaf layer in parallel coroutines if we're making an
+        // incremental RDPF.  If not, exactly one of these coroutines
+        // will be created, and we just run that one.
+        std::vector<coro_t> coroutines;
         if (level < depth-1) {
-            DPFnode CW;
-            // This field is ignored when we're not expanding to a leaf
-            // level, but it needs to be an lvalue reference.
-            int noleafinfo = 0;
-            create_level(tio, yield, curlevel, nextlevel, player, level,
-                depth, bs_choice, CW, cfbit, save_expansion, noleafinfo,
-                aes_ops);
-            cfbits |= (value_t(cfbit)<<level);
-            if (player < 2) {
-                cw.push_back(CW);
-            }
+            coroutines.emplace_back([this, &tio, curlevel, nextlevel,
+                player, level, depth, bs_choice, save_expansion,
+                &aes_ops] (yield_t &yield) {
+                    DPFnode CW;
+                    bool cfbit;
+                    // This field is ignored when we're not expanding to a leaf
+                    // level, but it needs to be an lvalue reference.
+                    int noleafinfo = 0;
+                    create_level(tio, yield, curlevel, nextlevel, player, level,
+                        depth, bs_choice, CW, cfbit, save_expansion, noleafinfo,
+                        aes_ops);
+                    cfbits |= (value_t(cfbit)<<level);
+                    if (player < 2) {
+                        cw.push_back(CW);
+                    }
+                });
         }
         if (incremental || level == depth-1) {
-            LeafNode CW;
-            create_level(tio, yield, curlevel, leaflevel, player, level,
-                depth, bs_choice, CW, cfbit, save_expansion,
-                li[depth-level-1], aes_ops);
-            leaf_cfbits |= (value_t(cfbit)<<(depth-level-1));
-            li[depth-level-1].leaf_cw = CW;
+            coroutines.emplace_back([this, &tio, curlevel, leaflevel,
+                player, level, depth, bs_choice, save_expansion,
+                &aes_ops](yield_t &yield) {
+                    LeafNode CW;
+                    bool cfbit;
+                    create_level(tio, yield, curlevel, leaflevel, player,
+                        level, depth, bs_choice, CW, cfbit, save_expansion,
+                        li[depth-level-1], aes_ops);
+                    leaf_cfbits |= (value_t(cfbit)<<(depth-level-1));
+                    li[depth-level-1].leaf_cw = CW;
+                });
         }
+        run_coroutines(yield, coroutines);
 
         if (!save_expansion) {
             delete[] leaflevel;
@@ -1079,5 +1097,31 @@ typename RDPFPair<WIDTH>::LeafNode RDPFPair<WIDTH>::descend_to_leaf(
     typename RDPF<WIDTH>::LeafNode C0, C1;
     C0 = dpf[0].descend_to_leaf(P0, parentdepth, whichchild, aes_ops);
     C1 = dpf[1].descend_to_leaf(P1, parentdepth, whichchild, aes_ops);
+    return std::make_tuple(C0,C1);
+}
+
+template <nbits_t WIDTH>
+typename RDPF2of3<WIDTH>::node RDPF2of3<WIDTH>::descend(
+    const RDPF2of3<WIDTH>::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &aes_ops) const
+{
+    auto [P0, P1] = parent;
+    DPFnode C0, C1;
+    C0 = dpf0.descend(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf1.descend(P1, parentdepth, whichchild, aes_ops);
+    return std::make_tuple(C0,C1);
+}
+
+template <nbits_t WIDTH>
+typename RDPF2of3<WIDTH>::LeafNode RDPF2of3<WIDTH>::descend_to_leaf(
+    const RDPF2of3<WIDTH>::node &parent,
+    nbits_t parentdepth, bit_t whichchild,
+    size_t &aes_ops) const
+{
+    auto [P0, P1] = parent;
+    typename RDPF<WIDTH>::LeafNode C0, C1;
+    C0 = dpf0.descend_to_leaf(P0, parentdepth, whichchild, aes_ops);
+    C1 = dpf1.descend_to_leaf(P1, parentdepth, whichchild, aes_ops);
     return std::make_tuple(C0,C1);
 }

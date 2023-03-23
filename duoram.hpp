@@ -1,6 +1,9 @@
 #ifndef __DUORAM_HPP__
 #define __DUORAM_HPP__
 
+#include <optional>
+#include <functional>
+
 #include "types.hpp"
 #include "mpcio.hpp"
 #include "coroutine.hpp"
@@ -22,10 +25,8 @@
 // on a Shape shared with other threads or coroutines.
 
 // This is templated, because you can have a Duoram of additively shared
-// (RegAS) or XOR shared (RegXS) elements, or std::arrays of those to
-// get "wide" memory cells.
-
-// The initial implementation is focused on additive shares.
+// (RegAS) or XOR shared (RegXS) elements, or more complex cell types
+// (see cell.hpp for example).
 
 template <typename T>
 class Duoram {
@@ -58,6 +59,13 @@ public:
     class Shape;
     // These are the different Shapes that exist
     class Flat;
+    class Pad;
+    class Stride;
+    class Path;
+
+    // Oblivious indices for use in related-index ORAM accesses
+    template <typename U, nbits_t WIDTH>
+    class OblivIndex;
 
     // Pass the player number and desired size
     Duoram(int player, size_t size);
@@ -80,8 +88,15 @@ public:
 
 template <typename T>
 class Duoram<T>::Shape {
-    // Subclasses should be able to access _other_ Shapes' indexmap
+    // Subclasses should be able to access _other_ Shapes'
+    // get_{comp,server} functions
     friend class Flat;
+    friend class Pad;
+    friend class Stride;
+    friend class Path;
+
+    template <typename U, nbits_t WIDTH>
+    friend class OblivIndex;
 
     // When you index into a shape (A[x]), you get one of these types,
     // depending on the type of x (the index), _not_ on the type T (the
@@ -97,8 +112,8 @@ class Duoram<T>::Shape {
     // a particular field of T, then FT will be the type of the field
     // (RegAS or RegXS) and FST will be a pointer-to-member T::* type
     // pointing to that field.  Sh is the specific Shape subtype used to
-    // create the MemRefS.
-    template <typename U, typename FT, typename FST, typename Sh>
+    // create the MemRefS.  WIDTH is the RDPF width to use.
+    template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
     class MemRefS;
     // When x is unshared explicit value.  FT and FST are as above.
     template <typename FT, typename FST>
@@ -161,12 +176,8 @@ protected:
         explicitmode(copy_from.explicitmode) {}
 
     // The index-mapping function. Input the index relative to this
-    // shape, and output the corresponding physical address.  The
-    // strategy is to map the index relative to this shape to the index
-    // relative to the parent shape, call the parent's indexmap function
-    // on that (unless this is the topmost shape), and return what it
-    // returns.  If this is the topmost shape, just return what you
-    // would have passed to the parent's indexmap.
+    // shape, and output the corresponding index relative to the parent
+    // shape.
     //
     // This is a pure virtual function; all subclasses of Shape must
     // implement it, and of course Shape itself therefore cannot be
@@ -174,55 +185,156 @@ protected:
     virtual size_t indexmap(size_t idx) const = 0;
 
     // Get a pair (for the server) of references to the underlying
-    // Duoram entries at share virtual index idx.  (That is, it gets
-    // duoram.p0_blind[indexmap(idx)], etc.)
-    inline std::tuple<T&,T&> get_server(size_t idx,
+    // Duoram entries at share virtual index idx.
+    virtual inline std::tuple<T&,T&> get_server(size_t idx,
         std::nullopt_t null = std::nullopt) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.p0_blind[physaddr],
-            duoram.p1_blind[physaddr]);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.p0_blind[parindex],
+                duoram.p1_blind[parindex]);
+        } else {
+            return this->parent.get_server(parindex, null);
+        }
     }
 
     // Get a triple (for the computational players) of references to the
-    // underlying Duoram entries at share virtual index idx.  (That is,
-    // it gets duoram.database[indexmap(idx)], etc.)
-    inline std::tuple<T&,T&,T&> get_comp(size_t idx,
+    // underlying Duoram entries at share virtual index idx.
+    virtual inline std::tuple<T&,T&,T&> get_comp(size_t idx,
         std::nullopt_t null = std::nullopt) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.database[physaddr],
-            duoram.blind[physaddr],
-            duoram.peer_blinded_db[physaddr]);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.database[parindex],
+                duoram.blind[parindex],
+                duoram.peer_blinded_db[parindex]);
+        } else {
+            return this->parent.get_comp(parindex, null);
+        }
     }
 
     // Get a pair (for the server) of references to a particular field
     // of the underlying Duoram entries at share virtual index idx.
-    // (That is, it gets duoram.p0_blind[indexmap(idx)].field, etc.)
     template <typename FT>
     inline std::tuple<FT&,FT&> get_server(size_t idx, FT T::*field) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.p0_blind[physaddr].*field,
-            duoram.p1_blind[physaddr].*field);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.p0_blind[parindex].*field,
+                duoram.p1_blind[parindex].*field);
+        } else {
+            return this->parent.get_server(parindex, field);
+        }
     }
 
     // Get a triple (for the computational players) of references to a
     // particular field to the underlying Duoram entries at share
-    // virtual index idx.  (That is, it gets
-    // duoram.database[indexmap(idx)].field, etc.)
+    // virtual index idx.
     template <typename FT>
     inline std::tuple<FT&,FT&,FT&> get_comp(size_t idx, FT T::*field) const {
-        size_t physaddr = indexmap(idx);
-        return std::tie(
-            duoram.database[physaddr].*field,
-            duoram.blind[physaddr].*field,
-            duoram.peer_blinded_db[physaddr].*field);
+        size_t parindex = indexmap(idx);
+        if (&(this->parent) == this) {
+            return std::tie(
+                duoram.database[parindex].*field,
+                duoram.blind[parindex].*field,
+                duoram.peer_blinded_db[parindex].*field);
+        } else {
+            return this->parent.get_comp(parindex, field);
+        }
     }
 
 public:
     // Get the size
-    inline size_t size() { return shape_size; }
+    inline size_t size() const { return shape_size; }
+
+    // Initialize the contents of the Shape to a constant.  This method
+    // does no communication; all the operations are local.  This only
+    // works for T=RegXS or RegAS.
+    void init(size_t value) {
+        T v;
+        v.set(value);
+        init([v] (size_t i) { return v; });
+    }
+
+    // As above, but for general T
+    void init(const T &value) {
+        init([value] (size_t i) { return value; });
+    }
+
+    // As above, but use the default initializer for T (probably sets
+    // everything to 0).
+    void init() {
+        T deflt;
+        init(deflt);
+    }
+
+    // Pass a function f: size_t -> size_t, and initialize element i of the
+    // Shape to f(i) for each i.  This method does no communication; all
+    // the operations are local.  This function must be deterministic
+    // and public.  Only works for T=RegAS or RegXS.
+    void init(std::function<size_t(size_t)> f) {
+        int player = tio.player();
+        if (player < 2) {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [DB, BL, PBD] = get_comp(i);
+                BL.set(0);
+                if (player) {
+                    DB.set(f(i));
+                    PBD.set(0);
+                } else {
+                    DB.set(0);
+                    PBD.set(f(i));
+                }
+            }
+        } else {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [BL0, BL1] = get_server(i);
+                BL0.set(0);
+                BL1.set(0);
+            }
+        }
+    }
+
+    // Pass a function f: size_t -> T, and initialize element i of the
+    // Shape to f(i) for each i.  This method does no communication; all
+    // the operations are local.  This function must be deterministic
+    // and public.
+    void init(std::function<T(size_t)> f) {
+        int player = tio.player();
+        if (player < 2) {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [DB, BL, PBD] = get_comp(i);
+                BL = T();
+                if (player) {
+                    DB = f(i);
+                    PBD = T();
+                } else {
+                    DB = T();
+                    PBD = f(i);
+                }
+            }
+        } else {
+            for (size_t i=0; i<shape_size; ++i) {
+                auto [BL0, BL1] = get_server(i);
+                BL0 = T();
+                BL1 = T();
+            }
+        }
+    }
+
+    // Assuming the Shape is already sorted, do an oblivious binary
+    // search for the smallest index containing the value at least the
+    // given one.  (The answer will be the length of the Shape if all
+    // elements are smaller than the target.) Only available for additive
+    // shared databases for now.
+
+    // The basic version uses log(N) ORAM reads of size N, where N is
+    // the smallest power of 2 strictly larger than the Shape size
+    RegAS basic_binary_search(RegAS &target);
+    // This version does 1 ORAM read of size 2, 1 of size 4, 1 of size
+    // 8, ..., 1 of size N/2, where N is the smallest power of 2
+    // strictly larger than the Shape size
+    RegXS binary_search(RegAS &target);
 
     // Enable or disable explicit-only mode.  Only using [] with
     // explicit (address_t) indices are allowed in this mode.  Using []
@@ -235,6 +347,40 @@ public:
     // explicit writes to every element of the Shape before you do your
     // next oblivious read or write.  Bitonic sort is a prime example.
     void explicitonly(bool enable);
+
+    // Create an OblivIndex, non-incrementally (supply the shares of the
+    // index directly) or incrementally (the bits of the index will be
+    // supplied later, one at a time)
+
+    // Non-incremental, RegXS index
+    OblivIndex<RegXS,1> oblivindex(const RegXS &idx, nbits_t depth=0) {
+        if (depth == 0) {
+            depth = this->addr_size;
+        }
+        typename Duoram<T>::template OblivIndex<RegXS,1>
+            res(this->tio, this->yield, idx, depth);
+        return res;
+    }
+
+    // Non-incremental, RegAS index
+    OblivIndex<RegAS,1> oblivindex(const RegAS &idx, nbits_t depth=0) {
+        if (depth == 0) {
+            depth = this->addr_size;
+        }
+        typename Duoram<T>::template OblivIndex<RegAS,1>
+            res(this->tio, this->yield, idx, depth);
+        return res;
+    }
+
+    // Incremental (requires RegXS index, supplied bit-by-bit later)
+    OblivIndex<RegXS,1> oblivindex(nbits_t depth=0) {
+        if (depth == 0) {
+            depth = this->addr_size;
+        }
+        typename Duoram<T>::template OblivIndex<RegXS,1>
+            res(this->tio, this->yield, depth);
+        return res;
+    }
 
     // For debugging or checking your answers (using this in general is
     // of course insecure)
@@ -258,20 +404,21 @@ class Duoram<T>::Flat : public Duoram<T>::Shape {
 
     inline size_t indexmap(size_t idx) const {
         size_t paridx = idx + start;
-        if (&(this->parent) == this) {
-            return paridx;
-        } else {
-            return this->parent.indexmap(paridx);
-        }
+        return paridx;
     }
 
     // Internal function to aid bitonic_sort
-    void butterfly(address_t start, nbits_t depth, bool dir);
+    void butterfly(address_t start, address_t len, bool dir);
 
 public:
     // Constructor.  len=0 means the maximum size (the parent's size
     // minus start).
     Flat(Duoram &duoram, MPCTIO &tio, yield_t &yield, size_t start = 0,
+        size_t len = 0);
+
+    // Constructor.  len=0 means the maximum size (the parent's size
+    // minus start).
+    Flat(const Shape &parent, MPCTIO &tio, yield_t &yield, size_t start = 0,
         size_t len = 0);
 
     // Copy the given Flat except for the tio and yield
@@ -290,18 +437,26 @@ public:
     }
 
     // Index into this Flat in various ways
-    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Flat>
+    typename Duoram::Shape::template MemRefS<RegAS,T,std::nullopt_t,Flat,1>
             operator[](const RegAS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegAS,T,std::nullopt_t,Flat>
+            template MemRefS<RegAS,T,std::nullopt_t,Flat,1>
             res(*this, idx, std::nullopt);
         return res;
     }
-    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Flat>
+    typename Duoram::Shape::template MemRefS<RegXS,T,std::nullopt_t,Flat,1>
             operator[](const RegXS &idx) {
         typename Duoram<T>::Shape::
-            template MemRefS<RegXS,T,std::nullopt_t,Flat>
+            template MemRefS<RegXS,T,std::nullopt_t,Flat,1>
             res(*this, idx, std::nullopt);
+        return res;
+    }
+    template <typename U, nbits_t WIDTH>
+    typename Duoram::Shape::template MemRefS<U,T,std::nullopt_t,Flat,WIDTH>
+            operator[](OblivIndex<U,WIDTH> &obidx) {
+        typename Duoram<T>::Shape::
+            template MemRefS<RegXS,T,std::nullopt_t,Flat,WIDTH>
+            res(*this, obidx, std::nullopt);
         return res;
     }
     typename Duoram::Shape::template MemRefExpl<T,std::nullopt_t>
@@ -338,18 +493,72 @@ public:
     template<typename U,typename V>
     void osort(const U &idx1, const V &idx2, bool dir=0);
 
-    // Bitonic sort the elements from start to start+(1<<depth)-1, in
+    // Bitonic sort the elements from start to start+len-1, in
     // increasing order if dir=0 or decreasing order if dir=1. Note that
     // the elements must be at most 63 bits long each for the notion of
     // ">" to make consistent sense.
-    void bitonic_sort(address_t start, nbits_t depth, bool dir=0);
+    void bitonic_sort(address_t start, address_t len, bool dir=0);
+};
 
-    // Assuming the memory is already sorted, do an oblivious binary
-    // search for the largest index containing the value at most the
-    // given one.  (The answer will be 0 if all of the memory elements
-    // are greate than the target.) This Flat must be a power of 2 size.
-    // Only available for additive shared databases for now.
-    RegAS obliv_binary_search(RegAS &target);
+// Oblivious indices for use in related-index ORAM accesses.
+
+template <typename T>
+template <typename U, nbits_t WIDTH>
+class Duoram<T>::OblivIndex {
+    template <typename Ux,typename FT,typename FST,typename Sh,nbits_t WIDTHx>
+    friend class Shape::MemRefS;
+
+    int player;
+    std::optional<RDPFTriple<WIDTH>> dt;
+    std::optional<RDPFPair<WIDTH>> dp;
+    nbits_t curdepth, maxdepth;
+    nbits_t next_windex;
+    bool incremental;
+    U idx;
+
+public:
+    // Non-incremental constructor
+    OblivIndex(MPCTIO &tio, yield_t &yield, const U &idx, nbits_t depth) :
+        player(tio.player()), curdepth(depth), maxdepth(depth),
+        next_windex(0), incremental(false), idx(idx)
+    {
+        if (player < 2) {
+            dt = tio.rdpftriple<WIDTH>(yield, depth);
+        } else {
+            dp = tio.rdpfpair<WIDTH>(yield, depth);
+        }
+    }
+
+    // Incremental constructor: only for U=RegXS
+    OblivIndex(MPCTIO &tio, yield_t &yield, nbits_t depth) :
+        player(tio.player()), curdepth(0), maxdepth(depth),
+        next_windex(0), incremental(true), idx(RegXS())
+    {
+        if (player < 2) {
+            dt = tio.rdpftriple(yield, depth, true);
+        } else {
+            dp = tio.rdpfpair(yield, depth, true);
+        }
+    }
+
+    // Incrementally append a (shared) bit to the oblivious index
+    void incr(RegBS bit)
+    {
+        assert(incremental);
+        idx.xshare = (idx.xshare << 1) | value_t(bit.bshare);
+        ++curdepth;
+        if (player < 2) {
+            dt->depth(curdepth);
+        } else {
+            dp->depth(curdepth);
+        }
+    }
+
+    // Get a copy of the index
+    U index() { return idx; }
+
+    // Get the next wide-RDPF index
+    nbits_t windex() { assert(next_windex < WIDTH); return next_windex++; }
 };
 
 // An additive or XOR shared memory reference.  You get one of these
@@ -363,31 +572,50 @@ public:
 // particular field of T, then FT will be the type of the field (RegAS
 // or RegXS) and FST will be a pointer-to-member T::* type pointing to
 // that field.  Sh is the specific Shape subtype used to create the
-// MemRefS.
+// MemRefS.  WIDTH is the RDPF width to use.
 
 template <typename T>
-template <typename U, typename FT, typename FST, typename Sh>
+template <typename U, typename FT, typename FST, typename Sh, nbits_t WIDTH>
 class Duoram<T>::Shape::MemRefS {
     Sh &shape;
-    U idx;
+    // oblividx is a reference to the OblivIndex we're using.  In the
+    // common case, we own the actual OblivIndex, and it's stored in
+    // our_oblividx, and oblividx is a pointer to that.  Sometimes
+    // (for example incremental ORAM accesses), the caller will own (and
+    // modify between uses) the OblivIndex.  In that case, oblividx will
+    // be a pointer to the caller's OblivIndex object, and
+    // our_oblividx will be nullopt.
+    std::optional<Duoram<T>::OblivIndex<U,WIDTH>> our_oblividx;
+    Duoram<T>::OblivIndex<U,WIDTH> *oblividx;
+
     FST fieldsel;
 
 private:
     // Oblivious update to a shared index of Duoram memory, only for
     // FT = RegAS or RegXS
-    MemRefS<U,FT,FST,Sh> &oram_update(const FT& M, const prac_template_true&);
+    MemRefS<U,FT,FST,Sh,WIDTH> &oram_update(const FT& M, const prac_template_true&);
     // Oblivious update to a shared index of Duoram memory, for
     // FT not RegAS or RegXS
-    MemRefS<U,FT,FST,Sh> &oram_update(const FT& M, const prac_template_false&);
+    MemRefS<U,FT,FST,Sh,WIDTH> &oram_update(const FT& M, const prac_template_false&);
 
 public:
-    MemRefS<U,FT,FST,Sh>(Sh &shape, const U &idx, FST fieldsel) :
-        shape(shape), idx(idx), fieldsel(fieldsel) {}
+    MemRefS<U,FT,FST,Sh,WIDTH>(Sh &shape, const U &idx, FST fieldsel) :
+        shape(shape), fieldsel(fieldsel) {
+        our_oblividx.emplace(shape.tio, shape.yield, idx,
+            shape.addr_size);
+        oblividx = &(*our_oblividx);
+    }
+
+    MemRefS<U,FT,FST,Sh,WIDTH>(Sh &shape, OblivIndex<U,WIDTH> &obidx, FST fieldsel) :
+        shape(shape), fieldsel(fieldsel) {
+        oblividx = &obidx;
+    }
 
     // Create a MemRefExpl for accessing a partcular field of T
     template <typename SFT>
-    MemRefS<U,SFT,SFT T::*,Sh> field(SFT T::*subfieldsel) {
-        auto res = MemRefS<U,SFT,SFT T::*,Sh>(this->shape, idx, subfieldsel);
+    MemRefS<U,SFT,SFT T::*,Sh,WIDTH> field(SFT T::*subfieldsel) {
+        auto res = MemRefS<U,SFT,SFT T::*,Sh,WIDTH>(this->shape,
+            *oblividx, subfieldsel);
         return res;
     }
 
@@ -395,10 +623,10 @@ public:
     operator FT();
 
     // Oblivious update to a shared index of Duoram memory
-    MemRefS<U,FT,FST,Sh> &operator+=(const FT& M);
+    MemRefS<U,FT,FST,Sh,WIDTH> &operator+=(const FT& M);
 
     // Oblivious write to a shared index of Duoram memory
-    MemRefS<U,FT,FST,Sh> &operator=(const FT& M);
+    MemRefS<U,FT,FST,Sh,WIDTH> &operator=(const FT& M);
 };
 
 // An explicit memory reference.  You get one of these from a Shape A

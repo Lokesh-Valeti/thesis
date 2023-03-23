@@ -42,7 +42,7 @@ preproc.o: rdpf.tcc mpcops.hpp mpcops.tcc cdpf.hpp cdpf.tcc
 online.o: online.hpp mpcio.hpp types.hpp bitutils.hpp corotypes.hpp mpcio.tcc
 online.o: options.hpp mpcops.hpp coroutine.hpp mpcops.tcc rdpf.hpp dpf.hpp
 online.o: prg.hpp aes.hpp rdpf.tcc duoram.hpp duoram.tcc cdpf.hpp cdpf.tcc
-online.o: cell.hpp
+online.o: cell.hpp shapes.hpp shapes.tcc
 mpcops.o: mpcops.hpp types.hpp bitutils.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 mpcops.o: coroutine.hpp mpcops.tcc
 rdpf.o: rdpf.hpp mpcio.hpp types.hpp bitutils.hpp corotypes.hpp mpcio.tcc
@@ -51,7 +51,7 @@ cdpf.o: bitutils.hpp cdpf.hpp mpcio.hpp types.hpp corotypes.hpp mpcio.tcc
 cdpf.o: coroutine.hpp dpf.hpp prg.hpp aes.hpp cdpf.tcc
 duoram.o: duoram.hpp types.hpp bitutils.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 duoram.o: coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
-duoram.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc
+duoram.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc shapes.hpp shapes.tcc
 cell.o: types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 cell.o: coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
 cell.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc cell.hpp options.hpp
