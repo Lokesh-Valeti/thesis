@@ -158,8 +158,13 @@ class AVL {
         delete oram;
     };
 
+    void init(){
+        num_items=0;
+        empty_locations.clear();
+    }
+
     size_t numEmptyLocations(){
-      return(empty_locations.size());
+        return(empty_locations.size());
     };
 
     void initialize(int num_players, size_t size);

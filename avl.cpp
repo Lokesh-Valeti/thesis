@@ -1352,6 +1352,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
         // (T2) : Test 2 : L rotation (root unmodified)
@@ -1437,6 +1438,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -1502,6 +1504,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -1588,6 +1591,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -1662,6 +1666,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -1749,6 +1754,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -1823,6 +1829,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
         // (T8) : Test 8 : RL rotation (root unmodified)
@@ -1909,6 +1916,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
         // Deletion Tests:
@@ -1980,6 +1988,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
         // (T10) : Test 10 : L rotation (root unmodified)
@@ -2074,6 +2083,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
         // (T11) : Test 11 : R rotation (root modified)
@@ -2147,6 +2157,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -2241,6 +2252,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -2320,6 +2332,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -2412,6 +2425,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
         // (T15) : Test 15 : RL rotation (root modified)
@@ -2490,6 +2504,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
         // (T16) : Test 16 : RL rotation (root unmodified)
@@ -2581,6 +2596,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
 
 
@@ -2720,6 +2736,7 @@ void avl_tests(MPCIO &mpcio,
                 }
             }
             A.init();
+            tree.init();
         }
     });
 }
