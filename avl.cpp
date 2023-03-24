@@ -1351,7 +1351,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T1 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1437,7 +1436,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T2 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1503,7 +1501,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T3 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1590,7 +1587,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T4 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1665,7 +1661,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T5 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1753,7 +1748,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T6 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1828,7 +1822,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T7 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1915,7 +1908,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T8 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -1987,7 +1979,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T9 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2082,7 +2073,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T10 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2156,7 +2146,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T11 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2251,7 +2240,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T12 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2331,7 +2319,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T13 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2424,7 +2411,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T14 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2503,7 +2489,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T15 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2595,7 +2580,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T16 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
 
@@ -2735,7 +2719,6 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T17 : FAIL\n");
                 }
             }
-            auto A = oram->flat(tio, yield);
             A.init();
         }
     });
