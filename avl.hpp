@@ -120,7 +120,7 @@ struct avl_insert_return {
 
 class AVL {
   private:
-    Duoram<Node> *oram;
+    Duoram<Node> oram;
     RegXS root;
 
     size_t num_items = 0;
@@ -149,13 +149,8 @@ class AVL {
         Duoram<Node>::Flat &A, int TTL, RegBS isDummy, Node *ret_node);
 
   public:
-    AVL(int num_players, size_t size) {
-      this->initialize(num_players, size);
-    };
-
-    ~AVL() {
-      if(oram)
-        delete oram;
+    AVL(int num_players, size_t size) : oram(num_players, size) {
+        this->MAX_SIZE = size;
     };
 
     void init(){
@@ -167,7 +162,6 @@ class AVL {
         return(empty_locations.size());
     };
 
-    void initialize(int num_players, size_t size);
     void insert(MPCTIO &tio, yield_t &yield, const Node &node);
 
     // Deletes the first node that matches del_key
@@ -187,7 +181,7 @@ class AVL {
 
     // For test functions ONLY:
     Duoram<Node>* get_oram() {
-        return oram;
+        return &oram;
     };
 
     RegXS get_root() {

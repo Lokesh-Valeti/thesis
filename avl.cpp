@@ -55,7 +55,7 @@ void AVL::pretty_print(const std::vector<Node> &R, value_t node,
 }
 
 void AVL::print_oram(MPCTIO &tio, yield_t &yield) {
-    auto A = oram->flat(tio, yield);
+    auto A = oram.flat(tio, yield);
     auto R = A.reconstruct();
 
     for(size_t i=0;i<R.size();++i) {
@@ -76,7 +76,7 @@ void AVL::pretty_print(MPCTIO &tio, yield_t &yield) {
         reconstructed_root += peer_root;
     }
 
-    auto A = oram->flat(tio, yield);
+    auto A = oram.flat(tio, yield);
     auto R = A.reconstruct();
     if(tio.player()==0) {
         pretty_print(R, reconstructed_root.xshare);
@@ -114,7 +114,7 @@ std::tuple<bool, bool, address_t> AVL::check_avl(const std::vector<Node> &R,
 }
 
 void AVL::check_avl(MPCTIO &tio, yield_t &yield) {
-    auto A = oram->flat(tio, yield);
+    auto A = oram.flat(tio, yield);
     auto R = A.reconstruct();
 
     RegXS rec_root = this->root;
@@ -132,10 +132,6 @@ void AVL::check_avl(MPCTIO &tio, yield_t &yield) {
     }
 }
 
-void AVL::initialize(int num_players, size_t size) {
-    this->MAX_SIZE = size;
-    oram = new Duoram<Node>(num_players, size);
-}
 
 /*
   Rotate: (gp = grandparent (if exists), p = parent, c = child)
@@ -451,7 +447,7 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
 // Insert(root, ptr, key, TTL, isDummy) -> (new_ptr, wptr, wnode, f_p)
 void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
     bool player0 = tio.player()==0;
-    auto A = oram->flat(tio, yield);
+    auto A = oram.flat(tio, yield);
     // If there are no items in tree. Make this new item the root.
     if(num_items==0) {
         Node zero;
@@ -682,10 +678,8 @@ bool AVL::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>
 }
 
 bool AVL::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
-    auto A = oram->flat(tio, yield);
-
+    auto A = oram.flat(tio, yield);
     RegBS isDummy;
-
     bool found = lookup(tio, yield, root, key, A, num_items, isDummy, ret_node);
     return found;
 }
@@ -1129,7 +1123,7 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
     if(num_items==0)
         return 0;
 
-    auto A = oram->flat(tio, yield);
+    auto A = oram.flat(tio, yield);
     if(num_items==1) {
         //Delete root
         Node zero;
