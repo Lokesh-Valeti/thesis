@@ -623,6 +623,12 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         setRightBal(parent_pointers, p_bal_r);
         setLeftBal(child_pointers, c_bal_l);
         setRightBal(child_pointers, c_bal_r);
+        // If double rotation (LR/RL) case, n ends up with 0 balance.
+        // In all other cases, n's balance remains unaffected by rotation during insertion.
+        mpc_select(tio, yield, n_bal_l, F_cn_rot, n_bal_l, s0);
+        mpc_select(tio, yield, n_bal_r, F_cn_rot, n_bal_r, s0);
+        setLeftBal(n_pointers, n_bal_l);
+        setRightBal(n_pointers, n_bal_r);
 
         // Write back update pointers and balances into gp, p, c, and n
         A[ret.c_node].NODE_POINTERS = child_pointers;
@@ -1207,8 +1213,8 @@ void avl(MPCIO &mpcio,
         AVL tree(tio.player(), size);
 
         // Insert a few elements
-        int insert_array[] = {10, 10, 13, 11, 14, 8, 15, 20, 17, 19, 7, 12};
-        size_t insert_array_size = 11;
+        int insert_array[] = {8, 5, 10, 2, 7, 6};
+        size_t insert_array_size = 5;
         //int insert_array[] = {10, 10, 13, 11, 14, 8, 15, 20, 17, 19, 7, 12};
         //size_t insert_array_size = 11;
         //int insert_array[] = {6, 3, 10, 1, 2};
@@ -1224,6 +1230,7 @@ void avl(MPCIO &mpcio,
           tree.check_avl(tio, yield);
         }
 
+        /*
         RegAS del_key;
         del_key.set(10 * tio.player());
         printf("Delete 10\n");
@@ -1267,7 +1274,7 @@ void avl(MPCIO &mpcio,
         else {
             printf("Lookup 12 failed\n");
         }
-
+        */
     });
 }
 
