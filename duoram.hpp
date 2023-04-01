@@ -535,9 +535,9 @@ public:
         next_windex(0), incremental(true), idx(RegXS())
     {
         if (player < 2) {
-            dt = tio.rdpftriple(yield, depth, true);
+            dt = tio.rdpftriple<WIDTH>(yield, depth, true);
         } else {
-            dp = tio.rdpfpair(yield, depth, true);
+            dp = tio.rdpfpair<WIDTH>(yield, depth, true);
         }
     }
 
