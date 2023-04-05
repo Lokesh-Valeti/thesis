@@ -137,6 +137,13 @@ class AVL {
     std::tuple<RegBS, RegBS, RegBS, RegBS> updateBalanceIns(MPCTIO &tio, yield_t &yield,
         RegBS bal_l, RegBS bal_r, RegBS bal_upd, RegBS child_dir);
 
+    void updateChildPointers(MPCTIO &tio, yield_t &yield, RegXS &left, RegXS &right,
+          RegBS c_prime, avl_del_return ret_struct);
+
+    void fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A, RegXS ptr, 
+        RegXS nodeptrs, RegBS p_bal_l, RegBS p_bal_r, RegBS &bal_upd, RegBS c_prime, 
+        RegXS cs_ptr, RegBS imb, RegBS &F_ri, avl_del_return &ret_struct);
+
     std::tuple<bool, RegBS> del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL,
         avl_del_return &ret_struct);
