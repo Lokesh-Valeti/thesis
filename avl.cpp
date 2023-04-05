@@ -933,6 +933,83 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A, RegXS
     A[ptr].NODE_POINTERS = nodeptrs;
 }
 
+/* Update the return structure
+   F_dh = Delete Here flag,
+   F_sf = successor found (no more left children while trying to find successor)
+   F_rs is a subflag for F_r (update children pointers with ret ptr)
+   F_rs: Flag for updating the correct child pointer of this node
+   This happens if F_r is set in ret_struct. F_r indicates if we need
+   to update a child pointer at this level by skipping the current
+   child in the direction of traversal. We do this in two cases:
+     i) F_d & (!F_2) : If we delete here, and this node does not have
+        2 children (;i.e., we are not in the finding successor case)
+    ii) F_ns: Found the successor (no more left children while
+        traversing to find successor)
+   In cases i and ii we skip the next node, and make the current node
+   point to the node after the next node.
+
+   The third case for F_r:
+   iii) We did rotation(s) at the lower level, changing the child in
+        that position. So we update it to the correct node in that
+        position now.
+   Whether skip happens or just update happens is handled by how
+   ret_struct.ret_ptr is set.
+*/
+
+void AVL::updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_2, RegBS F_c2, 
+        RegBS F_c4, RegBS lf, RegBS F_ri, RegBS &found, RegBS &bal_upd, 
+        avl_del_return &ret_struct) {
+    bool player0 = tio.player()==0;
+    RegBS s0, s1;
+    s1.set(tio.player()==1);
+    RegBS F_dh, F_sf, F_rs;
+    mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);
+    if(player0)
+        found^=1;
+    mpc_and(tio, yield, F_dh, lf, found);
+    mpc_select(tio, yield, ret_struct.N_d, F_dh, ret_struct.N_d, ptr);
+    // F_sf = Successor found = F_c4 = Finding successor & no more left child
+    F_sf = F_c4;
+    if(player0)
+        F_2^=1;
+    // If we have to i) delete here, and it doesn't have two children
+    // we have to update child pointer in parent with the returned pointer
+    mpc_and(tio, yield, F_rs, F_dh, F_2);
+    // ii) if we found successor here
+    mpc_or(tio, yield, F_rs, F_rs, F_sf);
+    mpc_select(tio, yield, ret_struct.N_s, F_sf, ret_struct.N_s, ptr);
+    // F_rs and F_ri will never trigger together. So the line below
+    // set ret_ptr to the correct pointer to handle either case
+    // If neither F_rs nor F_ri, we set the ret_ptr to current ptr.
+    RegBS F_nr;
+    mpc_or(tio, yield, F_nr, F_rs, F_ri);
+    // F_nr = F_rs || F_ri
+    ret_struct.F_r = F_nr;
+
+    /*
+    bool rec_ret_F_r, rec_F_rs, rec_F_ri;
+    rec_ret_F_r = reconstruct_RegBS(tio, yield, ret_struct.F_r);
+    rec_F_rs = reconstruct_RegBS(tio, yield, F_rs);
+    rec_F_ri = reconstruct_RegBS(tio, yield, F_ri);
+    printf("rec_ret_F_r = %d, rec_F_rs = %d, rec_F_ri = %d\n", rec_ret_F_r, rec_F_rs, rec_F_ri);
+    */
+
+    if(player0) {
+      F_nr^=1;
+    }
+    // F_nr = !(F_rs || F_ri)
+    mpc_select(tio, yield, ret_struct.ret_ptr, F_nr, ret_struct.ret_ptr, ptr);
+
+    // If F_rs, we skipped a node, so update bal_upd to 1
+    mpc_select(tio, yield, bal_upd, F_rs, bal_upd, s1);
+
+    /*
+    rec_F_rs = reconstruct_RegBS(tio, yield, F_rs);
+    bool rec_bal_upd_set = reconstruct_RegBS(tio, yield, bal_upd);
+    printf("foundter bal_upd select from rec_F_rs = %d, rec_bal_upd = %d\n",
+        rec_F_rs, rec_bal_upd_set);
+    */
+}
 
 std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
       Duoram<Node>::Flat &A, RegBS found, RegBS find_successor, int TTL,
@@ -1078,80 +1155,9 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         RegBS F_ri;
         fixImbalance(tio, yield, A, ptr, node.pointers, new_p_bal_l, new_p_bal_r, bal_upd, 
               c_prime, cs_ptr, imb, F_ri, ret_struct);
- 
-        // Update the return structure
-        // F_dh = Delete Here flag,
-        // F_sf = successor found (no more left children while trying to find successor)
-        // F_rs = subflag for F_r. F_rs = flag for F_r set to 1 from handling a skip fix
-        // (deleting a node with single child, or found successor cases)
 
-        /* F_rs: Flag for updating the correct child pointer of this node
-           This happens if F_r is set in ret_struct. F_r indicates if we need
-           to update a child pointer at this level by skipping the current
-           child in the direction of traversal. We do this in two cases:
-             i) F_d & (!F_2) : If we delete here, and this node does not have
-                2 children (;i.e., we are not in the finding successor case)
-            ii) F_ns: Found the successor (no more left children while
-                traversing to find successor)
-           In cases i and ii we skip the next node, and make the current node
-           point to the node after the next node.
+        updateRetStruct(tio, yield, ptr, F_2, F_c2, F_c4, lf, F_ri, found, bal_upd, ret_struct); 
 
-           iii) We did rotation(s) at the lower level, changing the child in
-                that position. So we update it to the correct node in that
-                position now.
-           Whether skip happens or just update happens is handled by how
-           ret_struct.ret_ptr is set.
-        */
-
-        RegBS F_dh, F_sf, F_rs;
-        mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);
-        if(player0)
-            found^=1;
-        mpc_and(tio, yield, F_dh, lf, found);
-        mpc_select(tio, yield, ret_struct.N_d, F_dh, ret_struct.N_d, ptr);
-        // F_sf = Successor found = F_c4 = Finding successor & no more left child
-        F_sf = F_c4;
-        if(player0)
-            F_2^=1;
-        // If we have to i) delete here, and it doesn't have two children
-        // we have to update child pointer in parent with the returned pointer
-        mpc_and(tio, yield, F_rs, F_dh, F_2);
-        // ii) if we found successor here
-        mpc_or(tio, yield, F_rs, F_rs, F_sf);
-        mpc_select(tio, yield, ret_struct.N_s, F_sf, ret_struct.N_s, ptr);
-        // F_rs and F_ri will never trigger together. So the line below
-        // set ret_ptr to the correct pointer to handle either case
-        // If neither F_rs nor F_ri, we set the ret_ptr to current ptr.
-        RegBS F_nr;
-        mpc_or(tio, yield, F_nr, F_rs, F_ri);
-        // F_nr = F_rs || F_ri
-        ret_struct.F_r = F_nr;
-
-        /*
-        bool rec_ret_F_r, rec_F_rs, rec_F_ri;
-        rec_ret_F_r = reconstruct_RegBS(tio, yield, ret_struct.F_r);
-        rec_F_rs = reconstruct_RegBS(tio, yield, F_rs);
-        rec_F_ri = reconstruct_RegBS(tio, yield, F_ri);
-        printf("rec_ret_F_r = %d, rec_F_rs = %d, rec_F_ri = %d\n", rec_ret_F_r, rec_F_rs, rec_F_ri);
-        */
-
-        if(player0) {
-          F_nr^=1;
-        }
-        // F_nr = !(F_rs || F_ri)
-        mpc_select(tio, yield, ret_struct.ret_ptr, F_nr, ret_struct.ret_ptr, ptr);
-
-        // If F_rs, we skipped a node, so update bal_upd to 1
-        mpc_select(tio, yield, bal_upd, F_rs, bal_upd, s1);
-
-        /*
-        rec_F_rs = reconstruct_RegBS(tio, yield, F_rs);
-        bool rec_bal_upd_set = reconstruct_RegBS(tio, yield, bal_upd);
-        printf("foundter bal_upd select from rec_F_rs = %d, rec_bal_upd = %d\n",
-            rec_F_rs, rec_bal_upd_set);
-        */ 
-
-        // Swap deletion node with successor node done outside of recursive traversal.
         return {key_found, bal_upd};
     }
 }
