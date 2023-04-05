@@ -349,7 +349,7 @@ std::tuple<RegBS, RegBS, RegBS, RegBS> AVL::updateBalanceIns(MPCTIO &tio, yield_
     return {bal_l, bal_r, bal_upd, imbalance};
 }
 
-std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
+std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, RegXS ptr, RegXS ins_addr,
     RegAS insert_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy, avl_insert_return *ret) {
     if(TTL==0) {
         RegBS z;
@@ -392,7 +392,7 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
 
     isDummy^=F_i;
     auto [bal_upd, F_gp, prev_node, prev_dir] = insert(tio, yield,
-          next_ptr, insert_key, A, TTL-1, isDummy, ret);
+          next_ptr, ins_addr, insert_key, A, TTL-1, isDummy, ret);
     /*
     rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
     rec_F_gp = reconstruct_RegBS(tio, yield, F_gp);
@@ -403,8 +403,11 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
     */
 
     // Save insertion pointer and direction
+    /*
     mpc_select(tio, yield, ret->i_node, F_i, ret->i_node, ptr, AVL_PTR_SIZE);
     mpc_select(tio, yield, ret->dir_i, F_i, ret->dir_i, gt);
+    */
+    
 
     // Update balance
     // If we inserted at this level (F_i), bal_upd is set to 1
@@ -430,7 +433,13 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
     setLeftBal(cnode.pointers, new_bal_l);
     setRightBal(cnode.pointers, new_bal_r);
     // We have to write the node pointers anyway to resolve balance updates
-    // We still defer the actual insertion to post recursion.
+    RegBS F_ir, F_il;
+    mpc_and(tio, yield, F_ir, F_i, gt);
+    mpc_and(tio, yield, F_il, F_i, lteq);
+    mpc_select(tio, yield, left, F_il, left, ins_addr); 
+    mpc_select(tio, yield, right, F_ir, right, ins_addr); 
+    setAVLLeftPtr(cnode.pointers, left);
+    setAVLRightPtr(cnode.pointers, right);
     A[ptr].NODE_POINTERS = cnode.pointers;
 
     // s0 = shares of 0
@@ -477,7 +486,8 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         avl_insert_return ret;
         RegAS insert_key = node.key;
         // Recursive insert function
-        auto [bal_upd, F_gp, prev_node, prev_dir] = insert(tio, yield, root, insert_key, A, TTL, isDummy, &ret);
+        auto [bal_upd, F_gp, prev_node, prev_dir] = insert(tio, yield, root, 
+            insert_address, insert_key, A, TTL, isDummy, &ret);
         /*
         // Debug code
         bool rec_bal_upd, rec_F_gp, ret_dir_pc, ret_dir_cn;
@@ -492,6 +502,7 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         */
 
         // Perform actual insertion
+        /*
         RegXS ins_pointers = A[ret.i_node].NODE_POINTERS;
         RegXS left_ptr = getAVLLeftPtr(ins_pointers);
         RegXS right_ptr = getAVLRightPtr(ins_pointers);
@@ -505,6 +516,7 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         setAVLLeftPtr(ins_pointers, left_ptr);
         setAVLRightPtr(ins_pointers, right_ptr);
         A[ret.i_node].NODE_POINTERS = ins_pointers;
+        */
 
         // Perform balance procedure
         RegXS gp_pointers = A[ret.gp_node].NODE_POINTERS;
@@ -1131,12 +1143,21 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
 
     auto A = oram.flat(tio, yield);
     if(num_items==1) {
-        //Delete root
+        //Delete root if root's key = del_key
         Node zero;
-        empty_locations.emplace_back(root);
-        A[root] = zero;
-        num_items--;
-        return 1;
+        Node node = A[root];
+        // Compare key
+        CDPF cdpf = tio.cdpf(yield);
+        auto [lt, eq, gt] = cdpf.compare(tio, yield, del_key - node.key, tio.aes_ops());
+        bool success = reconstruct_RegBS(tio, yield, eq);
+        if(success) {
+            empty_locations.emplace_back(root);
+            A[root] = zero;
+            num_items--;
+            return 1;
+        } else {
+            return 0;
+        } 
     } else {
         int TTL = AVL_TTL(num_items);
         // Flags for already found (found) item to delete and find successor (find_successor)

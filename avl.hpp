@@ -98,7 +98,7 @@ struct avl_del_return {
     RegXS N_d;
     // Pointers to successor node that would replace deleted node
     RegXS N_s;
-    // F_rs: Flag for updating child pointer with returned pointer
+    // F_r: Flag for updating child pointer with returned pointer
     RegBS F_r;
     RegXS ret_ptr;
 };
@@ -107,13 +107,11 @@ struct avl_insert_return {
   RegXS gp_node; // grandparent node
   RegXS p_node; // parent node
   RegXS c_node; // child node
-  RegXS i_node; // insertion node
 
   // Direction bits: 0 = Left, 1 = Right
   RegBS dir_gpp; // Direction bit from grandparent to parent node
   RegBS dir_pc; // Direction bit from p_node to c_node
   RegBS dir_cn; // Direction bit from c_node to new_node
-  RegBS dir_i;
 
   RegBS imbalance;
 };
@@ -129,7 +127,8 @@ class AVL {
     std::vector<RegXS> empty_locations;
 
     std::tuple<RegBS, RegBS, RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
-        RegAS ins_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy, avl_insert_return *ret);
+        RegXS ins_addr, RegAS ins_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy, 
+        avl_insert_return *ret);
 
     void rotate(MPCTIO &tio, yield_t &yield, RegXS &gp_pointers, RegXS p_ptr,
         RegXS &p_pointers, RegXS c_ptr, RegXS &c_pointers, RegBS dir_gpp,
