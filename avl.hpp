@@ -123,6 +123,7 @@ class AVL {
 
     size_t num_items = 0;
     size_t MAX_SIZE;
+    int MAX_DEPTH;
 
     std::vector<RegXS> empty_locations;
 
@@ -140,7 +141,8 @@ class AVL {
     void updateChildPointers(MPCTIO &tio, yield_t &yield, RegXS &left, RegXS &right,
           RegBS c_prime, avl_del_return ret_struct);
 
-    void fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A, RegXS ptr, 
+    void fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A, 
+        Duoram<Node>::OblivIndex<RegXS,1> oidx, RegXS oidx_oldptrs, RegXS ptr, 
         RegXS nodeptrs, RegBS p_bal_l, RegBS p_bal_r, RegBS &bal_upd, RegBS c_prime, 
         RegXS cs_ptr, RegBS imb, RegBS &F_ri, avl_del_return &ret_struct);
 
@@ -160,6 +162,11 @@ class AVL {
   public:
     AVL(int num_players, size_t size) : oram(num_players, size) {
         this->MAX_SIZE = size;
+        MAX_DEPTH = 0;
+        while(size>0) {
+          MAX_DEPTH+=1;
+          size=size>>1;
+        }
     };
 
     void init(){
