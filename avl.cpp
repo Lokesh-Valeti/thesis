@@ -1194,7 +1194,7 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
         RegBS found, find_successor;
         avl_del_return ret_struct;
         auto [success, bal_upd] = del(tio, yield, root, del_key, A, found, find_successor, TTL, ret_struct);
-        printf ("Success =  %d\n", success);
+        // printf ("Success =  %d\n", success);
         if(!success){
             return 0;
         }
@@ -1246,85 +1246,60 @@ void avl(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
     nbits_t depth=4;
+    size_t n_inserts=0, n_deletes=0;
+    if (*args) {
+        depth = atoi(args[0]);
+        n_inserts = atoi(args[1]);
+        n_deletes = atoi(args[2]);
+    }
 
-    if (*args) {
-        depth = atoi(*args);
-        ++args;
-    }
-    size_t items = (size_t(1)<<depth)-1;
-    if (*args) {
-        items = atoi(*args);
-        ++args;
-    }
+    /* The ORAM will be initialized with 2^depth-1 items, but the 0 slot is reserved.
+       So we initialize (initial inserts) with 2^depth-2 items.
+       The ORAM size is set to 2^depth-1 + n_insert.
+    */
+    size_t init_size = (size_t(1)<<depth) - 2;
+    size_t oram_size = init_size + 1 + n_inserts; // +1 because init_size does not account for slot at 0.
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, depth, items] (yield_t &yield) {
-        size_t size = size_t(1)<<depth;
-        AVL tree(tio.player(), size);
+    run_coroutines(tio, [&tio, &mpcio, depth, oram_size, init_size, n_inserts, n_deletes] (yield_t &yield) {
 
-        // Insert a few elements
-        int insert_array[] = {8, 5, 10, 2, 7, 6};
-        size_t insert_array_size = 5;
-        //int insert_array[] = {10, 10, 13, 11, 14, 8, 15, 20, 17, 19, 7, 12};
-        //size_t insert_array_size = 11;
-        //int insert_array[] = {6, 3, 10, 1, 2};
-        //size_t insert_array_size = 4;
+        std::cout << "\n===== SETUP =====\n";
+        AVL tree(tio.player(), oram_size);
+
+        // Insert 2^depth-1 items
         Node node;
-        for(size_t i = 0; i<=insert_array_size; i++) {
-          newnode(node);
-          node.key.set(insert_array[i] * tio.player());
-          printf("Insert %d\n", insert_array[i]);
-          tree.insert(tio, yield, node);
-          tree.print_oram(tio, yield);
-          tree.pretty_print(tio, yield);
-          tree.check_avl(tio, yield);
+        for(size_t i = 1; i<=init_size; i++) {
+            newnode(node);
+            node.key.set(i * tio.player());
+            //printf("Insert %d\n", insert_array[i]);
+            tree.insert(tio, yield, node);
+            //tree.print_oram(tio, yield);
+            //tree.pretty_print(tio, yield);
+            //tree.check_avl(tio, yield);
         }
 
-        /*
-        RegAS del_key;
-        del_key.set(10 * tio.player());
-        printf("Delete 10\n");
-        tree.del(tio, yield, del_key);
-        tree.print_oram(tio, yield);
-        tree.pretty_print(tio, yield);
-        tree.check_avl(tio, yield);
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+        std::cout << "\n===== INSERTS =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
 
-        del_key.set(14 * tio.player());
-        printf("Delete 14\n");
-        tree.del(tio, yield, del_key);
-        tree.print_oram(tio, yield);
-        tree.pretty_print(tio, yield);
-        tree.check_avl(tio, yield);
-
-        tree.pretty_print(tio, yield);
-        del_key.set(12 * tio.player());
-        printf("Delete 12\n");
-        tree.del(tio, yield, del_key);
-        tree.print_oram(tio, yield);
-        tree.pretty_print(tio, yield);
-        tree.check_avl(tio, yield);
-        
-        RegAS lookup_key;
-        Node lookup;
-        bool success;
-        lookup_key.set(8 * tio.player());
-        success = tree.lookup(tio, yield, lookup_key, &lookup);
-        if(success) {
-            printf("Lookup 8 success\n");
-        }
-        else {
-            printf("Lookup 8 failed\n");
+        for(size_t i = 1; i<=n_inserts; i++) {
+            newnode(node);
+            node.key.set((i+init_size) * tio.player());
+            tree.insert(tio, yield, node);
         }
 
-        lookup_key.set(12 * tio.player());
-        success = tree.lookup(tio, yield, lookup_key, &lookup);
-        if(success) {
-            printf("Lookup 12 success\n");
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+        std::cout << "\n===== DELETES =====\n";
+        mpcio.reset_stats();
+        tio.reset_lamport();
+        for(size_t i = 1; i<=n_deletes; i++) {
+            RegAS del_key;
+            del_key.set((i+init_size) * tio.player());
+            tree.del(tio, yield, del_key);
         }
-        else {
-            printf("Lookup 12 failed\n");
-        }
-        */
     });
 }
 
