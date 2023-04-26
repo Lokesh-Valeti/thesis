@@ -252,7 +252,7 @@ std::tuple<RegBS, RegBS, RegBS, RegBS> AVL::updateBalanceDel(MPCTIO &tio, yield_
     //F_ls (Flag left shift) <- child_dir & bal_upd
     mpc_and(tio, yield, F_ls, child_dir, bal_upd);
     if(player0) {
-        child_dir^=1;
+      child_dir^=1;
         balanced^=1;
     }
     //F_rs (Flag right shift) <- !child_dir & bal_upd
@@ -288,15 +288,18 @@ std::tuple<RegBS, RegBS, RegBS, RegBS> AVL::updateBalanceDel(MPCTIO &tio, yield_
 
     // if(bal_upd) and not imbalance bal_upd<-0
     RegBS bu0;
+    /*
     if(player0){
         imbalance^=1;
     }
-    mpc_and(tio, yield, bu0, bal_upd, imbalance);
+    */
+    mpc_and(tio, yield, bu0, bal_upd, balanced);
     mpc_select(tio, yield, bal_upd, bu0, bal_upd, s0);
+    /*
     if(player0){
         imbalance^=1;
     }
-
+    */
     // Any bal_upd, propogates all the way up to root
     return {bal_l, bal_r, bal_upd, imbalance};
 }
@@ -943,7 +946,7 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A, RegXS
    child in the direction of traversal. We do this in two cases:
      i) F_d & (!F_2) : If we delete here, and this node does not have
         2 children (;i.e., we are not in the finding successor case)
-    ii) F_ns: Found the successor (no more left children while
+    ii) F_sf: Found the successor (no more left children while
         traversing to find successor)
    In cases i and ii we skip the next node, and make the current node
    point to the node after the next node.
