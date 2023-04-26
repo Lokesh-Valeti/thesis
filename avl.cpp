@@ -520,17 +520,7 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         RegXS child_left = getAVLLeftPtr(child_pointers);
         RegXS child_right = getAVLRightPtr(child_pointers);
         RegXS n_node;
-        mpc_select(tio, yield, n_node, ret.dir_cn, n_node, child_right, AVL_PTR_SIZE);
-        // dir_cn -> !(dir_cn); to handle left case
-        if(player0) {
-            ret.dir_cn^=1;
-        }
-        mpc_select(tio, yield, n_node, ret.dir_cn, n_node, child_left, AVL_PTR_SIZE);
-        // Undo dir_cn negation
-        if(player0) {
-            ret.dir_cn^=1;
-        }
-        //RegXS n_pointers = A[n_node].NODE_POINTERS; 
+        mpc_select(tio, yield, n_node, ret.dir_cn, child_left, child_right, AVL_PTR_SIZE);
         typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_n(tio, yield, n_node, TTL+1);
         RegXS n_pointers = A[oidx_n].NODE_POINTERS;
 
@@ -932,15 +922,12 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
     setLeftBal(cs_node.pointers, cs_bal_l);
     setRightBal(cs_node.pointers, cs_bal_r);
 
-    //A[cs_ptr].NODE_POINTERS = cs_node.pointers;
-    //A[gcs_ptr].NODE_POINTERS = gcs_node.pointers;
     A[oidx_cs].NODE_POINTERS+= (cs_node.pointers - old_cs_ptr);
     A[oidx_gcs].NODE_POINTERS+= (gcs_node.pointers - old_gcs_ptr);
 
     // Write back updated pointers correctly accounting for rotations
     setLeftBal(nodeptrs, new_p_bal_l);
     setRightBal(nodeptrs, new_p_bal_r);
-    //A[ptr].NODE_POINTERS = nodeptrs;
     A[oidx].NODE_POINTERS +=(nodeptrs - oidx_oldptrs);
 }
 
