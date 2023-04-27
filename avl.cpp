@@ -166,7 +166,7 @@ void AVL::rotate(MPCTIO &tio, yield_t &yield, RegXS &gp_pointers, RegXS p_ptr,
     RegXS ptr_upd;
 
     // F_gpp: Flag to update gp -> p link, F_pc: Flag to update p -> c link
-    RegBS F_gpp, F_pc, F_gppr, F_gppl;
+    RegBS F_gpp, F_pc_l, F_pc_r, F_gppr, F_gppl;
     // We care about !F_gp. If !F_gp, then we do the gp->p link updates.
     // Otherwise, we do NOT do any updates to gp-> p link;
     // since F_gp==1, implies gp does not exist and parent is root.
@@ -175,48 +175,80 @@ void AVL::rotate(MPCTIO &tio, yield_t &yield, RegXS &gp_pointers, RegXS p_ptr,
     mpc_and(tio, yield, F_gpp, F_gp, isReal);
 
     // i) gp[dir_gpp] <-- c_ptr
+    RegBS nt_dir_gpp = dir_gpp;
+    if(player0)
+        nt_dir_gpp^=1;
     mpc_select(tio, yield, ptr_upd, F_gpp, p_ptr, c_ptr);
-    mpc_and(tio, yield, F_gppr, F_gpp, dir_gpp);
-    mpc_select(tio, yield, gp_right, F_gppr, gp_right, ptr_upd);
-    if(player0)
-        dir_gpp^=1;
-    mpc_and(tio, yield, F_gppl, F_gpp, dir_gpp);
-    mpc_select(tio, yield, gp_left, F_gppl, gp_left, ptr_upd);
-    setAVLLeftPtr(gp_pointers, gp_left);
-    setAVLRightPtr(gp_pointers, gp_right);
 
-    // ii) p[dir_pc] <-- c[!dir_pc] and iii) c[!dir_pc] <-- p_ptr
-    RegBS not_dir_pc = dir_pc;
+    RegBS not_dir_pc_l = dir_pc, not_dir_pc_r = dir_pc;
     if(player0)
-        not_dir_pc^=1;
+        not_dir_pc_r^=1;
     RegXS c_not_dir_pc; //c[!dir_pc]
     // ndpc_right: if not_dir_pc is right
     // ndpc_left: if not_dir_pc is left
     RegBS F_ndpc_right, F_ndpc_left;
-    mpc_and(tio, yield, F_ndpc_right, isReal, not_dir_pc);
-    mpc_select(tio, yield, c_not_dir_pc, F_ndpc_right, c_not_dir_pc, c_right, AVL_PTR_SIZE);
-    // Negating not_dir_pc to handle left case
+    RegBS nt_dir_pc = dir_pc;
     if(player0)
-        not_dir_pc^=1;
-    mpc_and(tio, yield, F_ndpc_left, isReal, not_dir_pc);
-    mpc_select(tio, yield, c_not_dir_pc, F_ndpc_left, c_not_dir_pc, c_left, AVL_PTR_SIZE);
-    // Now c_not_dir_pc = c[!dir_pc]
+        nt_dir_pc^=1;
+
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back( 
+        [&tio, &F_gppr, F_gpp, dir_gpp](yield_t &yield) { 
+            mpc_and(tio, yield, F_gppr, F_gpp, dir_gpp); 
+    });
+    coroutines.emplace_back( 
+        [&tio, &F_gppl, F_gpp, nt_dir_gpp](yield_t &yield) { 
+            mpc_and(tio, yield, F_gppl, F_gpp, nt_dir_gpp);
+    });
+    // ii) p[dir_pc] <-- c[!dir_pc] and iii) c[!dir_pc] <-- p_ptr
+    coroutines.emplace_back(
+        [&tio, &F_ndpc_right, isReal, not_dir_pc_r](yield_t &yield) { 
+            mpc_and(tio, yield, F_ndpc_right, isReal, not_dir_pc_r);
+    });
+    coroutines.emplace_back(
+        [&tio, &F_ndpc_left, isReal, not_dir_pc_l](yield_t &yield) {
+            mpc_and(tio, yield, F_ndpc_left, isReal, not_dir_pc_l);
+    });
+    coroutines.emplace_back(
+        [&tio, &F_pc_l, dir_pc, isReal](yield_t &yield) { 
+            mpc_and(tio, yield, F_pc_l, dir_pc, isReal);
+    });
+    coroutines.emplace_back(
+        [&tio, &F_pc_r, nt_dir_pc, isReal](yield_t &yield) {
+            mpc_and(tio, yield, F_pc_r, nt_dir_pc, isReal);
+    });
+    run_coroutines(tio, coroutines);
+
+    run_coroutines(tio, [&tio, &gp_right, F_gppr, ptr_upd](yield_t &yield)
+        { mpc_select(tio, yield, gp_right, F_gppr, gp_right, ptr_upd);},
+        [&tio, &gp_left, F_gppl, ptr_upd](yield_t &yield)
+        { mpc_select(tio, yield, gp_left, F_gppl, gp_left, ptr_upd);},
+        [&tio, &c_not_dir_pc, F_ndpc_right, c_right](yield_t &yield)
+        { mpc_select(tio, yield, c_not_dir_pc, F_ndpc_right, c_not_dir_pc, c_right, AVL_PTR_SIZE);});
+
+
+     //[&tio, &c_not_dir_pc, F_ndpc_left, c_left](yield_t &yield) 
+     mpc_select(tio, yield, c_not_dir_pc, F_ndpc_left, c_not_dir_pc, c_left, AVL_PTR_SIZE);
+
 
     // ii) p[dir_pc] <-- c[!dir_pc]
-    mpc_select(tio, yield, p_left, F_ndpc_right, p_left, c_not_dir_pc, AVL_PTR_SIZE);
-    mpc_select(tio, yield, p_right, F_ndpc_left, p_right, c_not_dir_pc, AVL_PTR_SIZE);
+    // iii): c[!dir_pc] <-- p_ptr
+    run_coroutines(tio, [&tio, &p_left, F_ndpc_right, c_not_dir_pc](yield_t &yield) 
+        { mpc_select(tio, yield, p_left, F_ndpc_right, p_left, c_not_dir_pc, AVL_PTR_SIZE);},
+        [&tio, &p_right, F_ndpc_left, c_not_dir_pc](yield_t &yield)
+        { mpc_select(tio, yield, p_right, F_ndpc_left, p_right, c_not_dir_pc, AVL_PTR_SIZE);},
+        [&tio, &ptr_upd, isReal, c_not_dir_pc, p_ptr](yield_t &yield)
+        { mpc_select(tio, yield, ptr_upd, isReal, c_not_dir_pc, p_ptr, AVL_PTR_SIZE);});
+
+    run_coroutines(tio, [&tio, &c_left, F_pc_l, ptr_upd](yield_t &yield)
+        { mpc_select(tio, yield, c_left, F_pc_l, c_left, ptr_upd, AVL_PTR_SIZE);},
+        [&tio, &c_right, F_pc_r, ptr_upd](yield_t &yield)
+        { mpc_select(tio, yield, c_right, F_pc_r, c_right, ptr_upd, AVL_PTR_SIZE);});
+
+    setAVLLeftPtr(gp_pointers, gp_left);
+    setAVLRightPtr(gp_pointers, gp_right);
     setAVLLeftPtr(p_pointers, p_left);
     setAVLRightPtr(p_pointers, p_right);
-
-    // iii): c[!dir_pc] <-- p_ptr
-    mpc_select(tio, yield, ptr_upd, isReal, c_not_dir_pc, p_ptr, AVL_PTR_SIZE);
-    mpc_and(tio, yield, F_pc, dir_pc, isReal);
-    mpc_select(tio, yield, c_left, F_pc, c_left, ptr_upd, AVL_PTR_SIZE);
-    if(player0)
-        dir_pc^=1;
-    // dir_pc <-- !dir_pc
-    mpc_and(tio, yield, F_pc, dir_pc, isReal);
-    mpc_select(tio, yield, c_right, F_pc, c_right, ptr_upd, AVL_PTR_SIZE);
     setAVLLeftPtr(c_pointers, c_left);
     setAVLRightPtr(c_pointers, c_right);
 }
@@ -237,69 +269,49 @@ std::tuple<RegBS, RegBS, RegBS, RegBS> AVL::updateBalanceDel(MPCTIO &tio, yield_
     bool player0 = tio.player()==0;
     RegBS s0;
     RegBS F_rs, F_ls, balanced, imbalance;
-
-    /*
-    bool rec_bal_l, rec_bal_r, rec_bal_upd;
-    rec_bal_l = reconstruct_RegBS(tio, yield, bal_l);
-    rec_bal_r = reconstruct_RegBS(tio, yield, bal_r);
-    rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
-    printf("In updateBalanceDel, beforeBalance: rec_bal_l = %d, rec_bal_r = %d, rec_bal_upd = %d\n",
-        rec_bal_l, rec_bal_r, rec_bal_upd);
-    */
+    RegBS nt_child_dir = child_dir;
+    if(player0) {
+        nt_child_dir^=1;
+    }
 
     // balanced = is the node currently balanced
     balanced = bal_l ^ bal_r;
-    //F_ls (Flag left shift) <- child_dir & bal_upd
-    mpc_and(tio, yield, F_ls, child_dir, bal_upd);
     if(player0) {
-      child_dir^=1;
         balanced^=1;
     }
-    //F_rs (Flag right shift) <- !child_dir & bal_upd
-    mpc_and(tio, yield, F_rs, child_dir, bal_upd);
 
-    /*
-    bool rec_F_ls, rec_F_rs;
-    rec_F_ls = reconstruct_RegBS(tio, yield, F_ls);
-    rec_F_rs = reconstruct_RegBS(tio, yield, F_rs);
-    printf("In updateBalanceDel: rec_F_ls = %d, rec_F_rs = %d\n",
-        rec_F_ls, rec_F_rs);
-    */
+    //F_ls (Flag left shift) <- child_dir & bal_upd
+    //F_rs (Flag right shift) <- !child_dir & bal_upd
+    run_coroutines(tio, [&tio, &F_ls, child_dir, bal_upd](yield_t &yield)
+        { mpc_and(tio, yield, F_ls, child_dir, bal_upd);},
+        [&tio, &F_rs, nt_child_dir, bal_upd](yield_t &yield)
+        { mpc_and(tio, yield, F_rs, nt_child_dir, bal_upd);});
 
     // Left shift if F_ls
-    mpc_select(tio, yield, imbalance, F_ls, imbalance, bal_l);
-    mpc_select(tio, yield, bal_l, F_ls, bal_l, balanced);
-    mpc_select(tio, yield, balanced, F_ls, balanced, bal_r);
-    mpc_select(tio, yield, bal_r, F_ls, bal_r, s0);
+    run_coroutines(tio, [&tio, &imbalance, F_ls, bal_l](yield_t &yield)
+        { mpc_select(tio, yield, imbalance, F_ls, imbalance, bal_l);},
+        [&tio, &bal_l, F_ls, balanced](yield_t &yield)
+        { mpc_select(tio, yield, bal_l, F_ls, bal_l, balanced);},
+        [&tio, &balanced, F_ls, bal_r](yield_t &yield)
+        { mpc_select(tio, yield, balanced, F_ls, balanced, bal_r);},
+        [&tio, &bal_r, F_ls, s0](yield_t &yield)
+        { mpc_select(tio, yield, bal_r, F_ls, bal_r, s0);});
 
     // Right shift if F_rs
-    mpc_select(tio, yield, imbalance, F_rs, imbalance, bal_r);
-    mpc_select(tio, yield, bal_r, F_rs, bal_r, balanced);
-    mpc_select(tio, yield, balanced, F_rs, balanced, bal_l);
-    mpc_select(tio, yield, bal_l, F_rs, bal_l, s0);
-
-    /*
-    rec_bal_l = reconstruct_RegBS(tio, yield, bal_l);
-    rec_bal_r = reconstruct_RegBS(tio, yield, bal_r);
-    rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
-    printf("In updateBalanceDel, foundterBalance: rec_bal_l = %d, rec_bal_r = %d, rec_bal_upd = %d\n",
-        rec_bal_l, rec_bal_r, rec_bal_upd);
-    */
+    run_coroutines(tio, [&tio, &imbalance, F_rs, bal_r](yield_t &yield)
+        { mpc_select(tio, yield, imbalance, F_rs, imbalance, bal_r);},
+        [&tio, &bal_r, F_rs, balanced](yield_t &yield)
+        { mpc_select(tio, yield, bal_r, F_rs, bal_r, balanced);},
+        [&tio, &balanced, F_rs, bal_l](yield_t &yield)
+        { mpc_select(tio, yield, balanced, F_rs, balanced, bal_l);},
+        [&tio, &bal_l, F_rs, s0](yield_t &yield) 
+        { mpc_select(tio, yield, bal_l, F_rs, bal_l, s0);});
 
     // if(bal_upd) and not imbalance bal_upd<-0
     RegBS bu0;
-    /*
-    if(player0){
-        imbalance^=1;
-    }
-    */
     mpc_and(tio, yield, bu0, bal_upd, balanced);
     mpc_select(tio, yield, bal_upd, bu0, bal_upd, s0);
-    /*
-    if(player0){
-        imbalance^=1;
-    }
-    */
+
     // Any bal_upd, propogates all the way up to root
     return {bal_l, bal_r, bal_upd, imbalance};
 }
@@ -319,30 +331,64 @@ std::tuple<RegBS, RegBS, RegBS, RegBS> AVL::updateBalanceIns(MPCTIO &tio, yield_
     bool player0 = tio.player()==0;
     RegBS s1, s0;
     s1.set(tio.player()==1);
-    RegBS F_rs, F_ls, balanced, imbalance;
+    RegBS F_rs, F_ls, balanced, imbalance, nt_child_dir;
 
     // balanced = is the node currently balanced
     balanced = bal_l ^ bal_r;
-    //F_rs (Flag right shift) <- child_dir & bal_upd
-    mpc_and(tio, yield, F_rs, child_dir, bal_upd);
+    nt_child_dir = child_dir;
+    if(player0){
+        nt_child_dir^=1;
+    }
     if(player0) {
-        child_dir^=1;
         balanced^=1;
     }
-    //F_ls (Flag left shift) <- !child_dir & bal_upd
-    mpc_and(tio, yield, F_ls, child_dir, bal_upd);
+    run_coroutines(tio, [&tio, &F_rs, child_dir, bal_upd](yield_t &yield) 
+        { //F_rs (Flag right shift) <- child_dir & bal_upd
+          mpc_and(tio, yield, F_rs, child_dir, bal_upd);},
+        [&tio, &F_ls, nt_child_dir, bal_upd](yield_t &yield)
+        { //F_ls (Flag left shift) <- !child_dir & bal_upd
+          mpc_and(tio, yield, F_ls, nt_child_dir, bal_upd);});
 
+
+    std::vector<coro_t> coroutines;
     // Right shift if child_dir = 1 & bal_upd = 1
-    mpc_select(tio, yield, imbalance, F_rs, imbalance, bal_r);
-    mpc_select(tio, yield, bal_r, F_rs, bal_r, balanced);
-    mpc_select(tio, yield, balanced, F_rs, balanced, bal_l);
-    mpc_select(tio, yield, bal_l, F_rs, bal_l, s0);
+    coroutines.emplace_back(
+        [&tio, &imbalance, F_rs, bal_r, balanced](yield_t &yield) {
+            mpc_select(tio, yield, imbalance, F_rs, imbalance, bal_r);
+        });
+    coroutines.emplace_back(
+        [&tio, &bal_r, F_rs, balanced](yield_t &yield) {
+            mpc_select(tio, yield, bal_r, F_rs, bal_r, balanced);
+        });
+    coroutines.emplace_back(
+        [&tio, &balanced, F_rs, bal_l](yield_t &yield) {
+            mpc_select(tio, yield, balanced, F_rs, balanced, bal_l);
+        });
+    coroutines.emplace_back(
+        [&tio, &bal_l, F_rs, s0](yield_t &yield) {
+            mpc_select(tio, yield, bal_l, F_rs, bal_l, s0);
+        });
+    run_coroutines(tio, coroutines);
+    coroutines.clear();
 
     // Left shift if child_dir = 0 & bal_upd = 1
-    mpc_select(tio, yield, imbalance, F_ls, imbalance, bal_l);
-    mpc_select(tio, yield, bal_l, F_ls, bal_l, balanced);
-    mpc_select(tio, yield, balanced, F_ls, balanced, bal_r);
-    mpc_select(tio, yield, bal_r, F_ls, bal_r, s0);
+    coroutines.emplace_back(
+        [&tio, &imbalance, F_ls, bal_l] (yield_t &yield) {
+            mpc_select(tio, yield, imbalance, F_ls, imbalance, bal_l);
+        });
+    coroutines.emplace_back(
+        [&tio, &bal_l, F_ls, balanced] (yield_t &yield) {
+            mpc_select(tio, yield, bal_l, F_ls, bal_l, balanced);
+        });
+    coroutines.emplace_back(
+        [&tio, &balanced, F_ls, bal_r] (yield_t &yield) {
+            mpc_select(tio, yield, balanced, F_ls, balanced, bal_r);
+        });
+    coroutines.emplace_back(
+        [&tio, &bal_r, F_ls, s0](yield_t &yield) {
+            mpc_select(tio, yield, bal_r, F_ls, bal_r, s0);
+        });
+    run_coroutines(tio, coroutines);
 
     // bal_upd' <- bal_upd ^ imbalance
     RegBS F_bu0;
@@ -424,27 +470,52 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
     // Store if this insert triggers an imbalance
     ret->imbalance ^= imbalance;
 
+    std::vector<coro_t> coroutines;
     // Save grandparent pointer
-    mpc_select(tio, yield, ret->gp_node, F_gp, ret->gp_node, ptr, AVL_PTR_SIZE);
-    mpc_select(tio, yield, ret->dir_gpp, F_gp, ret->dir_gpp, gt);
-
+    coroutines.emplace_back(
+        [&tio, &ret, F_gp, ptr](yield_t &yield) {
+            mpc_select(tio, yield, ret->gp_node, F_gp, ret->gp_node, ptr, AVL_PTR_SIZE);
+        });
+    coroutines.emplace_back(
+        [&tio, &ret, F_gp, gt](yield_t &yield) {
+            mpc_select(tio, yield, ret->dir_gpp, F_gp, ret->dir_gpp, gt);
+        });
     // Save parent pointer
-    mpc_select(tio, yield, ret->p_node, imbalance, ret->p_node, ptr, AVL_PTR_SIZE);
-    mpc_select(tio, yield, ret->dir_pc, imbalance, ret->dir_pc, gt);
-
+    coroutines.emplace_back(
+        [&tio, &ret, imbalance, ptr](yield_t &yield) {
+            mpc_select(tio, yield, ret->p_node, imbalance, ret->p_node, ptr, AVL_PTR_SIZE);
+        });
+    coroutines.emplace_back(
+        [&tio, &ret, imbalance, gt](yield_t &yield) {
+            mpc_select(tio, yield, ret->dir_pc, imbalance, ret->dir_pc, gt);
+        });
     // Save child pointer
-    mpc_select(tio, yield, ret->c_node, imbalance, ret->c_node, prev_node, AVL_PTR_SIZE);
-    mpc_select(tio, yield, ret->dir_cn, imbalance, ret->dir_cn, prev_dir);
+    coroutines.emplace_back(
+        [&tio, &ret, imbalance, prev_node](yield_t &yield) {
+            mpc_select(tio, yield, ret->c_node, imbalance, ret->c_node, prev_node, AVL_PTR_SIZE);
+        });
+    coroutines.emplace_back(
+        [&tio, &ret, imbalance, prev_dir](yield_t &yield) {
+            mpc_select(tio, yield, ret->dir_cn, imbalance, ret->dir_cn, prev_dir);
+        });
+    run_coroutines(tio, coroutines);
+
 
     // Store new_bal_l and new_bal_r for this node
     setLeftBal(cnode.pointers, new_bal_l);
     setRightBal(cnode.pointers, new_bal_r);
     // We have to write the node pointers anyway to resolve balance updates
     RegBS F_ir, F_il;
-    mpc_and(tio, yield, F_ir, F_i, gt);
-    mpc_and(tio, yield, F_il, F_i, lteq);
-    mpc_select(tio, yield, left, F_il, left, ins_addr); 
-    mpc_select(tio, yield, right, F_ir, right, ins_addr); 
+    run_coroutines(tio, [&tio, &F_ir, F_i, gt](yield_t &yield) 
+        { mpc_and(tio, yield, F_ir, F_i, gt); },
+        [&tio, &F_il, F_i, lteq](yield_t &yield)
+        { mpc_and(tio, yield, F_il, F_i, lteq); });
+
+    run_coroutines(tio, [&tio, &left, F_il, ins_addr](yield_t &yield) 
+        { mpc_select(tio, yield, left, F_il, left, ins_addr);},
+        [&tio, &right, F_ir, ins_addr](yield_t &yield)
+        { mpc_select(tio, yield, right, F_ir, right, ins_addr);});
+
     setAVLLeftPtr(cnode.pointers, left);
     setAVLRightPtr(cnode.pointers, right);
     A[oidx].NODE_POINTERS+=(cnode.pointers - old_pointers);
@@ -544,10 +615,11 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
            (Note: in the second rotation c is actually n, since the the first rotation
             swaps their positions)
         */
-        RegBS F_cn_rot, F_ur;
-        mpc_and(tio, yield, F_ur, F_gp, ret.imbalance);
-        mpc_and(tio, yield, F_cn_rot, ret.imbalance, F_dr);
-        RegBS s0;
+        RegBS F_cn_rot, F_ur, s0;
+        run_coroutines(tio, [&tio, &F_ur, F_gp, ret](yield_t &yield) 
+            {mpc_and(tio, yield, F_ur, F_gp, ret.imbalance);},
+            [&tio, &F_cn_rot, ret, F_dr](yield_t &yield) 
+            {mpc_and(tio, yield, F_cn_rot, ret.imbalance, F_dr);});
 
         // Get the n children information for 2nd rotate fix before rotations happen.
         RegBS n_bal_l, n_bal_r;
@@ -562,8 +634,11 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
 
         // If F_cn_rot, i.e. we did first rotation. Then c and n need to swap before the second rotate.
         RegXS new_child_pointers, new_child;
-        mpc_select(tio, yield, new_child_pointers, F_cn_rot, child_pointers, n_pointers);
-        mpc_select(tio, yield, new_child, F_cn_rot, ret.c_node, n_node, AVL_PTR_SIZE);
+
+        run_coroutines(tio, [&tio, &new_child_pointers, F_cn_rot, child_pointers, n_pointers] (yield_t &yield)
+            {mpc_select(tio, yield, new_child_pointers, F_cn_rot, child_pointers, n_pointers);}, 
+            [&tio, &new_child, F_cn_rot, ret, n_node](yield_t &yield)
+            {mpc_select(tio, yield, new_child, F_cn_rot, ret.c_node, n_node, AVL_PTR_SIZE);});
 
         // Second rotation: p->c link
         rotate(tio, yield, gp_pointers, ret.p_node, parent_pointers, new_child,
@@ -576,61 +651,79 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         p_bal_l = getLeftBal(parent_pointers);
         p_bal_r = getRightBal(parent_pointers);
 
-        mpc_select(tio, yield, child_pointers, F_cn_rot, new_child_pointers, child_pointers);
-        mpc_select(tio, yield, n_pointers, F_cn_rot, n_pointers, new_child_pointers);
+        run_coroutines(tio, [&tio, &child_pointers, F_cn_rot, new_child_pointers] (yield_t &yield)
+            {mpc_select(tio, yield, child_pointers, F_cn_rot, new_child_pointers, child_pointers);},
+            [&tio, &n_pointers, F_cn_rot, new_child_pointers] (yield_t &yield) 
+            {mpc_select(tio, yield, n_pointers, F_cn_rot, n_pointers, new_child_pointers);});
 
         c_bal_l = getLeftBal(child_pointers);
         c_bal_r = getRightBal(child_pointers);
-        mpc_select(tio, yield, c_bal_l, ret.imbalance, c_bal_l, s0);
-        mpc_select(tio, yield, c_bal_r, ret.imbalance, c_bal_r, s0);
+
+        run_coroutines(tio, [&tio, &c_bal_l, ret, s0] (yield_t &yield)
+            {mpc_select(tio, yield, c_bal_l, ret.imbalance, c_bal_l, s0);},
+            [&tio, &c_bal_r, ret, s0] (yield_t &yield) 
+            {mpc_select(tio, yield, c_bal_r, ret.imbalance, c_bal_r, s0);});
 
         /*   In the double rotation case: balance of c and p have a tweak
            p_bal_ndpc <- !(n_bal_ndpc)
            c_bal_dpc <- !(n_bal_dpc) */
         CDPF cdpf = tio.cdpf(yield);
         size_t &aes_ops = tio.aes_ops();
-        RegBS n_l0 = cdpf.is_zero(tio, yield, n_l, aes_ops);
-        RegBS n_r0 = cdpf.is_zero(tio, yield, n_r, aes_ops);
+      
+        RegBS n_l0, n_r0;
+        run_coroutines(tio, [&tio, &n_l0, n_l, &cdpf, &aes_ops] (yield_t &yield) 
+            {n_l0 = cdpf.is_zero(tio, yield, n_l, aes_ops);},
+            [&tio, &n_r0, n_r, &cdpf, &aes_ops] (yield_t &yield)
+            {n_r0 = cdpf.is_zero(tio, yield, n_r, aes_ops);});
+
         RegBS p_c_update, n_has_children;
         // n_has_children = !(n_l0 & n_r0)
         mpc_and(tio, yield, n_has_children, n_l0, n_r0);
         if(player0) {
             n_has_children^=1;
         }
+      
+        run_coroutines(tio, [&tio, &p_c_update, F_cn_rot, n_has_children] (yield_t &yield) 
+            {mpc_and(tio, yield, p_c_update, F_cn_rot, n_has_children);}, 
+            [&tio, &n_bal_ndpc, ret, n_bal_l, n_bal_r] (yield_t &yield)
+            {mpc_select(tio, yield, n_bal_ndpc, ret.dir_pc, n_bal_r, n_bal_l);},
+            [&tio, &n_bal_dpc, ret, n_bal_l, n_bal_r] (yield_t &yield)
+            {mpc_select(tio, yield, n_bal_dpc, ret.dir_pc, n_bal_l, n_bal_r);},
+            [&tio, &p_bal_ndpc, ret, p_bal_r, p_bal_l] (yield_t &yield)
+            {mpc_select(tio, yield, p_bal_ndpc, ret.dir_pc, p_bal_r, p_bal_l);});
 
-        /*
-        bool rec_n_l0, rec_n_r0, rec_n_hc;
-        rec_n_l0 = reconstruct_RegBS(tio, yield, n_l0);
-        rec_n_r0 = reconstruct_RegBS(tio, yield, n_r0);
-        rec_n_hc = reconstruct_RegBS(tio, yield, n_has_children);
-        printf("n_l0 = %d, n_r0 = %d, n_has_children = %d\n", rec_n_l0, rec_n_r0, rec_n_hc);
-        */
-
-        mpc_and(tio, yield, p_c_update, F_cn_rot, n_has_children);
-        mpc_select(tio, yield, n_bal_ndpc, ret.dir_pc, n_bal_r, n_bal_l);
-        mpc_select(tio, yield, n_bal_dpc, ret.dir_pc, n_bal_l, n_bal_r);
-        mpc_select(tio, yield, p_bal_ndpc, ret.dir_pc, p_bal_r, p_bal_l);
         // !n_bal_ndpc, !n_bal_dpc
         if(player0) {
             n_bal_ndpc^=1;
             n_bal_dpc^=1;
         }
-        mpc_select(tio, yield, p_bal_ndpc, p_c_update, p_bal_ndpc, n_bal_ndpc);
-        mpc_select(tio, yield, c_bal_dpc, p_c_update, c_bal_dpc, n_bal_dpc);
 
-        mpc_select(tio, yield, p_bal_r, ret.dir_pc, p_bal_ndpc, p_bal_r);
-        mpc_select(tio, yield, p_bal_l, ret.dir_pc, p_bal_l, p_bal_ndpc);
-        mpc_select(tio, yield, c_bal_r, ret.dir_pc, c_bal_r, c_bal_dpc);
-        mpc_select(tio, yield, c_bal_l, ret.dir_pc, c_bal_dpc, c_bal_l);
+        run_coroutines(tio, [&tio, &p_bal_ndpc, p_c_update, n_bal_ndpc] (yield_t &yield)
+            {mpc_select(tio, yield, p_bal_ndpc, p_c_update, p_bal_ndpc, n_bal_ndpc);},
+            [&tio, &c_bal_dpc, p_c_update, n_bal_dpc] (yield_t &yield)
+            {mpc_select(tio, yield, c_bal_dpc, p_c_update, c_bal_dpc, n_bal_dpc);});
+
+        std::vector<coro_t> coroutines;
+        coroutines.emplace_back([&tio, &p_bal_r, ret, p_bal_ndpc] (yield_t &yield)
+            {mpc_select(tio, yield, p_bal_r, ret.dir_pc, p_bal_ndpc, p_bal_r);});
+        coroutines.emplace_back([&tio, &p_bal_l, ret, p_bal_ndpc] (yield_t &yield)
+            {mpc_select(tio, yield, p_bal_l, ret.dir_pc, p_bal_l, p_bal_ndpc);});
+        coroutines.emplace_back([&tio, &c_bal_r, ret, c_bal_dpc] (yield_t &yield)
+            {mpc_select(tio, yield, c_bal_r, ret.dir_pc, c_bal_r, c_bal_dpc);});
+        coroutines.emplace_back([&tio, &c_bal_l, ret, c_bal_dpc] (yield_t &yield)
+            {mpc_select(tio, yield, c_bal_l, ret.dir_pc, c_bal_dpc, c_bal_l);});
+        // If double rotation (LR/RL) case, n ends up with 0 balance.
+        // In all other cases, n's balance remains unaffected by rotation during insertion.
+        coroutines.emplace_back([&tio, &n_bal_l, F_cn_rot, s0] (yield_t &yield)
+            {mpc_select(tio, yield, n_bal_l, F_cn_rot, n_bal_l, s0);});
+        coroutines.emplace_back([&tio, &n_bal_r, F_cn_rot, s0] (yield_t &yield)
+            {mpc_select(tio, yield, n_bal_r, F_cn_rot, n_bal_r, s0);});
+        run_coroutines(tio, coroutines);
 
         setLeftBal(parent_pointers, p_bal_l);
         setRightBal(parent_pointers, p_bal_r);
         setLeftBal(child_pointers, c_bal_l);
         setRightBal(child_pointers, c_bal_r);
-        // If double rotation (LR/RL) case, n ends up with 0 balance.
-        // In all other cases, n's balance remains unaffected by rotation during insertion.
-        mpc_select(tio, yield, n_bal_l, F_cn_rot, n_bal_l, s0);
-        mpc_select(tio, yield, n_bal_r, F_cn_rot, n_bal_r, s0);
         setLeftBal(n_pointers, n_bal_l);
         setRightBal(n_pointers, n_bal_r);
 
@@ -640,12 +733,17 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         A[oidx_p].NODE_POINTERS+=(parent_pointers - old_parent_pointers); 
         A[oidx_gp].NODE_POINTERS+=(gp_pointers - old_gp_pointers); 
 
-        // Handle root pointer switch (if F_gp is true in the return from insert())
-        // If F_gp and we did a double rotation: root <-- new node
-        // If F_gp and we did a single rotation: root <-- child node
-        mpc_select(tio, yield, root, F_ur, root, ret.c_node, AVL_PTR_SIZE);
-        mpc_and(tio, yield, F_ur, F_gp, F_dr);
-        mpc_select(tio, yield, root, F_ur, root, n_node, AVL_PTR_SIZE);
+        // Handle root pointer update (if F_ur is true)
+        // If F_ur and we did a double rotation: root <-- new node
+        // If F_ur and we did a single rotation: root <-- child node
+        RegXS temp_root = root;
+        run_coroutines(tio, [&tio, &temp_root, F_ur, ret] (yield_t &yield)
+            {mpc_select(tio, yield, temp_root, F_ur, temp_root, ret.c_node, AVL_PTR_SIZE);},
+            [&tio, &F_ur, F_gp, F_dr] (yield_t &yield)
+            {mpc_and(tio, yield, F_ur, F_gp, F_dr);});
+
+        mpc_select(tio, yield, temp_root, F_ur, temp_root, n_node, AVL_PTR_SIZE);
+        root = temp_root;
     }
 }
 
@@ -697,15 +795,21 @@ bool AVL::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
 void AVL::updateChildPointers(MPCTIO &tio, yield_t &yield, RegXS &left, RegXS &right,
           RegBS c_prime, avl_del_return ret_struct) {
     bool player0 = tio.player()==0;
-    RegBS F_rr; // Flag to resolve F_r by updating correct child ptr
-    mpc_and(tio, yield, F_rr, c_prime, ret_struct.F_r);
-    mpc_select(tio, yield, right, F_rr, right, ret_struct.ret_ptr);
+    RegBS F_rr; // Flag to resolve F_r by updating right child ptr
+    RegBS F_rl; // Flag to resolve F_r by updating left child ptr
+    RegBS nt_c_prime = c_prime;
     if(player0)
-        c_prime^=1;
-    mpc_and(tio, yield, F_rr, c_prime, ret_struct.F_r);
-    mpc_select(tio, yield, left, F_rr, left, ret_struct.ret_ptr);
-    if(player0)
-        c_prime^=1;
+        nt_c_prime^=1;
+
+    run_coroutines(tio, [&tio, &F_rr, c_prime, ret_struct](yield_t &yield)
+        { mpc_and(tio, yield, F_rr, c_prime, ret_struct.F_r);},
+        [&tio, &F_rl, nt_c_prime, ret_struct](yield_t &yield)
+        { mpc_and(tio, yield, F_rl, nt_c_prime, ret_struct.F_r);});
+
+    run_coroutines(tio, [&tio, &right, F_rr, ret_struct](yield_t &yield)
+        { mpc_select(tio, yield, right, F_rr, right, ret_struct.ret_ptr);},
+        [&tio, &left, F_rl, ret_struct](yield_t &yield)
+        { mpc_select(tio, yield, left, F_rl, left, ret_struct.ret_ptr);});
 }
 
 
@@ -773,14 +877,22 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
     cs_bal_r = getRightBal(cs_node.pointers);
     cs_left = getAVLLeftPtr(cs_node.pointers);
     cs_right = getAVLRightPtr(cs_node.pointers);
-    mpc_select(tio, yield, cs_bal_dpc, c_prime, cs_bal_l, cs_bal_r);
-    mpc_select(tio, yield, cs_bal_ndpc, c_prime, cs_bal_r, cs_bal_l);
-    mpc_select(tio, yield, cs_dpc, c_prime, cs_left, cs_right);
-    mpc_select(tio, yield, cs_ndpc, c_prime, cs_right, cs_left);
+
+    run_coroutines(tio, [&tio, &cs_bal_dpc, c_prime, cs_bal_l, cs_bal_r](yield_t &yield)
+        { mpc_select(tio, yield, cs_bal_dpc, c_prime, cs_bal_l, cs_bal_r);},
+        [&tio, &cs_bal_ndpc, c_prime, cs_bal_r, cs_bal_l](yield_t &yield)
+        { mpc_select(tio, yield, cs_bal_ndpc, c_prime, cs_bal_r, cs_bal_l);},
+        [&tio, &cs_dpc, c_prime, cs_left, cs_right](yield_t &yield)
+        { mpc_select(tio, yield, cs_dpc, c_prime, cs_left, cs_right);},
+        [&tio, &cs_ndpc, c_prime, cs_right, cs_left](yield_t &yield)
+        { mpc_select(tio, yield, cs_ndpc, c_prime, cs_right, cs_left);});
 
     // We need to double rotate (LR or RL case) if cs_bal_dpc is 1
-    mpc_and(tio, yield, F_dr, imb, cs_bal_dpc);
-    mpc_select(tio, yield, gcs_ptr, cs_bal_dpc, cs_ndpc, cs_dpc, AVL_PTR_SIZE);
+    run_coroutines(tio, [&tio, &F_dr, imb, cs_bal_dpc] (yield_t &yield)
+        { mpc_and(tio, yield, F_dr, imb, cs_bal_dpc);},
+        [&tio, &gcs_ptr, cs_bal_dpc, cs_ndpc, cs_dpc](yield_t &yield)
+        { mpc_select(tio, yield, gcs_ptr, cs_bal_dpc, cs_ndpc, cs_dpc, AVL_PTR_SIZE);});
+
     typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_gcs(tio, yield, gcs_ptr, MAX_DEPTH);
     Node gcs_node = A[oidx_gcs];
     RegXS old_gcs_ptr = gcs_node.pointers;
@@ -795,8 +907,12 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
 
     // If F_dr, we did first rotation. Then cs and gcs need to swap before the second rotate.
     RegXS new_cs_pointers, new_cs, new_ptr;
-    mpc_select(tio, yield, new_cs_pointers, F_dr, cs_node.pointers, gcs_node.pointers);
-    mpc_select(tio, yield, new_cs, F_dr, cs_ptr, gcs_ptr, AVL_PTR_SIZE);
+    run_coroutines(tio, [&tio, &new_cs_pointers, F_dr, cs_node, gcs_node](yield_t &yield)
+        { mpc_select(tio, yield, new_cs_pointers, F_dr, cs_node.pointers, gcs_node.pointers);},
+        [&tio, &new_cs, F_dr, cs_ptr, gcs_ptr](yield_t &yield)
+        { mpc_select(tio, yield, new_cs, F_dr, cs_ptr, gcs_ptr, AVL_PTR_SIZE);},
+        [&tio, &new_ptr, F_dr, cs_ptr, gcs_ptr](yield_t &yield) 
+        { mpc_select(tio, yield, new_ptr, F_dr, cs_ptr, gcs_ptr);});
 
     // Second rotation: p->cs link
     // Since we don't have access to gp node here we just send a null and s0
@@ -805,79 +921,98 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
     rotate(tio, yield, null, ptr, nodeptrs, new_cs,
         new_cs_pointers, s0, not_c_prime, imb, s1);
 
-    /*
-    size_t rec_p_left_1, rec_p_right_1;
-    bool rec_flag_imb, rec_flag_dr;
-    rec_flag_imb = reconstruct_RegBS(tio, yield, imb);
-    rec_flag_dr = reconstruct_RegBS(tio, yield, F_dr);
-    rec_p_left_1 = reconstruct_RegXS(tio, yield, getAVLLeftPtr(node.pointers));
-    rec_p_right_1 = reconstruct_RegXS(tio, yield, getAVLRightPtr(node.pointers));
-    printf("flag_imb = %d, flag_dr = %d\n", rec_flag_imb, rec_flag_dr);
-    printf("parent_ptrs (foundter rotations): left = %lu, right = %lu\n", rec_p_left_1, rec_p_right_1);
-    */
-
     // If imb (we do some rotation), then update F_r, and ret_ptr, to
     // fix the gp->p link (The F_r clauses later, and this are mutually
     // exclusive events. They will never trigger together.)
-    mpc_select(tio, yield, new_ptr, F_dr, cs_ptr, gcs_ptr);
-    mpc_select(tio, yield, F_ri, imb, s0, s1);
-    mpc_select(tio, yield, ret_struct.ret_ptr, imb, ret_struct.ret_ptr, new_ptr);
 
+    std::vector<coro_t> coroutines;
+    coroutines.emplace_back([&tio, &F_ri, imb, s0, s1](yield_t &yield) {
+        mpc_select(tio, yield, F_ri, imb, s0, s1);
+    });
+    coroutines.emplace_back([&tio, &ret_struct, imb, new_ptr](yield_t &yield) {
+        mpc_select(tio, yield, ret_struct.ret_ptr, imb, ret_struct.ret_ptr, new_ptr);
+    });
     // Write back new_cs_pointers correctly to (cs_node/gcs_node).pointers
     // and then balance the nodes
-    mpc_select(tio, yield, cs_node.pointers, F_dr, new_cs_pointers, cs_node.pointers);
-    mpc_select(tio, yield, gcs_node.pointers, F_dr, gcs_node.pointers, new_cs_pointers);
-
+    coroutines.emplace_back([&tio, &cs_node, F_dr, new_cs_pointers](yield_t &yield) {
+        mpc_select(tio, yield, cs_node.pointers, F_dr, new_cs_pointers, cs_node.pointers);
+    });
+    coroutines.emplace_back([&tio, &gcs_node, F_dr, new_cs_pointers](yield_t &yield) {
+        mpc_select(tio, yield, gcs_node.pointers, F_dr, gcs_node.pointers, new_cs_pointers);
+    });
+    run_coroutines(tio, coroutines);
+    coroutines.clear();
+    
     /*
        Update balances based on imbalance and type of rotations that happen.
        In the case of an imbalance, updateBalance() sets bal_l and bal_r of p to 0.
 
     */
     RegBS IC1, IC2, IC3; // Imbalance Case 1, 2 or 3
-    // IC1 = Single rotation (L/R). L/R = dpc
-    mpc_and(tio, yield, IC1, imb, cs_bal_ndpc);
-    // IC3 = Double rotation (LR/RL). 1st rotate direction = ndpc, 2nd direction = dpc
-    mpc_and(tio, yield, IC3, imb, cs_bal_dpc);
+    run_coroutines(tio, [&tio, &IC1, imb, cs_bal_ndpc] (yield_t &yield) {
+        // IC1 = Single rotation (L/R). L/R = dpc
+        mpc_and(tio, yield, IC1, imb, cs_bal_ndpc);
+        },
+        [&tio, &IC3, imb, cs_bal_dpc](yield_t &yield) {
+        // IC3 = Double rotation (LR/RL). 1st rotate direction = ndpc, 2nd direction = dpc
+        mpc_and(tio, yield, IC3, imb, cs_bal_dpc);
+        });
+
     // IC2 = Single rotation (L/R).
     IC2 = IC1 ^ IC3;
     if(player0) {
       IC2^=1;
     }
-    mpc_and(tio, yield, IC2, imb, IC2);
 
-    /*
-    bool rec_IC1, rec_IC2, rec_IC3;
-    rec_IC1 = reconstruct_RegBS(tio, yield, IC1);
-    rec_IC2 = reconstruct_RegBS(tio, yield, IC2);
-    rec_IC3 = reconstruct_RegBS(tio, yield, IC3);
-    printf("rec_IC1 = %d, rec_IC2 = %d, rec_IC3 = %d\n", rec_IC1, rec_IC2, rec_IC3);
-    */
+    RegBS p_bal_dpc, p_bal_ndpc;
+    RegBS IC2_ndpc_l, IC2_ndpc_r, IC2_dpc_l, IC2_dpc_r;
 
-    // IC1, IC2, IC3: CS.bal = 0 0
-    mpc_select(tio, yield, cs_bal_dpc, imb, cs_bal_dpc, s0);
-    mpc_select(tio, yield, cs_bal_ndpc, imb, cs_bal_ndpc, s0);
-    mpc_select(tio, yield, cs_bal_r, c_prime, cs_bal_ndpc, cs_bal_dpc);
-    mpc_select(tio, yield, cs_bal_l, c_prime, cs_bal_dpc, cs_bal_ndpc);
+    run_coroutines(tio, [&tio, &IC2, imb] (yield_t &yield)
+        { mpc_and(tio, yield, IC2, imb, IC2);},
+        [&tio, &cs_bal_dpc, imb, s0](yield_t &yield) 
+        { // IC1, IC2, IC3: CS.bal = 0 0
+          mpc_select(tio, yield, cs_bal_dpc, imb, cs_bal_dpc, s0);},
+        [&tio, &cs_bal_ndpc, c_prime, imb, s0](yield_t &yield) {
+        mpc_select(tio, yield, cs_bal_ndpc, imb, cs_bal_ndpc, s0);});
+
+    run_coroutines(tio, [&tio, &cs_bal_r, c_prime, cs_bal_ndpc, cs_bal_dpc] (yield_t &yield) 
+        { mpc_select(tio, yield, cs_bal_r, c_prime, cs_bal_ndpc, cs_bal_dpc);},
+        [&tio, &cs_bal_l, c_prime, cs_bal_dpc, cs_bal_ndpc](yield_t &yield)
+        { mpc_select(tio, yield, cs_bal_l, c_prime, cs_bal_dpc, cs_bal_ndpc);});
 
     // IC2: p.bal_ndpc = 1, cs.bal_dpc = 1
     // (IC2 & not_c_prime)
-    cs_bal_dpc^=IC2;
-    RegBS p_bal_dpc, p_bal_ndpc;
-    mpc_select(tio, yield, p_bal_ndpc, c_prime, new_p_bal_r, new_p_bal_l);
-    p_bal_ndpc^=IC2;
-    RegBS IC2_ndpc_l, IC2_ndpc_r, IC2_dpc_l, IC2_dpc_r;
-    mpc_and(tio, yield, IC2_ndpc_l, IC2, c_prime);
-    mpc_and(tio, yield, IC2_ndpc_r, IC2, not_c_prime);
-    mpc_and(tio, yield, IC2_dpc_l, IC2, not_c_prime);
-    mpc_and(tio, yield, IC2_dpc_r, IC2, c_prime);
+    coroutines.emplace_back([&tio, &p_bal_ndpc, c_prime, new_p_bal_r, new_p_bal_l](yield_t &yield)
+        { mpc_select(tio, yield, p_bal_ndpc, c_prime, new_p_bal_r, new_p_bal_l);});
+    coroutines.emplace_back([&tio, &IC2_ndpc_l, c_prime, IC2] (yield_t &yield)
+        { mpc_and(tio, yield, IC2_ndpc_l, IC2, c_prime);});
+    coroutines.emplace_back([&tio, &IC2_ndpc_r, IC2, not_c_prime](yield_t &yield)
+        { mpc_and(tio, yield, IC2_ndpc_r, IC2, not_c_prime);});
+    coroutines.emplace_back([&tio, &IC2_dpc_l, IC2, not_c_prime](yield_t &yield)
+        { mpc_and(tio, yield, IC2_dpc_l, IC2, not_c_prime);});
+    coroutines.emplace_back([&tio, &IC2_dpc_r, IC2, c_prime](yield_t &yield)
+        { mpc_and(tio, yield, IC2_dpc_r, IC2, c_prime);});
+    run_coroutines(tio, coroutines); 
+    coroutines.clear();
 
-    mpc_select(tio, yield, new_p_bal_l, IC2_ndpc_l, new_p_bal_l, p_bal_ndpc);
-    mpc_select(tio, yield, new_p_bal_r, IC2_ndpc_r, new_p_bal_r, p_bal_ndpc);
-    mpc_select(tio, yield, cs_bal_l, IC2_dpc_l, cs_bal_l, cs_bal_dpc);
-    mpc_select(tio, yield, cs_bal_r, IC2_dpc_r, cs_bal_r, cs_bal_dpc);
-    // In the IC2 case bal_upd = 0 (The rotation doesn't end up
-    // decreasing height of this subtree.
-    mpc_select(tio, yield, bal_upd, IC2, bal_upd, s0);
+    cs_bal_dpc^=IC2;
+    p_bal_ndpc^=IC2;
+  
+    coroutines.emplace_back([&tio, &new_p_bal_l, IC2_ndpc_l, p_bal_ndpc](yield_t &yield)
+        { mpc_select(tio, yield, new_p_bal_l, IC2_ndpc_l, new_p_bal_l, p_bal_ndpc);});
+    coroutines.emplace_back([&tio, &new_p_bal_r, IC2_ndpc_r, p_bal_ndpc](yield_t &yield)
+        { mpc_select(tio, yield, new_p_bal_r, IC2_ndpc_r, new_p_bal_r, p_bal_ndpc);});
+    coroutines.emplace_back([&tio, &cs_bal_l, IC2_dpc_l, cs_bal_dpc](yield_t &yield)
+        { mpc_select(tio, yield, cs_bal_l, IC2_dpc_l, cs_bal_l, cs_bal_dpc);});
+    coroutines.emplace_back([&tio, &cs_bal_r, IC2_dpc_r, cs_bal_dpc](yield_t &yield)
+        { mpc_select(tio, yield, cs_bal_r, IC2_dpc_r, cs_bal_r, cs_bal_dpc);});
+    coroutines.emplace_back([&tio, &bal_upd, IC2, s0](yield_t &yield)
+        {
+        // In the IC2 case bal_upd = 0 (The rotation doesn't end up
+        // decreasing height of this subtree.
+        mpc_select(tio, yield, bal_upd, IC2, bal_upd, s0);});
+    run_coroutines(tio, coroutines);
+    coroutines.clear();
 
     // IC3:
     // To set balance in this case we need to know if gcs.dpc child exists
@@ -890,31 +1025,55 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
     RegBS gcs_bal_l = getLeftBal(gcs_node.pointers);
     RegBS gcs_bal_r = getRightBal(gcs_node.pointers);
     RegXS gcs_dpc, gcs_ndpc;
-    mpc_select(tio, yield, gcs_dpc, c_prime, gcs_l, gcs_r);
-    mpc_select(tio, yield, gcs_ndpc, not_c_prime, gcs_l, gcs_r);
+
+    run_coroutines(tio, [&tio, &gcs_dpc, c_prime, gcs_l, gcs_r] (yield_t &yield)
+        { mpc_select(tio, yield, gcs_dpc, c_prime, gcs_l, gcs_r);},
+        [&tio, &gcs_ndpc, not_c_prime, gcs_l, gcs_r] (yield_t &yield)
+        { mpc_select(tio, yield, gcs_ndpc, not_c_prime, gcs_l, gcs_r);});
 
     CDPF cdpf = tio.cdpf(yield);
-    gcs_dpc_exists = cdpf.is_zero(tio, yield, gcs_dpc, tio.aes_ops());
-    gcs_ndpc_exists = cdpf.is_zero(tio, yield, gcs_ndpc, tio.aes_ops());
+    run_coroutines(tio, [&tio, &gcs_dpc_exists, gcs_dpc, &cdpf](yield_t &yield) 
+        { gcs_dpc_exists = cdpf.is_zero(tio, yield, gcs_dpc, tio.aes_ops());},
+        [&tio, &gcs_ndpc_exists, gcs_ndpc, &cdpf](yield_t &yield)
+        { gcs_ndpc_exists = cdpf.is_zero(tio, yield, gcs_ndpc, tio.aes_ops());});
+
     cs_bal_ndpc^=IC3;
     RegBS IC3_ndpc_l, IC3_ndpc_r, IC3_dpc_l, IC3_dpc_r;
-    mpc_and(tio, yield, IC3_ndpc_l, IC3, c_prime);
-    mpc_and(tio, yield, IC3_ndpc_r, IC3, not_c_prime);
-    mpc_and(tio, yield, IC3_dpc_l, IC3, not_c_prime);
-    mpc_and(tio, yield, IC3_dpc_r, IC3, c_prime);
-    RegBS f0, f1, f2, f3;
-    mpc_and(tio, yield, f0, IC3_dpc_l, gcs_dpc_exists);
-    mpc_and(tio, yield, f1, IC3_dpc_r, gcs_dpc_exists);
-    mpc_and(tio, yield, f2, IC3_ndpc_l, gcs_ndpc_exists);
-    mpc_and(tio, yield, f3, IC3_ndpc_r, gcs_ndpc_exists);
+    
+    run_coroutines(tio, [&tio, &IC3_ndpc_l, IC3, c_prime](yield_t &yield)
+        { mpc_and(tio, yield, IC3_ndpc_l, IC3, c_prime);},
+        [&tio, &IC3_ndpc_r, IC3, not_c_prime](yield_t &yield)
+        { mpc_and(tio, yield, IC3_ndpc_r, IC3, not_c_prime);},
+        [&tio, &IC3_dpc_l, IC3, not_c_prime](yield_t &yield)
+        { mpc_and(tio, yield, IC3_dpc_l, IC3, not_c_prime);},
+        [&tio, &IC3_dpc_r, IC3, c_prime](yield_t &yield)
+        { mpc_and(tio, yield, IC3_dpc_r, IC3, c_prime);});
 
-    mpc_select(tio, yield, new_p_bal_l, f0, new_p_bal_l, IC3);
-    mpc_select(tio, yield, new_p_bal_r, f1, new_p_bal_r, IC3);
-    mpc_select(tio, yield, cs_bal_l, f2, cs_bal_l, IC3);
-    mpc_select(tio, yield, cs_bal_r, f3, cs_bal_r, IC3);
+    RegBS f0, f1, f2, f3;
+    run_coroutines(tio, [&tio, &f0, IC3_dpc_l, gcs_dpc_exists] (yield_t &yield)
+        { mpc_and(tio, yield, f0, IC3_dpc_l, gcs_dpc_exists);},
+        [&tio, &f1, IC3_dpc_r, gcs_dpc_exists] (yield_t &yield)
+        { mpc_and(tio, yield, f1, IC3_dpc_r, gcs_dpc_exists);},
+        [&tio, &f2, IC3_ndpc_l, gcs_ndpc_exists] (yield_t &yield)
+        { mpc_and(tio, yield, f2, IC3_ndpc_l, gcs_ndpc_exists);},
+        [&tio, &f3, IC3_ndpc_r, gcs_ndpc_exists] (yield_t &yield) 
+        { mpc_and(tio, yield, f3, IC3_ndpc_r, gcs_ndpc_exists);});
+
+    
+    coroutines.emplace_back([&tio, &new_p_bal_l, f0, IC3](yield_t &yield) {
+        mpc_select(tio, yield, new_p_bal_l, f0, new_p_bal_l, IC3);});
+    coroutines.emplace_back([&tio, &new_p_bal_r, f1, IC3](yield_t &yield) {
+        mpc_select(tio, yield, new_p_bal_r, f1, new_p_bal_r, IC3);});
+    coroutines.emplace_back([&tio, &cs_bal_l, f2, IC3](yield_t &yield) {
+        mpc_select(tio, yield, cs_bal_l, f2, cs_bal_l, IC3);});
+    coroutines.emplace_back([&tio, &cs_bal_r, f3, IC3](yield_t &yield) {
+        mpc_select(tio, yield, cs_bal_r, f3, cs_bal_r, IC3);});
     // In IC3 gcs.bal = 0 0
-    mpc_select(tio, yield, gcs_bal_l, IC3, gcs_bal_l, s0);
-    mpc_select(tio, yield, gcs_bal_r, IC3, gcs_bal_r, s0);
+    coroutines.emplace_back([&tio, &gcs_bal_l, IC3, s0](yield_t &yield) {
+        mpc_select(tio, yield, gcs_bal_l, IC3, gcs_bal_l, s0);});
+    coroutines.emplace_back([&tio, &gcs_bal_r, IC3, s0](yield_t &yield) {
+        mpc_select(tio, yield, gcs_bal_r, IC3, gcs_bal_r, s0);});
+    run_coroutines(tio, coroutines); 
 
     // Write back <cs_bal_dpc, cs_bal_ndpc> and <gcs_bal_l, gcs_bal_r>
     setLeftBal(gcs_node.pointers, gcs_bal_l);
@@ -961,11 +1120,18 @@ void AVL::updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_2, Reg
     RegBS s0, s1;
     s1.set(tio.player()==1);
     RegBS F_dh, F_sf, F_rs;
-    mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);
-    if(player0)
-        found^=1;
-    mpc_and(tio, yield, F_dh, lf, found);
-    mpc_select(tio, yield, ret_struct.N_d, F_dh, ret_struct.N_d, ptr);
+    RegBS not_found = found;
+    if(player0) {
+        not_found^=1;
+    }
+
+    run_coroutines(tio, [&tio, &ret_struct, F_c2](yield_t &yield)
+        { mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);},
+        [&tio, &F_dh, lf, not_found] (yield_t &yield)
+        { mpc_and(tio, yield, F_dh, lf, not_found);},
+        [&tio, &ret_struct, F_dh, ptr] (yield_t &yield)
+        { mpc_select(tio, yield, ret_struct.N_d, F_dh, ret_struct.N_d, ptr);});
+
     // F_sf = Successor found = F_c4 = Finding successor & no more left child
     F_sf = F_c4;
     if(player0)
@@ -974,8 +1140,11 @@ void AVL::updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_2, Reg
     // we have to update child pointer in parent with the returned pointer
     mpc_and(tio, yield, F_rs, F_dh, F_2);
     // ii) if we found successor here
-    mpc_or(tio, yield, F_rs, F_rs, F_sf);
-    mpc_select(tio, yield, ret_struct.N_s, F_sf, ret_struct.N_s, ptr);
+    run_coroutines(tio, [&tio, &F_rs, F_sf](yield_t &yield)
+        { mpc_or(tio, yield, F_rs, F_rs, F_sf);},
+        [&tio, &ret_struct, F_sf, ptr] (yield_t &yield)
+        { mpc_select(tio, yield, ret_struct.N_s, F_sf, ret_struct.N_s, ptr);});
+
     // F_rs and F_ri will never trigger together. So the line below
     // set ret_ptr to the correct pointer to handle either case
     // If neither F_rs nor F_ri, we set the ret_ptr to current ptr.
@@ -984,29 +1153,15 @@ void AVL::updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_2, Reg
     // F_nr = F_rs || F_ri
     ret_struct.F_r = F_nr;
 
-    /*
-    bool rec_ret_F_r, rec_F_rs, rec_F_ri;
-    rec_ret_F_r = reconstruct_RegBS(tio, yield, ret_struct.F_r);
-    rec_F_rs = reconstruct_RegBS(tio, yield, F_rs);
-    rec_F_ri = reconstruct_RegBS(tio, yield, F_ri);
-    printf("rec_ret_F_r = %d, rec_F_rs = %d, rec_F_ri = %d\n", rec_ret_F_r, rec_F_rs, rec_F_ri);
-    */
-
     if(player0) {
       F_nr^=1;
     }
     // F_nr = !(F_rs || F_ri)
-    mpc_select(tio, yield, ret_struct.ret_ptr, F_nr, ret_struct.ret_ptr, ptr);
-
-    // If F_rs, we skipped a node, so update bal_upd to 1
-    mpc_select(tio, yield, bal_upd, F_rs, bal_upd, s1);
-
-    /*
-    rec_F_rs = reconstruct_RegBS(tio, yield, F_rs);
-    bool rec_bal_upd_set = reconstruct_RegBS(tio, yield, bal_upd);
-    printf("foundter bal_upd select from rec_F_rs = %d, rec_bal_upd = %d\n",
-        rec_F_rs, rec_bal_upd_set);
-    */
+    run_coroutines(tio, [&tio, &ret_struct, F_nr, ptr](yield_t &yield)
+        { mpc_select(tio, yield, ret_struct.ret_ptr, F_nr, ret_struct.ret_ptr, ptr);},
+        [&tio, &bal_upd, F_rs, s1](yield_t &yield)
+        { // If F_rs, we skipped a node, so update bal_upd to 1
+          mpc_select(tio, yield, bal_upd, F_rs, bal_upd, s1);});
 }
 
 std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
@@ -1038,71 +1193,79 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         RegXS right = getAVLRightPtr(node.pointers);
 
         size_t &aes_ops = tio.aes_ops();
+        RegBS l0, r0;
         // Check if left and right children are 0, and compute F_0, F_1, F_2
-        RegBS l0 = cdpf.is_zero(tio, yield, left, aes_ops);
-        RegBS r0 = cdpf.is_zero(tio, yield, right, aes_ops);
+        run_coroutines(tio, [&tio, &l0, left, &aes_ops, &cdpf](yield_t &yield)
+            { l0 = cdpf.is_zero(tio, yield, left, aes_ops);},
+            [&tio, &r0, right, &aes_ops, &cdpf](yield_t &yield)
+            { r0 = cdpf.is_zero(tio, yield, right, aes_ops);});
+
         RegBS F_0, F_1, F_2;
-        // F_0 = l0 & r0
-        mpc_and(tio, yield, F_0, l0, r0);
+        RegBS F_c1, F_c2, F_c3, F_c4;
+        RegXS next_ptr, cs_ptr;
+        RegBS c_prime;
+
         // F_1 = l0 \xor r0
         F_1 = l0 ^ r0;
+
+        // F_0 = l0 & r0
+        // Case 1: lf & F_1
+        run_coroutines(tio, [&tio, &F_0, l0, r0](yield_t &yield)
+            { mpc_and(tio, yield, F_0, l0, r0);},
+            [&tio, &F_c1, lf, F_1](yield_t &yield)
+            { mpc_and(tio, yield, F_c1, lf, F_1);});
+
         // F_2 = !(F_0 + F_1) (Only 1 of F_0, F_1, and F_2 can be true)
         F_2 = F_0 ^ F_1;
         if(player0)
             F_2^=1;
-
-        // We set next ptr based on c, but we need to handle three
-        // edge cases where we do not pick next_ptr by just the comparison result
-        RegXS next_ptr, cs_ptr;
-        RegBS c_prime;
-        // Case 1: found the node here (lf), and node has only one child.
-        // Then we iterate down the only child.
-        RegBS F_c1, F_c2, F_c3, F_c4;
-        // Case 1: lf & F_1
-        mpc_and(tio, yield, F_c1, lf, F_1);
-        // Set c_prime for Case 1
-        mpc_select(tio, yield, c_prime, F_c1, c, l0);
-
         // s1: shares of 1 bit, s0: shares of 0 bit
         RegBS s1, s0;
         s1.set(tio.player()==1);
 
+        // We set next ptr based on c, but we need to handle three
+        // edge cases where we do not pick next_ptr by just the comparison result
+        // Case 1: found the node here (lf), and node has only one child.
+        // Then we iterate down the only child.
+        // Set c_prime for Case 1
+        run_coroutines(tio, [&tio, &c_prime, F_c1, c, l0](yield_t &yield)
+            { mpc_select(tio, yield, c_prime, F_c1, c, l0);},
+            [&tio, &F_c2, lf, F_2](yield_t &yield)
+            { mpc_and(tio, yield, F_c2, lf, F_2);});
+
         // Case 2: found the node here (lf) and node has both children (F_2)
         // In find successor case, so we find inorder successor for node to be deleted
         // (inorder successor = go right and then find leftmost child.)
-        mpc_and(tio, yield, F_c2, lf, F_2);
-        mpc_select(tio, yield, c_prime, F_c2, c_prime, s1);
-
-        /*
-        // Reconstruct and Debug Block 2
-        bool F_c2_rec, s1_rec;
-        F_c2_rec = reconstruct_RegBS(tio, yield, F_c2);
-        s1_rec = reconstruct_RegBS(tio, yield, s1);
-        c_prime_rec = reconstruct_RegBS(tio, yield, c_prime);
-        printf("c_prime = %d, F_c2 = %d, s1 = %d\n", c_prime_rec, F_c2_rec, s1_rec);
-        */
 
         // Case 3: finding successor (find_successor) and node has both children (F_2)
         // Go left.
-        mpc_and(tio, yield, F_c3, find_successor, F_2);
-        mpc_select(tio, yield, c_prime, F_c3, c_prime, s0);
+
+        run_coroutines(tio, [&tio, &c_prime, F_c2, s1](yield_t &yield)
+            { mpc_select(tio, yield, c_prime, F_c2, c_prime, s1);},
+            [&tio, &F_c3, find_successor, F_2](yield_t &yield)
+            { mpc_and(tio, yield, F_c3, find_successor, F_2);});
 
         // Case 4: finding successor (find_successor) and node has no more left children (l0)
         // This is the successor node then.
         // Go right (since no more left)
-        mpc_and(tio, yield, F_c4, find_successor, l0);
-        mpc_select(tio, yield, c_prime, F_c4, c_prime, l0);
+        run_coroutines(tio, [&tio, &c_prime, F_c3, s0](yield_t &yield) 
+            { mpc_select(tio, yield, c_prime, F_c3, c_prime, s0);},
+            [&tio, &F_c4, find_successor, l0](yield_t &yield)
+            { mpc_and(tio, yield, F_c4, find_successor, l0);});
 
+        RegBS found_prime, find_successor_prime;
+        mpc_select(tio, yield, c_prime, F_c4, c_prime, l0);
         // Set next_ptr
         mpc_select(tio, yield, next_ptr, c_prime, left, right, AVL_PTR_SIZE);
         // cs_ptr: child's sibling pointer
-        mpc_select(tio, yield, cs_ptr, c_prime, right, left, AVL_PTR_SIZE);
 
-        RegBS found_prime, find_successor_prime;
-        mpc_or(tio, yield, found_prime, found, lf);
-
-        // If in Case 2, set find_successor. We are now finding successor
-        mpc_or(tio, yield, find_successor_prime, find_successor, F_c2);
+        run_coroutines(tio, [&tio, &cs_ptr, c_prime, right, left](yield_t &yield)
+            { mpc_select(tio, yield, cs_ptr, c_prime, right, left, AVL_PTR_SIZE);},
+            [&tio, &found_prime, found, lf](yield_t &yield)
+            { mpc_or(tio, yield, found_prime, found, lf);},
+            // If in Case 2, set find_successor. We are now finding successor
+            [&tio, &find_successor_prime, find_successor, F_c2](yield_t &yield)
+            { mpc_or(tio, yield, find_successor_prime, find_successor, F_c2);});
 
         // If in Case 4. Successor found here already. Toggle find_successor off
         find_successor_prime=find_successor_prime^F_c4;
@@ -1129,28 +1292,6 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         auto [new_p_bal_l, new_p_bal_r, new_bal_upd, imb] =
             updateBalanceDel(tio, yield, p_bal_l, p_bal_r, bal_upd, c_prime);
         
-        /*
-        // Reconstruct and Debug Block
-        bool rec_new_bal_upd, rec_imb, rec_bal_upd;
-        size_t rec_ckey;
-        rec_new_bal_upd = reconstruct_RegBS(tio, yield, new_bal_upd);
-        rec_imb = reconstruct_RegBS(tio, yield, imb);
-        rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
-        rec_ckey = reconstruct_RegAS(tio, yield, node.key);
-        bool rec_F_c1, rec_F_c2, rec_F_c3, rec_F_c4;
-        rec_F_c1 = reconstruct_RegBS(tio, yield, F_c1);
-        rec_F_c2 = reconstruct_RegBS(tio, yield, F_c2);
-        rec_F_c3 = reconstruct_RegBS(tio, yield, F_c3);
-        rec_F_c4 = reconstruct_RegBS(tio, yield, F_c4);
-        printf("Current Key = %lu\n", rec_ckey);
-        size_t rec_p_left_0, rec_p_right_0;
-        rec_p_left_0 = reconstruct_RegXS(tio, yield, getAVLLeftPtr(node.pointers));
-        rec_p_right_0 = reconstruct_RegXS(tio, yield, getAVLRightPtr(node.pointers));
-        printf("parent_ptrs (foundter read): left = %lu, right = %lu\n", rec_p_left_0, rec_p_right_0);
-        printf("F_c1 = %d, F_c2 = %d, F_c3 = %d, F_c4 = %d\n", rec_F_c1, rec_F_c2, rec_F_c3, rec_F_c4);
-        printf("bal_upd = %d, new_bal_upd = %d, imb= %d\n", rec_bal_upd, rec_new_bal_upd, rec_imb);
-        */
-
         // F_ri: subflag for F_r. F_ri = returned flag set to 1 from imbalance fix.
         RegBS F_ri;
         fixImbalance(tio, yield, A, oidx, oldptrs, ptr, node.pointers, new_p_bal_l, new_p_bal_r, bal_upd, 
@@ -1171,14 +1312,15 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
     if(num_items==1) {
         //Delete root if root's key = del_key
         Node zero;
-        Node node = A[root];
+        typename Duoram<Node>::template OblivIndex<RegXS,1> oidx(tio, yield, root, MAX_DEPTH);
+        Node node = A[oidx];
         // Compare key
         CDPF cdpf = tio.cdpf(yield);
         auto [lt, eq, gt] = cdpf.compare(tio, yield, del_key - node.key, tio.aes_ops());
         bool success = reconstruct_RegBS(tio, yield, eq);
         if(success) {
             empty_locations.emplace_back(root);
-            A[root] = zero;
+            A[oidx] = zero;
             num_items--;
             return 1;
         } else {
@@ -1223,15 +1365,20 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
 
             RegXS old_del_value = del_node.value;
             RegAS old_del_key = del_node.key;
-            mpc_select(tio, yield, del_node.key, ret_struct.F_ss, del_node.key, suc_node.key);
-            mpc_select(tio, yield, del_node.value, ret_struct.F_ss, del_node.value, suc_node.value);
+            RegXS empty_loc;
+
+            run_coroutines(tio, [&tio, &del_node, ret_struct, suc_node](yield_t &yield)
+                { mpc_select(tio, yield, del_node.key, ret_struct.F_ss, del_node.key, suc_node.key);},
+                [&tio, &del_node, ret_struct, suc_node] (yield_t &yield)
+                { mpc_select(tio, yield, del_node.value, ret_struct.F_ss, del_node.value, suc_node.value);},
+                [&tio, &empty_loc, ret_struct](yield_t &yield)
+                { mpc_select(tio, yield, empty_loc, ret_struct.F_ss, ret_struct.N_d, ret_struct.N_s);});
+
             A[oidx_nd].NODE_KEY+=(del_node.key - old_del_key);
             A[oidx_nd].NODE_VALUE+=(del_node.value - old_del_value);
             A[oidx_ns].NODE_KEY+=(-suc_node.key);
             A[oidx_ns].NODE_VALUE+=(suc_node.value);
           
-            RegXS empty_loc;
-            mpc_select(tio, yield, empty_loc, ret_struct.F_ss, ret_struct.N_d, ret_struct.N_s);
             //Add deleted (empty) location into the empty_locations vector for reuse in next insert()
             empty_locations.emplace_back(empty_loc);
         }
