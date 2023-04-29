@@ -74,8 +74,8 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
     num_items++;
     std::cout << "num_items = " << num_items << std::endl;
 
-    uint64_t val_reconstruct = mpc_reconstruct(tio, yield, val);
-    std::cout << "val_reconstruct = " << val_reconstruct << std::endl;
+    // uint64_t val_reconstruct = mpc_reconstruct(tio, yield, val);
+    // std::cout << "val_reconstruct = " << val_reconstruct << std::endl;
 
     size_t childindex = num_items;
     size_t parentindex = childindex / 2;
@@ -313,7 +313,7 @@ auto MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield) {
     return std::make_pair(smallerindex, gt);
 }
 
-RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield) {
+RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield, int is_optimized) {
 
     RegAS minval;
     auto HeapArray = oram.flat(tio, yield);
@@ -324,8 +324,8 @@ RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield) {
     num_items--;
     auto outroot = restore_heap_property_at_root(tio, yield);
     RegXS smaller = outroot.first;
-    uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
-    std::cout << "smaller_rec [root] = " << smaller_rec << std::endl;
+    // uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
+    // std::cout << "smaller_rec [root] = " << smaller_rec << std::endl;
     std::cout << "num_items = " << num_items << std::endl;
     size_t height = std::log2(num_items);
     std::cout << "height = " << height << std::endl << "===================" << std::endl;
@@ -335,13 +335,22 @@ RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield) {
         std::cout << "i = " << i << std::endl;
 
         // typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx(tio, yield, i+1);
-        auto out = restore_heap_property_optimized(tio, yield, smaller, i + 1, height, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > (oidx));;
+        
+        if(is_optimized > 0)
+        {
+            auto out = restore_heap_property_optimized(tio, yield, smaller, i + 1, height, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > (oidx));;
+            smaller = out.first;
+            oidx.incr(out.second);
+        }
 
-        smaller = out.first;
-        oidx.incr(out.second);
-        //smaller = restore_heap_property(tio, yield, smaller);
+        if(is_optimized == 0)
+        {
+            smaller = restore_heap_property(tio, yield, smaller);    
+        }
+        
         std::cout << "\n-------\n\n";
     }
+
     return minval;
 }
 
@@ -350,6 +359,7 @@ void Heap(MPCIO & mpcio,
     nbits_t depth     = atoi(args[0]);
     size_t n_inserts  = atoi(args[1]);
     size_t n_extracts = atoi(args[2]);
+    int is_optimized  = atoi(args[3]);
     std::cout << "print arguements " << std::endl;
     std::cout << args[0] << std::endl;
 
@@ -369,7 +379,7 @@ void Heap(MPCIO & mpcio,
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
 
-    run_coroutines(tio, [ & tio, depth, items, n_inserts, n_extracts](yield_t & yield) {
+    run_coroutines(tio, [ & tio, depth, items, n_inserts, n_extracts, is_optimized](yield_t & yield) {
         size_t size = size_t(1) << depth;
         std::cout << "size = " << size << std::endl;
 
@@ -380,26 +390,29 @@ void Heap(MPCIO & mpcio,
             RegAS inserted_val;
             inserted_val.randomize(40);
             inserted_val.ashare = inserted_val.ashare;
-            tree.insert_optimized(tio, yield, inserted_val);
-            //tree.insert(tio, yield, inserted_val);
-             tree.print_heap(tio, yield);
+            if(is_optimized > 0)  tree.insert_optimized(tio, yield, inserted_val);
+            if(is_optimized == 0) tree.insert(tio, yield, inserted_val);
+             //tree.print_heap(tio, yield);
         }
 
   
         
         std::cout << std::endl << "=============[Insert Done]================ " << std::endl << std::endl;
-        tree.verify_heap_property(tio, yield);
-       
+        //tree.verify_heap_property(tio, yield);
+        
         for (size_t j = 0; j < n_extracts; ++j) {
-            RegAS minval = tree.extract_min(tio, yield);
-            uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval, 64);
-            std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
-            tree.verify_heap_property(tio, yield);
-            tree.print_heap(tio, yield);
+            std::cout << "j = " << j << std::endl;
+            tree.extract_min(tio, yield, is_optimized);
+            
+            //RegAS minval = tree.extract_min(tio, yield, is_optimized);
+            // uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval, 64);
+            // std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
+            // tree.verify_heap_property(tio, yield);
+            // tree.print_heap(tio, yield);
         }
 
         std::cout << std::endl << "=============[Extract Min Done]================" << std::endl << std::endl;
-        tree.verify_heap_property(tio, yield);
+       // tree.verify_heap_property(tio, yield);
         
     });
 }

@@ -18,7 +18,7 @@ class MinHeap {
     };
 
     
-    RegAS extract_min(MPCTIO tio, yield_t & yield);
+    RegAS extract_min(MPCTIO tio, yield_t & yield, int is_optimized);
     void initialize(MPCTIO tio, yield_t & yield);
     int insert(MPCTIO tio, yield_t & yield, RegAS val);
     int insert_optimized(MPCTIO tio, yield_t & yield, RegAS val);
