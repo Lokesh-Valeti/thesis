@@ -608,7 +608,7 @@ void Heap(MPCIO & mpcio,
        // std::cout << "size = " << size << std::endl;
 
         MinHeap tree(tio.player(), size);
-        tree.initialize(tio, yield);
+        tree.initialize(tio, yield); 
 
         tree.num_items = (size_t(1) << depth2) - 1;
         //  std::cout << "num_items " << tree.num_items << std::endl;
