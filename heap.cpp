@@ -614,7 +614,9 @@ void Heap(MPCIO & mpcio,
         //  std::cout << "num_items " << tree.num_items << std::endl;
         tree.initialize_random(tio, yield);
               // tree.print_heap(tio, yield);
+        #ifdef HEAPIFY
         tree.heapify(tio, yield);
+        #endif
        //tree.print_heap(tio, yield);
 
         std::cout << "\n===== Heapify Stats =====\n";
