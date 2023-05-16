@@ -21,19 +21,25 @@ int MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);
 
     num_items++;
-    std::cout << "num_items = " << num_items << std::endl;
+    //std::cout << "num_items = " << num_items << std::endl;
 
     uint64_t height = std::log2(num_items) + 1;
     
     size_t childindex = num_items;
+    RegAS zero;
+    zero.ashare = 0;
+    HeapArray[childindex] = zero;
 
     typename Duoram<RegAS>::Path P(HeapArray, tio, yield, childindex);
     RegXS foundidx = P.binary_search(val);
 
-    std::cout << "height = " << height << std::endl;
+    // std::cout << "height = " << height << std::endl;
+    
     RDPF<1> dpf2(tio, yield, foundidx, height, false, false);
     RegBS * flags_array = new RegBS[height];
     RegBS * standard_basis_vector = new RegBS[height];
+
+
     for(size_t j = 0; j < height; ++j)
     {
         if(tio.player() !=2) 
@@ -42,22 +48,27 @@ int MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
          RegBS tmp__ = dpf2.unit_bs(tmp);
          flags_array[j] =  tmp__;
          standard_basis_vector[j] = tmp__;
+        
          if(j > 0) flags_array[j] = flags_array[j] ^ flags_array[j-1];
         }
     }
 
-       for(size_t j = 0; j < height; ++j)
-    {
-        uint64_t reconstruction = mpc_reconstruct(tio, yield, standard_basis_vector[j], 64);
-        std::cout << j << " --->> reconstruction [standard_basis_vector] = " << reconstruction << std::endl;
-    }    
 
+    #ifdef VERBOSE
+        for(size_t j = 0; j < height; ++j)
+        {
+            uint64_t reconstruction = mpc_reconstruct(tio, yield, standard_basis_vector[j], 64);
+            std::cout << j << " --->> reconstruction [standard_basis_vector] = " << reconstruction << std::endl;
+        }    
+    #endif
 
     RegAS * z_array2 = new RegAS[height];
     RegAS * z2_tmp   = new RegAS[height]; 
     RegAS * standard_basis_vector_time_value   = new RegAS[height];
     for(size_t j = 0; j < height; ++j) z_array2[j] = P[j];            
- 
+    
+    //print_heap(tio, yield);
+
     std::vector<coro_t> coroutines;
     for(size_t j = 1; j < height; ++j)
     {
@@ -67,26 +78,57 @@ int MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
          });
 
         coroutines.emplace_back( 
-        [&tio, standard_basis_vector_time_value, standard_basis_vector, val, j](yield_t &yield) { 
-            mpc_flagmult(tio, yield, standard_basis_vector_time_value[j-1], standard_basis_vector[j-1], val, 64); 
+        [&tio, standard_basis_vector_time_value, standard_basis_vector, val, z_array2, j](yield_t &yield) { 
+            mpc_flagmult(tio, yield, standard_basis_vector_time_value[j-1], standard_basis_vector[j-1], (val - z_array2[j-1]) , 64); 
          });             
     }    
    
     run_coroutines(tio, coroutines);
 
-    for(size_t j = 0; j < height; ++j)
-    {
-        uint64_t reconstruction = mpc_reconstruct(tio, yield, standard_basis_vector_time_value[j], 64);
-        std::cout << j << " --->> reconstruction [product] = " << reconstruction << std::endl;
-    }    
+    #ifdef VERBOSE
+        for(size_t j = 0; j < height; ++j)
+        {
+            int64_t reconstruction = mpc_reconstruct(tio, yield, z2_tmp[j], 64);
+            std::cout << j << " --->> reconstruction [z2_tmp] = " << reconstruction << std::endl;
+        }    
+        std::cout << std::endl << " =============== " << std::endl;
+        for(size_t j = 0; j < height; ++j)
+        {
+            int64_t reconstruction = mpc_reconstruct(tio, yield, flags_array[j], 64);
+            std::cout << j << " --->> reconstruction [flags_array] = " << reconstruction << std::endl;
+        }   
+               std::cout << std::endl << " =============== " << std::endl;
+        for(size_t j = 0; j < height; ++j)
+        {
+            int64_t reconstruction = mpc_reconstruct(tio, yield, standard_basis_vector[j], 64);
+            std::cout << j << " --->> reconstruction [standard_basis_vector] = " << reconstruction << std::endl;
+        }   
+        std::cout << std::endl << " =============== " << std::endl;
+        for(size_t j = 0; j < height; ++j)
+        {
+            int64_t reconstruction = mpc_reconstruct(tio, yield, z_array2[j], 64);
+            std::cout << j << " --->> reconstruction [z_array2] = " << reconstruction << std::endl;
+        }   
+    #endif
 
-
-    //for(size_t j = 0; j < height; ++j) P[j] += (z2_tmp[j] + standard_basis_vector_time_value[j]);    
+    for(size_t j = 0; j < height; ++j) P[j] += (z2_tmp[j] + standard_basis_vector_time_value[j]);   
     
-    for(size_t j = 1; j < height; ++j) P[j] += z2_tmp[j];
-    typename Duoram<RegAS>::template OblivIndex<RegXS,1> oidx(tio, yield, foundidx, height);
+    #ifdef VERBOSE
+       std::cout << std::endl << " =============== " << std::endl;
+        for(size_t j = 0; j < height; ++j)
+        {
+            int64_t reconstruction = mpc_reconstruct(tio, yield, P[j], 64);
+            std::cout << j << " --->> reconstruction [P] = " << reconstruction << std::endl;
+        }  
+     print_heap(tio, yield);
+    #endif
+
+    
+
+    // for(size_t j = 1; j < height; ++j) P[j] += z2_tmp[j];
+    // typename Duoram<RegAS>::template OblivIndex<RegXS,1> oidx(tio, yield, foundidx, height);
         
-    P[oidx] = val;
+     //P[oidx] = val;
 
     return 1;
 }
@@ -100,15 +142,19 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);
 
     num_items++;
-    std::cout << "num_items = " << num_items << std::endl;
+    //std::cout << "num_items = " << num_items << std::endl;
 
     // uint64_t val_reconstruct = mpc_reconstruct(tio, yield, val);
     // std::cout << "val_reconstruct = " << val_reconstruct << std::endl;
 
     size_t childindex = num_items;
     size_t parentindex = childindex / 2;
-    std::cout << "childindex = " << childindex << std::endl;
-    std::cout << "parentindex = " << parentindex << std::endl;
+    
+    #ifdef VERBOSE
+        std::cout << "childindex = " << childindex << std::endl;
+        std::cout << "parentindex = " << parentindex << std::endl;
+    #endif
+
     HeapArray[num_items] = val;
     typename Duoram<RegAS>::Path P(HeapArray, tio, yield, childindex);
     //RegXS foundidx = P.binary_search(val);   
@@ -217,20 +263,24 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
     RegXS smallerindex;
     
 
-    uint64_t LC_rec = mpc_reconstruct(tio, yield, leftchildindex);
+    #ifdef VERBOSE
+        uint64_t LC_rec = mpc_reconstruct(tio, yield, leftchildindex);
+        std::cout << "LC_rec = " << LC_rec << std::endl;
+    #endif
 
-    std::cout << "LC_rec = " << LC_rec << std::endl;
 
-    //smallerindex    = leftchildindex ^ lt_c;
     mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, 64);
-    uint64_t smallerindex_rec = mpc_reconstruct(tio, yield, smallerindex);
 
-    std::cout << "smallerindex_rec = " << smallerindex_rec << std::endl; 
+    #ifdef VERBOSE
+        uint64_t smallerindex_rec = mpc_reconstruct(tio, yield, smallerindex);
+        std::cout << "smallerindex_rec = " << smallerindex_rec << std::endl; 
+    #endif
 
     RegAS smallerchild;
     mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild, 64);
 
     CDPF cdpf0 = tio.cdpf(yield);
+
     auto[lt_p, eq_p, gt_p] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
     
     auto lt_p_eq_p = lt_p ^ eq_p;
@@ -248,15 +298,18 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
             );
 
     
-    RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
-    RegAS tmp = (sum - leftchildplusparent);
+
 
     HeapArray[index]           += z;
     HeapArray[leftchildindex]  += zz;
+
+    RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
+    RegAS tmp = (sum - leftchildplusparent);
+    
     HeapArray[rightchildindex] += tmp - rightchild;
 
     
-    verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
+    //verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
 
     return smallerindex;
 }
@@ -367,8 +420,9 @@ void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
 
 auto MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield, size_t index = 1) {
 
-   // size_t index = 1;
-    std::cout << "index = " << index << std::endl;
+    //size_t index = 1;
+    //std::cout << "index = " << index << std::endl;
+    
     auto HeapArray = oram.flat(tio, yield);
     RegAS parent = HeapArray[index];
     RegAS leftchild = HeapArray[2 * index];
@@ -403,26 +457,31 @@ auto MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield, size_t 
             );
 
     
-    RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
-    RegAS tmp = (sum - leftchildplusparent);
 
     HeapArray[index]           += z;
     HeapArray[leftchildindex]  += zz;
+
+    RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
+    RegAS tmp = (sum - leftchildplusparent);
+
     HeapArray[rightchildindex] += tmp - rightchild;
 
+    #ifdef VERBOSE
+        RegAS new_parent = HeapArray[index];
+        RegAS new_left   = HeapArray[leftchildindex];
+        RegAS new_right  = HeapArray[rightchildindex]; 
 
-    RegAS new_parent = HeapArray[index];
-    RegAS new_left   = HeapArray[leftchildindex];
-    RegAS new_right  = HeapArray[rightchildindex]; 
 
-    uint64_t parent_R = mpc_reconstruct(tio, yield, new_parent);
-    uint64_t left_R = mpc_reconstruct(tio, yield, new_left);
-    uint64_t right_R = mpc_reconstruct(tio, yield, new_right);
+        uint64_t parent_R  = mpc_reconstruct(tio, yield, new_parent);
+        uint64_t left_R    = mpc_reconstruct(tio, yield, new_left);
+        uint64_t right_R   = mpc_reconstruct(tio, yield, new_right);
 
-    std::cout << "parent_R = " << parent_R << std::endl;
+        std::cout << "parent_R = " << parent_R << std::endl;
         std::cout << "left_R = " << left_R << std::endl;
-            std::cout << "right_R = " << right_R << std::endl;
-    verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
+        std::cout << "right_R = " << right_R << std::endl;
+    #endif
+
+    //verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
 
     return std::make_pair(smallerindex, gt);
 }
@@ -443,15 +502,13 @@ RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield, int is_optimized) {
     RegXS smaller = outroot.first;
     // uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
     // std::cout << "smaller_rec [root] = " << smaller_rec << std::endl;
-    std::cout << "num_items = " << num_items << std::endl;
     size_t height = std::log2(num_items);
-    std::cout << "height = " << height << std::endl << "===================" << std::endl;
+    
+    //std::cout << "height = " << height << std::endl << "===================" << std::endl;
+    
     typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx(tio, yield, height);
     oidx.incr(outroot.second);
     for (size_t i = 0; i < height; ++i) {
-        std::cout << "i = " << i << std::endl;
-
-        // typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx(tio, yield, i+1);
         
         if(is_optimized > 0)
         {
@@ -465,7 +522,7 @@ RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield, int is_optimized) {
             smaller = restore_heap_property(tio, yield, smaller);    
         }
         
-        std::cout << "\n-------\n\n";
+        //std::cout << "\n-------\n\n";
     }
 
     return minval;
@@ -477,16 +534,28 @@ void MinHeap::heapify2(MPCTIO tio, yield_t & yield, size_t index = 1) {
     auto outroot = restore_heap_property_at_root(tio, yield, index);
 
     RegXS smaller = outroot.first;
-    uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
-    std::cout << "smaller_rec = " << smaller_rec << std::endl;
-    std::cout << "num_items = " << num_items << std::endl;
-    std::cout << "index = " << index << std::endl;
+    
+    #ifdef VERBOSE
+        uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
+        std::cout << "smaller_rec = " << smaller_rec << std::endl;
+        std::cout << "num_items = " << num_items << std::endl;
+        std::cout << "index = " << index << std::endl;
+    #endif
+
     size_t height =  std::log2(num_items) - std::floor(log2(index)) ;
-    std::cout << "height = " << height << std::endl << "===================" << std::endl;
+    
+    #ifdef VERBOSE
+        std::cout << "height = " << height << std::endl << "===================" << std::endl;
+    #endif
+
     for (size_t i = 0; i < height - 1; ++i) {
-        std::cout << "index = " << index <<  ",  i = " << i << std::endl; 
+         
+         #ifdef VERBOSE
+         std::cout << "index = " << index <<  ",  i = " << i << std::endl; 
          uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
          std::cout << "[inside loop] smaller_rec = " << smaller_rec << std::endl;
+         #endif
+
         smaller = restore_heap_property(tio, yield, smaller);    
     }
 }
@@ -494,31 +563,20 @@ void MinHeap::heapify2(MPCTIO tio, yield_t & yield, size_t index = 1) {
 void MinHeap::heapify(MPCTIO tio, yield_t & yield) {
 
     size_t startIdx = ((num_items + 1) / 2) - 1;
-    std::cout << "startIdx " << startIdx << std::endl;
-    // Perform reverse level order traversal
-    // from last non-leaf node and heapify
-    // each node
+
+    //std::cout << "startIdx " << startIdx << std::endl;
 
     for (size_t i = startIdx; i >= 1; i--) {
+         heapify2(tio, yield, i);
 
-//             printf("\n==[Before Heapify]==\n\n");
-//      print_heap(tio, yield);
- 
-// printf("\n====\n\n");
-//     std::cout << "heap printed \n\n";
-     heapify2(tio, yield, i);
-    
-     // printf("\n==[After Heapify]==\n\n");
-     // print_heap(tio, yield);
-     // printf("\n====\n\n");
-     // std::cout << "heap printed \n\n";
+         //print_heap(tio, yield);
      }
 }   
 
 void Heap(MPCIO & mpcio,
     const PRACOptions & opts, char ** args) {
     nbits_t depth     = atoi(args[0]);
-    nbits_t depth2     = atoi(args[1]);
+    nbits_t depth2    = atoi(args[1]);
     size_t n_inserts  = atoi(args[2]);
     size_t n_extracts = atoi(args[3]);
     int is_optimized  = atoi(args[4]);
@@ -537,6 +595,7 @@ void Heap(MPCIO & mpcio,
         ++args;
     }
 
+    //
     std::cout << "items = " << items << std::endl;
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
@@ -546,57 +605,70 @@ void Heap(MPCIO & mpcio,
 
 
         size_t size = size_t(1) << depth;
-        std::cout << "size = " << size << std::endl;
+       // std::cout << "size = " << size << std::endl;
 
         MinHeap tree(tio.player(), size);
         tree.initialize(tio, yield);
 
         tree.num_items = (size_t(1) << depth2) - 1;
-        std::cout << "num_items " << tree.num_items << std::endl;
+        //  std::cout << "num_items " << tree.num_items << std::endl;
         tree.initialize_random(tio, yield);
+              // tree.print_heap(tio, yield);
         tree.heapify(tio, yield);
-        tree.verify_heap_property(tio, yield);      
-        tree.print_heap(tio, yield);
+       //tree.print_heap(tio, yield);
 
+        std::cout << "\n===== Heapify Stats =====\n";
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+
+
+
+        mpcio.reset_stats();
+        tio.reset_lamport();
         for (size_t j = 0; j < n_inserts; ++j) {
             RegAS inserted_val;
             inserted_val.randomize(8);
+            
+
+            #ifdef VERBOSE
             inserted_val.ashare = inserted_val.ashare;
             uint64_t inserted_val_rec = mpc_reconstruct(tio, yield, inserted_val, 64);
             std::cout << "inserted_val_rec = " << inserted_val_rec << std::endl << std::endl;
+            #endif
+
             if(is_optimized > 0)  tree.insert_optimized(tio, yield, inserted_val);
             if(is_optimized == 0) tree.insert(tio, yield, inserted_val);
-            tree.print_heap(tio, yield);
+            //tree.print_heap(tio, yield);
         }
 
-  
-        // tio.sync_lamport();
-        // mpcio.dump_stats(std::cout);
-        // std::cout << "\n===== INSERTS =====\n";
-        // mpcio.reset_stats();
-        // tio.reset_lamport();
+        std::cout << "\n===== Insert Stats =====\n";
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+        mpcio.reset_stats();
+        tio.reset_lamport();
 
 
-        // std::cout << std::endl << "=============[Insert Done]================ " << std::endl << std::endl;
-        // tree.verify_heap_property(tio, yield);
+
+      //  tree.verify_heap_property(tio, yield);
         
-        // for (size_t j = 0; j < n_extracts; ++j) {
-        //     std::cout << "j = " << j << std::endl;
-        //     tree.extract_min(tio, yield, is_optimized);
+        for (size_t j = 0; j < n_extracts; ++j) {
+           
+            tree.extract_min(tio, yield, is_optimized);
             
-        //     //RegAS minval = tree.extract_min(tio, yield, is_optimized);
-        //     // uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval, 64);
-        //     // std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
-        //     // tree.verify_heap_property(tio, yield);
-        //     // tree.print_heap(tio, yield);
-        // }
-        // tio.sync_lamport();
-        // mpcio.dump_stats(std::cout);
-        // std::cout << "\n===== Extract Min =====\n";
-        // mpcio.reset_stats();
-        // tio.reset_lamport();
-        // std::cout << std::endl << "=============[Extract Min Done]================" << std::endl << std::endl;
-        // tree.verify_heap_property(tio, yield);
+            //RegAS minval = tree.extract_min(tio, yield, is_optimized);
+            // uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval, 64);
+            // std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
+            // tree.verify_heap_property(tio, yield);
+            // tree.print_heap(tio, yield);
+        }
+        std::cout << "\n===== Extract Min Stats =====\n";
+        tio.sync_lamport();
+        mpcio.dump_stats(std::cout);
+
+ 
+       // tree.verify_heap_property(tio, yield);
         
       
     });
