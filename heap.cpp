@@ -396,6 +396,7 @@ void MinHeap::initialize_random(MPCTIO tio, yield_t & yield) {
     {
         RegAS inserted_val;
         inserted_val.randomize(10);
+        inserted_val.ashare = j * tio.player();
         HeapArray[j] = inserted_val;
     }
  //   HeapArray.init(0x7fffffffffffff);
@@ -614,8 +615,8 @@ void Heap(MPCIO & mpcio,
         //  std::cout << "num_items " << tree.num_items << std::endl;
         tree.initialize_random(tio, yield);
               // tree.print_heap(tio, yield);
-      
-        tree.heapify(tio, yield);
+      //tree.verify_heap_property(tio, yield);
+        //tree.heapify(tio, yield);
       
        //tree.print_heap(tio, yield);
 
