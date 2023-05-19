@@ -20,6 +20,8 @@
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
+#define OPT_ON 0
+
 /*
   For AVL tree we'll treat the pointers fields as:
   < L_ptr (31 bits), R_ptr (31 bits), bal_L (1 bit), bal_R (1 bit)>
@@ -185,6 +187,9 @@ class AVL {
 
     // Returns the first node that matches key
     bool lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node);
+
+    // Non-obliviously initialize an AVL tree of a particular size
+    void initialize(MPCTIO &tio, yield_t &yield, size_t depth);
 
     // Display and correctness check functions
     void pretty_print(MPCTIO &tio, yield_t &yield);
