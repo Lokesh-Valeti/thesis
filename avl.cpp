@@ -1382,7 +1382,7 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
         RegBS found, find_successor;
         avl_del_return ret_struct;
         auto [success, bal_upd] = del(tio, yield, root, del_key, A, found, find_successor, TTL, ret_struct);
-        // printf ("Success =  %d\n", success);
+        printf ("Success =  %d\n", success);
         if(!success){
             return 0;
         }
