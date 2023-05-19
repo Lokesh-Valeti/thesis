@@ -1473,7 +1473,6 @@ void AVL::initialize(MPCTIO &tio, yield_t &yield, size_t depth) {
                 setAVLLeftPtr(node.pointers, lptr);
                 setAVLRightPtr(node.pointers, rptr);
             }
-            printf("\n");
             A[current] = node;
             current+=gap;
         }
@@ -1503,7 +1502,6 @@ void avl(MPCIO &mpcio,
     */
     size_t init_size = (size_t(1)<<(depth));
     size_t oram_size = init_size + 1 + n_inserts; // +1 because init_size does not account for slot at 0.
-    printf("oram_size = %ld\n", oram_size);
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
     run_coroutines(tio, [&tio, &mpcio, depth, oram_size, init_size, n_inserts, n_deletes] (yield_t &yield) {
