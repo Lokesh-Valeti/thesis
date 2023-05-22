@@ -589,9 +589,10 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         // Perform balance procedure
         RegXS gp_pointers, parent_pointers, child_pointers;
         #ifdef OPT_ON
-            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_gp(tio, yield, ret.gp_node, TTL+1);
-            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_p(tio, yield, ret.p_node, TTL+1);
-            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_c(tio, yield, ret.c_node, TTL+1); 
+            int logn = int(ceil(log2(num_items)));
+            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_gp(tio, yield, ret.gp_node, logn);
+            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_p(tio, yield, ret.p_node, logn);
+            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_c(tio, yield, ret.c_node, logn); 
             gp_pointers = A[oidx_gp].NODE_POINTERS;
             parent_pointers = A[oidx_p].NODE_POINTERS;
             child_pointers = A[oidx_c].NODE_POINTERS;
@@ -607,7 +608,7 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         mpc_select(tio, yield, n_node, ret.dir_cn, child_left, child_right, AVL_PTR_SIZE);
 
         #ifdef OPT_ON
-            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_n(tio, yield, n_node, TTL+1);
+            typename Duoram<Node>::template OblivIndex<RegXS,1> oidx_n(tio, yield, n_node, logn);
             n_pointers = A[oidx_n].NODE_POINTERS;
         #else
             n_pointers = A[n_node].NODE_POINTERS;  
