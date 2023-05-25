@@ -573,6 +573,7 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         // Recursive insert function
         auto [bal_upd, F_gp, prev_node, prev_dir] = insert(tio, yield, root, 
             insert_address, insert_key, A, TTL, isDummy, &ret);
+
         /*
         // Debug code
         bool rec_bal_upd, rec_F_gp, ret_dir_pc, ret_dir_cn;
@@ -1456,7 +1457,7 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
 void AVL::initialize(MPCTIO &tio, yield_t &yield, size_t depth) {
     size_t init_size = (size_t(1)<<depth) - 1;
     auto A = oram.flat(tio, yield);
-
+    std::vector<coro_t> coroutines;
     for(size_t i=1; i<=depth; i++) {
         size_t start = size_t(1)<<(i-1);
         size_t gap = size_t(1)<<i;
@@ -1474,9 +1475,15 @@ void AVL::initialize(MPCTIO &tio, yield_t &yield, size_t depth) {
                 setAVLLeftPtr(node.pointers, lptr);
                 setAVLRightPtr(node.pointers, rptr);
             }
-            A[current] = node;
+            coroutines.emplace_back( 
+                [&tio, &A, current, node](yield_t &yield) { 
+                  auto acont = A.context(yield);
+                  acont[current] = node;
+            });
             current+=gap;
         }
+        run_coroutines(tio, coroutines);
+        coroutines.clear();
     }
 
     // Set num_items to init_size after they have been initialized;

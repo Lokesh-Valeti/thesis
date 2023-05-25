@@ -20,7 +20,7 @@
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
-#define OPT_ON 0
+#define OPT_ON 1
 
 /*
   For AVL tree we'll treat the pointers fields as:
