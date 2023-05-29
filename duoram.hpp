@@ -7,7 +7,7 @@
 #include "types.hpp"
 #include "mpcio.hpp"
 #include "coroutine.hpp"
-
+#include "rdpf.hpp"
 // Implementation of the 3-party protocols described in:
 // Adithya Vadapalli, Ryan Henry, Ian Goldberg, "Duoram: A
 // Bandwidth-Efficient Distributed ORAM for 2- and 3-Party Computation".
@@ -541,6 +541,41 @@ public:
         }
     }
 
+
+    auto unit_vector(MPCTIO &tio, yield_t &yield, size_t nitems, RegXS foundidx)
+    {
+//      std::cout << "unit_vector .... \n";
+      std::vector<RegBS> standard_basis(nitems+1); 
+      if(player < 2)  
+      {
+        U indoffset;
+        dt->get_target(indoffset);
+        indoffset -= foundidx;
+        U peerindoffset;
+        tio.queue_peer(&indoffset, 64);
+        yield();
+        tio.recv_peer(&peerindoffset, 64);
+ 
+        auto indshift = combine(indoffset, peerindoffset, 64);
+ 
+        // std::cout << "nitems = " << nitems << std::endl;
+        // std::cout << "indshift = " << indshift << std::endl;
+        auto se = StreamEval(dt->dpf[1], 0, indshift,  tio.aes_ops(), true);
+        for(size_t j = 0; j < nitems; ++j)
+        {
+          RDPF<1>::LeafNode  leaf = se.next();
+          RegBS leaf_bs_share = dt->dpf[1].unit_bs(leaf);
+          standard_basis[j] = leaf_bs_share;        
+        } 
+       }
+       else
+       {  
+        yield();
+       }
+       
+       return standard_basis;
+    } 
+
     // Incrementally append a (shared) bit to the oblivious index
     void incr(RegBS bit)
     {
@@ -556,6 +591,8 @@ public:
 
     // Get a copy of the index
     U index() { return idx; }
+
+    nbits_t depth() {return maxdepth;}
 
     // Get the next wide-RDPF index
     nbits_t windex() { assert(next_windex < WIDTH); return next_windex++; }

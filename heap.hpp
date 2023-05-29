@@ -9,11 +9,11 @@
 
 class MinHeap {
     private: Duoram < RegAS > oram;
-
+      Duoram < RegBS > oram_insert;
     size_t MAX_SIZE;
 
     public: size_t num_items = 0;
-    MinHeap(int num_players, size_t size) : oram(num_players, size), MAX_SIZE(size){
+    MinHeap(int num_players, size_t size) : oram(num_players, size), oram_insert(num_players, size), MAX_SIZE(size){
 
     };
 
