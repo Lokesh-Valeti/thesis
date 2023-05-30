@@ -785,8 +785,8 @@ void Heap(MPCIO & mpcio,
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
 
-        // mpcio.reset_stats();
-        // tio.reset_lamport();
+         mpcio.reset_stats();
+         tio.reset_lamport();
 
 
 
