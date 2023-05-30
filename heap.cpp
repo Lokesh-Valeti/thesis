@@ -274,7 +274,7 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
     RegAS leftchild = HeapArray[leftchildindex];
     RegAS rightchild = HeapArray[rightchildindex];
  
-    RegAS sum = parent + leftchild + rightchild;
+    //RegAS sum = parent + leftchild + rightchild;
 
     CDPF cdpf = tio.cdpf(yield);
     auto[lt_c, eq_c, gt_c] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
@@ -308,12 +308,14 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
     
     mpc_and(tio, yield, ltlt1, lteq, lt_p_eq_p);
 
-    RegAS z, zz;
+    RegAS z, zz, zzz;
 
     run_coroutines(tio, [&tio, &zz, ltlt1, parent, leftchild](yield_t &yield)
             { mpc_flagmult(tio, yield, zz, ltlt1, (parent - leftchild), 64);},
             [&tio, &z, lt_p, parent, smallerchild](yield_t &yield)
-            {mpc_flagmult(tio, yield, z, lt_p, smallerchild - parent, 64);}
+            {mpc_flagmult(tio, yield, z, lt_p, smallerchild - parent, 64);},
+            [&tio, &zzz, ltlt1, parent,  rightchild](yield_t &yield)
+            {mpc_flagmult(tio, yield, zzz, ltlt1, (parent - rightchild), 64);}
             );
 
     
@@ -324,37 +326,33 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
 
     
     
-    HeapArray[index]           += z;
-    HeapArray[leftchildindex]  += zz;    
-
-    RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
-    RegAS tmp = (sum - leftchildplusparent);
-    HeapArray[rightchildindex] += tmp - rightchild;
+    // HeapArray[index]           += z;
+    // HeapArray[leftchildindex]  += zz;    
+    // HeapArray[rightchildindex] += zzz;
 
  
-    // std::vector<coro_t> coroutines;
+    std::vector<coro_t> coroutines;
 
 
-    // coroutines.emplace_back( 
-    // [&tio, &HeapArray, index, z](yield_t &yield) { 
-    //         auto Acoro = HeapArray.context(yield); 
-    //         Acoro[index] += z; //inserted_val;
-    //  });             
+    coroutines.emplace_back( 
+    [&tio, &HeapArray, index, z](yield_t &yield) { 
+            auto Acoro = HeapArray.context(yield); 
+            Acoro[index] += z; //inserted_val;
+     });             
    
-    // coroutines.emplace_back( 
-    // [&tio, &HeapArray, leftchildindex, zz](yield_t &yield) { 
-    //         auto Acoro = HeapArray.context(yield); 
-    //         Acoro[leftchildindex] += zz; //inserted_val;
-    //  }); 
+    coroutines.emplace_back( 
+    [&tio, &HeapArray, leftchildindex, zz](yield_t &yield) { 
+            auto Acoro = HeapArray.context(yield); 
+            Acoro[leftchildindex] += zz; //inserted_val;
+     }); 
 
-    // coroutines.emplace_back( 
-    // [&tio, &HeapArray, rightchildindex, sum, leftchildplusparent, rightchild](yield_t &yield) { 
-    //         auto Acoro = HeapArray.context(yield); 
-    //         RegAS tmp = (sum - leftchildplusparent);
-    //         Acoro[rightchildindex] += tmp - rightchild;
-    //  }); 
+    coroutines.emplace_back( 
+    [&tio, &HeapArray, rightchildindex, zzz](yield_t &yield) { 
+            auto Acoro = HeapArray.context(yield); 
+            Acoro[rightchildindex] += zzz;
+     }); 
 
-    // run_coroutines(tio, coroutines);
+    run_coroutines(tio, coroutines);
 
     
     //verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
@@ -384,7 +382,7 @@ auto MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS
     RegAS leftchild_tmp = L[oidx];
     RegAS rightchild_tmp = R[oidx];
 
-    RegAS sum = parent_tmp + leftchild_tmp + rightchild_tmp;
+    //RegAS sum = parent_tmp + leftchild_tmp + rightchild_tmp;
 
     CDPF cdpf = tio.cdpf(yield);
 
@@ -405,39 +403,40 @@ auto MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent_tmp, tio.aes_ops());
 
-    RegAS z;
-    mpc_flagmult(tio, yield, z, lt1, smallerchild - parent_tmp, 64);
+    // RegAS z;
+    // mpc_flagmult(tio, yield, z, lt1, smallerchild - parent_tmp, 64);
 
     
     auto lt1eq1 = lt1 ^ eq1;
 
     RegBS ltlt1;
-    RegAS zz;
+    // RegAS zz;
     
-    // mpc_and(tio, yield, ltlt1, lteq, lt1eq1);
-    // mpc_flagmult(tio, yield, zz, ltlt1, (parent_tmp - leftchild_tmp), 64);
+    mpc_and(tio, yield, ltlt1, lteq, lt1eq1);
+    // // mpc_flagmult(tio, yield, zz, ltlt1, (parent_tmp - leftchild_tmp), 64);
 
-    run_coroutines(tio, [&tio, &ltlt1, lteq, lt1eq1](yield_t &yield)
-            { mpc_and(tio, yield, ltlt1, lteq, lt1eq1);},
-            [&tio, &zz, ltlt1, parent_tmp, leftchild_tmp](yield_t &yield)
-            { mpc_flagmult(tio, yield, zz, ltlt1, (parent_tmp - leftchild_tmp), 64);});
+    // run_coroutines(tio, [&tio, &ltlt1, lteq, lt1eq1](yield_t &yield)
+    //         { mpc_and(tio, yield, ltlt1, lteq, lt1eq1);},
+    //         [&tio, &zz, ltlt1, parent_tmp, leftchild_tmp](yield_t &yield)
+    //         { mpc_flagmult(tio, yield, zz, ltlt1, (parent_tmp - leftchild_tmp), 64);});
 
+    RegAS z, zz, zzz;
+
+    run_coroutines(tio, [&tio, &zz, ltlt1, parent_tmp, leftchild_tmp](yield_t &yield)
+            { mpc_flagmult(tio, yield, zz, ltlt1, (parent_tmp - leftchild_tmp), 64);},
+            [&tio, &z, lt1eq1, parent_tmp, smallerchild](yield_t &yield)
+            {mpc_flagmult(tio, yield, z, lt1eq1, smallerchild - parent_tmp, 64);},
+            [&tio, &zzz, ltlt1, parent_tmp,  rightchild_tmp](yield_t &yield)
+            {mpc_flagmult(tio, yield, zzz, ltlt1, (parent_tmp - rightchild_tmp), 64);}
+            );
     
 
-    RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
-    RegAS tmp = (sum - leftchildplusparent);
+    // RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
+    // RegAS tmp = (sum - leftchildplusparent);
 
     P[oidx] += z;
     L[oidx] += zz;// - leftchild_tmp;
-    R[oidx] += tmp - rightchild_tmp;
-
-
-    // std::vector<coro_t> coroutines;
-    // coroutines.emplace_back( 
-    // [&tio, &P, oidx, z](yield_t &yield) { 
-    //         auto Acoro = P.context(yield); 
-    //         Acoro[oidx] += z; //inserted_val;
-    //  }); 
+    R[oidx] += zzz;//tmp - rightchild_tmp;
 
     return std::make_pair(smallerindex, gt);
 }
@@ -579,31 +578,31 @@ RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield, int is_optimized) {
     HeapArray[1] = RegAS(HeapArray[num_items]);
 
     num_items--;
+
     auto outroot = restore_heap_property_at_root(tio, yield);
+
     RegXS smaller = outroot.first;
-    // uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
-    // std::cout << "smaller_rec [root] = " << smaller_rec << std::endl;
+
     size_t height = std::log2(num_items);
     
-    //std::cout << "height = " << height << std::endl << "===================" << std::endl;
-    
-    typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx(tio, yield, height);
-    oidx.incr(outroot.second);
-    for (size_t i = 0; i < height; ++i) {
-        
-        if(is_optimized > 0)
-        {
+    if(is_optimized > 0)
+    {
+            typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx(tio, yield, height);
+            oidx.incr(outroot.second);
+
+            for (size_t i = 0; i < height; ++i) {
             auto out = restore_heap_property_optimized(tio, yield, smaller, i + 1, height, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > (oidx));;
             smaller = out.first;
             oidx.incr(out.second);
         }
+    }
 
-        if(is_optimized == 0)
-        {
+
+    if(is_optimized == 0)
+    {
+        for (size_t i = 0; i < height; ++i) {
             smaller = restore_heap_property(tio, yield, smaller);    
         }
-        
-        //std::cout << "\n-------\n\n";
     }
 
     return minval;
