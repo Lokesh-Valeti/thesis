@@ -253,7 +253,8 @@ void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, Reg
 RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield, RegXS index) {
     RegAS smallest;
     auto HeapArray = oram.flat(tio, yield);
-
+       mpcio.reset_stats();
+        tio.reset_lamport();
 
     RegXS leftchildindex = index;
     leftchildindex = index << 1;
@@ -611,18 +612,40 @@ auto MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield, size_t 
     
     mpc_and(tio, yield, ltlt1, lteq, lt_p_eq_p);
 
-    RegAS z, zz;
+    RegAS update_index_by, update_leftindex_by;
 
-    run_coroutines(tio, [&tio, &zz, ltlt1, parent, leftchild](yield_t &yield)
-            { mpc_flagmult(tio, yield, zz, ltlt1, (parent - leftchild), 64);},
-            [&tio, &z, lt1, parent, smallerchild](yield_t &yield)
-            {mpc_flagmult(tio, yield, z, lt1, smallerchild - parent, 64);}
+    run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield)
+            { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, (parent - leftchild), 64);},
+            [&tio, &update_index_by, lt1, parent, smallerchild](yield_t &yield)
+            {mpc_flagmult(tio, yield, update_index_by, lt1, smallerchild - parent, 64);}
             );
 
     
 
-    HeapArray[index]           += z;
-    HeapArray[leftchildindex]  += zz;
+    // HeapArray[index]           += update_index_by;
+    // HeapArray[leftchildindex]  += update_leftindex_by;
+
+    std::vector<coro_t> coroutines;
+
+    coroutines.emplace_back( 
+    [&tio, &HeapArray, index, update_index_by](yield_t &yield) { 
+            auto Acoro = HeapArray.context(yield); 
+            Acoro[index] += update_index_by; //inserted_val;
+     });             
+   
+    coroutines.emplace_back( 
+    [&tio, &HeapArray, leftchildindex, update_leftindex_by](yield_t &yield) { 
+            auto Acoro = HeapArray.context(yield); 
+            Acoro[leftchildindex] += update_leftindex_by; //inserted_val;
+     }); 
+
+    coroutines.emplace_back( 
+    [&tio, &HeapArray, rightchildindex, update_index_by, update_leftindex_by](yield_t &yield) { 
+            auto Acoro = HeapArray.context(yield); 
+            Acoro[rightchildindex] += -(update_index_by + update_leftindex_by);
+     }); 
+
+    run_coroutines(tio, coroutines);
 
     RegAS leftchildplusparent = RegAS(HeapArray[index]) + RegAS(HeapArray[leftchildindex]);
     RegAS tmp = (sum - leftchildplusparent);
@@ -683,8 +706,7 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
 
     if(is_optimized == 0)
     {
-        mpcio.reset_stats();
-        tio.reset_lamport();
+ 
         for (size_t i = 0; i < height; ++i) {
             smaller = restore_heap_property(mpcio, tio, yield, smaller);  
             std::cout << "one iter done ... \n \n \n";  
@@ -698,37 +720,37 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
 
 void MinHeap::heapify2(MPCTIO tio, yield_t & yield, size_t index = 1) {
 
-    auto outroot = restore_heap_property_at_root(tio, yield, index);
+    // auto outroot = restore_heap_property_at_root(tio, yield, index);
 
-    RegXS smaller = outroot.first;
+    // RegXS smaller = outroot.first;
     
-    #ifdef VERBOSE
-        uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
-        std::cout << "smaller_rec = " << smaller_rec << std::endl;
-        std::cout << "num_items = " << num_items << std::endl;
-        std::cout << "index = " << index << std::endl;
-    #endif
+    // #ifdef VERBOSE
+    //     uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
+    //     std::cout << "smaller_rec = " << smaller_rec << std::endl;
+    //     std::cout << "num_items = " << num_items << std::endl;
+    //     std::cout << "index = " << index << std::endl;
+    // #endif
 
-    size_t height =  std::log2(num_items) - std::floor(log2(index)) ;
+    // size_t height =  std::log2(num_items) - std::floor(log2(index)) ;
     
-    #ifdef VERBOSE
-        std::cout << "height = " << height << std::endl << "===================" << std::endl;
-    #endif
+    // #ifdef VERBOSE
+    //     std::cout << "height = " << height << std::endl << "===================" << std::endl;
+    // #endif
 
-    for (size_t i = 0; i < height - 1; ++i) {
+    // for (size_t i = 0; i < height - 1; ++i) {
          
-         #ifdef VERBOSE
-         std::cout << "index = " << index <<  ",  i = " << i << std::endl; 
-         uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
-         std::cout << "[inside loop] smaller_rec = " << smaller_rec << std::endl;
-         #endif
+    //      #ifdef VERBOSE
+    //      std::cout << "index = " << index <<  ",  i = " << i << std::endl; 
+    //      uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, 64);
+    //      std::cout << "[inside loop] smaller_rec = " << smaller_rec << std::endl;
+    //      #endif
 
-//        smaller = restore_heap_property(tio, yield, smaller);    
-    }
+    //     smaller = restore_heap_property(tio, yield, smaller);    
+    // }
 }
 
 void MinHeap::heapify(MPCTIO tio, yield_t & yield) {
-
+ 
     size_t startIdx = ((num_items + 1) / 2) - 1;
 
     //std::cout << "startIdx " << startIdx << std::endl;
