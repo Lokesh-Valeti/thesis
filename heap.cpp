@@ -266,6 +266,10 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     RegAS leftchild;  //  = HeapArray[leftchildindex];
     RegAS rightchild; // = HeapArray[rightchildindex];
  
+   std::time_t currentTime = std::time(nullptr);
+   std::string timeString = std::ctime(&currentTime);
+   std::cout << "Current time (before read): " << timeString;
+
     std::vector<coro_t> coroutines_read;
     coroutines_read.emplace_back( 
     [&tio, &parent, &HeapArray, index](yield_t &yield) { 
@@ -287,15 +291,28 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 
     run_coroutines(tio, coroutines_read);
 
+
     std::cout << "=========== READS DONE =========== \n";
+   currentTime = std::time(nullptr);
+   timeString = std::ctime(&currentTime);
+   std::cout << "Current time (after read): " << timeString;
+
     tio.sync_lamport();
     mpcio.dump_stats(std::cout);
 
 
     //RegAS sum = parent + leftchild + rightchild;
 
+    currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (before compare): " << timeString;
+
     CDPF cdpf = tio.cdpf(yield);
     auto[lt_c, eq_c, gt_c] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
+    
+    currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (after compare): " << timeString;
     auto lteq = lt_c ^ eq_c;    
     RegXS smallerindex;
     RegAS smallerchild;
@@ -314,10 +331,19 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     // mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, 64);
     // mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild, 64);
 
+    currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (before mpc_select): " << timeString;
     run_coroutines(tio, [&tio, &smallerindex, lteq, rightchildindex, leftchildindex](yield_t &yield)
             { mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, 64);},
             [&tio, &smallerchild, lteq, rightchild, leftchild](yield_t &yield)
             { mpc_select(tio, yield, smallerchild, lteq, rightchild, leftchild, 64);});
+
+
+    currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (after mpc_select): " << timeString;
+
 
 
     #ifdef VERBOSE
@@ -329,11 +355,17 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     tio.sync_lamport();
     mpcio.dump_stats(std::cout);
 
+    currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (before compare): " << timeString;
 
     CDPF cdpf0 = tio.cdpf(yield);
 
     auto[lt_p, eq_p, gt_p] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
     
+        currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (after compare): " << timeString;
     std::cout << "=========== Compare DONE =========== \n";   
     tio.sync_lamport();
     mpcio.dump_stats(std::cout);
@@ -342,13 +374,25 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 
     RegBS ltlt1;
     
+        currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (before mpc_and): " << timeString;
+
     mpc_and(tio, yield, ltlt1, lteq, lt_p_eq_p);
+
+        currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (after mpc_and): " << timeString;
+
     std::cout << "=========== mpc_and DONE =========== \n";   
     tio.sync_lamport();
     mpcio.dump_stats(std::cout);
     
 
     RegAS update_index_by, update_leftindex_by;
+        currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (before mpc_flagmult): " << timeString;
 
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield)
             { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, (parent - leftchild), 64);},
@@ -356,7 +400,11 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
             {mpc_flagmult(tio, yield, update_index_by, lt_p, smallerchild - parent, 64);}
             );
 
-    std::cout << "=========== flag mults =========== \n";   
+    std::cout << "=========== flag mults =========== \n";  
+
+            currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (after mpc_flagmult): " << timeString; 
     tio.sync_lamport();
     mpcio.dump_stats(std::cout);
 
@@ -365,6 +413,9 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     // HeapArray[index] += update_index_by;
     // HeapArray[leftchildindex] += update_leftindex_by;
     // HeapArray[rightchildindex] += -(update_index_by + update_leftindex_by);
+            currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (before updates): " << timeString;
     coroutines.emplace_back( 
     [&tio, &HeapArray, index, update_index_by](yield_t &yield) { 
             auto Acoro = HeapArray.context(yield); 
@@ -384,7 +435,9 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
      }); 
 
     run_coroutines(tio, coroutines);
-
+        currentTime = std::time(nullptr);
+    timeString = std::ctime(&currentTime);
+    std::cout << "Current time (after updates): " << timeString;
     std::cout << "=========== updates done =========== \n";   
     tio.sync_lamport();
     mpcio.dump_stats(std::cout);
