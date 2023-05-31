@@ -18,13 +18,13 @@ class MinHeap {
     };
 
     
-    RegAS extract_min(MPCTIO tio, yield_t & yield, int is_optimized);
+    RegAS extract_min(MPCIO &mpcio, MPCTIO tio, yield_t & yield, int is_optimized);
     void initialize(MPCTIO tio, yield_t & yield);
     void initialize_random(MPCTIO tio, yield_t & yield);
     int insert(MPCTIO tio, yield_t & yield, RegAS val);
     int insert_optimized(MPCTIO tio, yield_t & yield, RegAS val);
     int verify_heap_property(MPCTIO tio, yield_t & yield);
-    RegXS restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index);
+    RegXS restore_heap_property(MPCIO &mpcio, MPCTIO tio, yield_t & yield, RegXS index);
     auto restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t depth, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
     auto restore_heap_property_at_root(MPCTIO tio, yield_t & yield,  size_t index);
     void print_heap(MPCTIO tio, yield_t & yield);

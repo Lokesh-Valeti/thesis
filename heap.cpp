@@ -250,7 +250,7 @@ void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, Reg
 
  
 
-RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
+RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield, RegXS index) {
     RegAS smallest;
     auto HeapArray = oram.flat(tio, yield);
 
@@ -286,6 +286,11 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
 
     run_coroutines(tio, coroutines_read);
 
+    std::cout << "=========== READS DONE =========== \n";
+    tio.sync_lamport();
+    mpcio.dump_stats(std::cout);
+
+
     //RegAS sum = parent + leftchild + rightchild;
 
     CDPF cdpf = tio.cdpf(yield);
@@ -300,14 +305,18 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
         std::cout << "LC_rec = " << LC_rec << std::endl;
     #endif
 
+     std::cout << "=========== Compare DONE =========== \n";   
+    tio.sync_lamport();
+    mpcio.dump_stats(std::cout);
+    
 
     // mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, 64);
     // mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild, 64);
 
     run_coroutines(tio, [&tio, &smallerindex, lteq, rightchildindex, leftchildindex](yield_t &yield)
             { mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, 64);},
-            [&tio, &smallerchild, lt_c, rightchild, leftchild](yield_t &yield)
-            { mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild, 64);});
+            [&tio, &smallerchild, lteq, rightchild, leftchild](yield_t &yield)
+            { mpc_select(tio, yield, smallerchild, lteq, rightchild, leftchild, 64);});
 
 
     #ifdef VERBOSE
@@ -315,18 +324,28 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
         std::cout << "smallerindex_rec = " << smallerindex_rec << std::endl; 
     #endif
 
-    
+         std::cout << "=========== mpc_select DONE =========== \n";   
+    tio.sync_lamport();
+    mpcio.dump_stats(std::cout);
 
 
     CDPF cdpf0 = tio.cdpf(yield);
 
     auto[lt_p, eq_p, gt_p] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
     
+    std::cout << "=========== Compare DONE =========== \n";   
+    tio.sync_lamport();
+    mpcio.dump_stats(std::cout);
+
     auto lt_p_eq_p = lt_p ^ eq_p;
 
     RegBS ltlt1;
     
     mpc_and(tio, yield, ltlt1, lteq, lt_p_eq_p);
+    std::cout << "=========== mpc_and DONE =========== \n";   
+    tio.sync_lamport();
+    mpcio.dump_stats(std::cout);
+    
 
     RegAS update_index_by, update_leftindex_by;
 
@@ -336,8 +355,15 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
             {mpc_flagmult(tio, yield, update_index_by, lt_p, smallerchild - parent, 64);}
             );
 
+    std::cout << "=========== flag mults =========== \n";   
+    tio.sync_lamport();
+    mpcio.dump_stats(std::cout);
+
     std::vector<coro_t> coroutines;
 
+    // HeapArray[index] += update_index_by;
+    // HeapArray[leftchildindex] += update_leftindex_by;
+    // HeapArray[rightchildindex] += -(update_index_by + update_leftindex_by);
     coroutines.emplace_back( 
     [&tio, &HeapArray, index, update_index_by](yield_t &yield) { 
             auto Acoro = HeapArray.context(yield); 
@@ -358,6 +384,9 @@ RegXS MinHeap::restore_heap_property(MPCTIO tio, yield_t & yield, RegXS index) {
 
     run_coroutines(tio, coroutines);
 
+    std::cout << "=========== updates done =========== \n";   
+    tio.sync_lamport();
+    mpcio.dump_stats(std::cout);
     
    // verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
 
@@ -623,7 +652,7 @@ auto MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield, size_t 
     
 
 
-RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield, int is_optimized) {
+RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_optimized) {
 
     RegAS minval;
     auto HeapArray = oram.flat(tio, yield);
@@ -654,9 +683,13 @@ RegAS MinHeap::extract_min(MPCTIO tio, yield_t & yield, int is_optimized) {
 
     if(is_optimized == 0)
     {
+        mpcio.reset_stats();
+        tio.reset_lamport();
         for (size_t i = 0; i < height; ++i) {
-            smaller = restore_heap_property(tio, yield, smaller);    
+            smaller = restore_heap_property(mpcio, tio, yield, smaller);  
+            std::cout << "one iter done ... \n \n \n";  
         }
+
     }
 
     return minval;
@@ -690,7 +723,7 @@ void MinHeap::heapify2(MPCTIO tio, yield_t & yield, size_t index = 1) {
          std::cout << "[inside loop] smaller_rec = " << smaller_rec << std::endl;
          #endif
 
-        smaller = restore_heap_property(tio, yield, smaller);    
+//        smaller = restore_heap_property(tio, yield, smaller);    
     }
 }
 
@@ -795,7 +828,7 @@ void Heap(MPCIO & mpcio,
 
         for (size_t j = 0; j < n_extracts; ++j) {
            
-            tree.extract_min(tio, yield, is_optimized);
+            tree.extract_min(mpcio, tio, yield, is_optimized);
             
             //RegAS minval = tree.extract_min(tio, yield, is_optimized);
             // uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval, 64);
