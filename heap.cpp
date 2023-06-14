@@ -588,8 +588,7 @@ void Heap(MPCIO & mpcio,
     size_t n_inserts  = atoi(args[2]);
     size_t n_extracts = atoi(args[3]);
     int is_optimized  = atoi(args[4]);
-    std::cout << "print arguements " << std::endl;
-    std::cout << args[0] << std::endl;
+ 
     if ( * args) {
         depth = atoi( * args);
         ++args;
