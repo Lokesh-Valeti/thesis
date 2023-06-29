@@ -20,7 +20,7 @@
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
-#define OPT_ON 1
+#define OPT_ON 0
 
 /*
   For AVL tree we'll treat the pointers fields as:
@@ -34,9 +34,15 @@
 #define AVL_PTR_SIZE 31
 
 inline int AVL_TTL(size_t n) {
-    double logn = log2(n);
-    double TTL = 1.44 * logn;
-    return (int(ceil(TTL)));
+    if(n==0) {
+        return 0;
+    } else if (n==1) {
+        return 1;
+    } else {
+        double logn = log2(n);
+        double TTL = 1.44 * logn;
+        return (int(ceil(TTL)));
+    }
 }
 
 inline RegXS getAVLLeftPtr(RegXS pointer){
