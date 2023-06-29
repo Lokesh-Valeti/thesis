@@ -583,27 +583,62 @@ void MinHeap::heapify(MPCIO & mpcio, MPCTIO tio, yield_t & yield) {
 void Heap(MPCIO & mpcio,
     
     const PRACOptions & opts, char ** args) {
-    nbits_t depth     = atoi(args[0]);
-    nbits_t depth2    = atoi(args[1]);
-    size_t n_inserts  = atoi(args[2]);
-    size_t n_extracts = atoi(args[3]);
-    int is_optimized  = atoi(args[4]);
- 
-    if ( * args) {
-        depth = atoi( * args);
-        ++args;
+    // nbits_t depth     = atoi(args[0]);
+    // nbits_t depth2    = atoi(args[1]);
+    // size_t n_inserts  = atoi(args[2]);
+    // size_t n_extracts = atoi(args[3]);
+    // int is_optimized  = atoi(args[4]);
+    // int run_sanity    = atoi(args[5]);
+    int argc = 12;
+
+    int depth = 0;
+    int depth2 = 0;
+    size_t n_inserts = 0;
+    size_t n_extracts = 0;
+    int is_optimized = 0;
+    int run_sanity = 0;
+
+    // Process command line arguments
+    for (int i = 0; i < argc; i += 2) {
+        std::string option = args[i];
+        if (option == "-m" && i + 1 < argc) {
+            depth = std::atoi(args[i + 1]);
+        } else if (option == "-d" && i + 1 < argc) {
+            depth2 = std::atoi(args[i + 1]);
+        } else if (option == "-i" && i + 1 < argc) {
+            n_inserts = std::atoi(args[i + 1]);
+        } else if (option == "-e" && i + 1 < argc) {
+            n_extracts = std::atoi(args[i + 1]);
+        } else if (option == "-opt" && i + 1 < argc) {
+            is_optimized = std::atoi(args[i + 1]);
+        } else if (option == "-s" && i + 1 < argc) {
+            run_sanity = std::atoi(args[i + 1]);
+        }
     }
+
+    // Use the values
+    std::cout << "depth: " << depth << std::endl;
+    std::cout << "depth2: " << depth2 << std::endl;
+    std::cout << "n_inserts: " << n_inserts << std::endl;
+    std::cout << "n_extracts: " << n_extracts << std::endl;
+    std::cout << "is_optimized: " << is_optimized << std::endl;
+    std::cout << "run_sanity: " << run_sanity << std::endl;
+
+    // if ( * args) {
+    //     depth = atoi( * args);
+    //     ++args;
+    // }
     
-    size_t items = (size_t(1) << depth) - 1;
+     size_t items = (size_t(1) << depth) - 1;
     
-    if ( * args) {
-        items = atoi( * args);
-        ++args;
-    }
+    // if ( * args) {
+    //     items = atoi( * args);
+    //     ++args;
+    // }
     
     MPCTIO tio(mpcio, 0, opts.num_threads);
     
-    run_coroutines(tio, [ & tio, depth, depth2, items, n_inserts, n_extracts, is_optimized, &mpcio](yield_t & yield) {
+    run_coroutines(tio, [ & tio, depth, depth2, items, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
         size_t size = size_t(1) << depth;
         MinHeap tree(tio.player(), size);
         tree.initialize(tio, yield);
@@ -633,10 +668,8 @@ void Heap(MPCIO & mpcio,
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
         
-        //#ifdef DEBUG
-        tree.verify_heap_property(tio, yield);
-        //#endif 
-        
+        if(run_sanity == 1) tree.verify_heap_property(tio, yield);
+         
         mpcio.reset_stats();
         tio.reset_lamport();
         
@@ -673,9 +706,7 @@ void Heap(MPCIO & mpcio,
         tree.print_heap(tio, yield);
         #endif
 
-        //#ifdef DEBUG
-        tree.verify_heap_property(tio, yield);
-        //#endif
+        if(run_sanity == 1) tree.verify_heap_property(tio, yield);
     }
     );
 }
