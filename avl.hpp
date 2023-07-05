@@ -21,6 +21,8 @@
 #define KWHT  "\x1B[37m"
 
 #define OPT_ON 0
+#define RANDOMIZE 0
+#define SANITY_TEST 0
 
 /*
   For AVL tree we'll treat the pointers fields as:
@@ -95,7 +97,8 @@ inline void dumpAVL(Node n) {
     RegBS left_bal, right_bal;
     left_bal = getLeftBal(n.pointers);
     right_bal = getRightBal(n.pointers);
-    printf("[%016lx %016lx %d %d %016lx]", n.key.share(), n.pointers.share(),
+    printf("[%016lx %016lx(L:%ld, R:%ld) %d %d %016lx]", n.key.share(), n.pointers.share(),
+          getAVLLeftPtr(n.pointers).xshare, getAVLRightPtr(n.pointers).xshare,
           left_bal.share(), right_bal.share(), n.value.share());
 }
 
@@ -130,6 +133,7 @@ class AVL {
     RegXS root;
 
     size_t num_items = 0;
+    size_t cur_max_index = 0;
     size_t MAX_SIZE;
     int MAX_DEPTH;
 
@@ -179,6 +183,7 @@ class AVL {
 
     void init(){
         num_items=0;
+        cur_max_index=0;
         empty_locations.clear();
     }
 
