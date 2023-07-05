@@ -100,7 +100,7 @@ std::tuple<bool, bool, address_t> AVL::check_avl(const std::vector<Node> &R,
     value_t left_ptr = getAVLLeftPtr(n.pointers).xshare;
     value_t right_ptr = getAVLRightPtr(n.pointers).xshare;
     auto [leftok, leftavlok, leftheight ] = check_avl(R, left_ptr, min_key, key);
-    auto [rightok, rightavlok, rightheight ] = check_avl(R, right_ptr, key+1, max_key);
+    auto [rightok, rightavlok, rightheight ] = check_avl(R, right_ptr, key, max_key);
     address_t height = leftheight;
     if (rightheight > height) {
         height = rightheight;
