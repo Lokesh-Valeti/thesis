@@ -23,6 +23,7 @@
 #define OPT_ON 0
 #define RANDOMIZE 0
 #define SANITY_TEST 0
+//#define DEBUG 0
 
 /*
   For AVL tree we'll treat the pointers fields as:
@@ -207,7 +208,7 @@ class AVL {
     void pretty_print(const std::vector<Node> &R, value_t node,
         const std::string &prefix, bool is_left_child, bool is_right_child);
     void check_avl(MPCTIO &tio, yield_t &yield);
-    std::tuple<bool, bool, address_t> check_avl(const std::vector<Node> &R,
+    std::tuple<bool, bool, bool, address_t> check_avl(const std::vector<Node> &R,
         value_t node, value_t min_key, value_t max_key);
     void print_oram(MPCTIO &tio, yield_t &yield);
 
