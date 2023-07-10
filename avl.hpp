@@ -23,7 +23,8 @@
 #define OPT_ON 0
 #define RANDOMIZE 0
 #define SANITY_TEST 0
-//#define DEBUG 0
+// #define DEBUG 0
+// #define DEBUG_BB 0
 
 /*
   For AVL tree we'll treat the pointers fields as:
