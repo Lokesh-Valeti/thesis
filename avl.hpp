@@ -160,8 +160,8 @@ class AVL {
         RegXS nodeptrs, RegBS p_bal_l, RegBS p_bal_r, RegBS &bal_upd, RegBS c_prime, 
         RegXS cs_ptr, RegBS imb, RegBS &F_ri, avl_del_return &ret_struct);
 
-    void updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_2, RegBS F_c2, 
-        RegBS F_c4, RegBS lf, RegBS F_ri, RegBS &found, RegBS &bal_upd, avl_del_return &ret_struct);
+    void updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_rs, 
+        RegBS F_dh, RegBS F_ri, RegBS &bal_upd, avl_del_return &ret_struct);
 
     std::tuple<bool, RegBS> del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL,

@@ -1235,61 +1235,41 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
     #endif
 }
 
-/* Update the return structure
-   F_dh = Delete Here flag,
-   F_sf = successor found (no more left children while trying to find successor)
-   F_rs is a subflag for F_r (update children pointers with ret ptr)
-   F_rs: Flag for updating the correct child pointer of this node
-   This happens if F_r is set in ret_struct. F_r indicates if we need
-   to update a child pointer at this level by skipping the current
-   child in the direction of traversal. We do this in two cases:
-     i) F_d & (!F_2) : If we delete here, and this node does not have
-        2 children (;i.e., we are not in the finding successor case)
-    ii) F_sf: Found the successor (no more left children while
-        traversing to find successor)
-   In cases i and ii we skip the next node, and make the current node
-   point to the node after the next node.
+/* 
+    Update the return structure
 
-   The third case for F_r:
-   iii) We did rotation(s) at the lower level, changing the child in
-        that position. So we update it to the correct node in that
-        position now.
-   Whether skip happens or just update happens is handled by how
-   ret_struct.ret_ptr is set.
+    F_dh = Delete Here flag,
+    F_sf = successor found (no more left children while trying to find successor)
+    F_r  = Flag for updating with ret_struct.ret_ptr. F_r happens in 3 cases.
+           It's subflag F_rs, handles cases (i) and (ii). 
+
+    F_rs = Subflag of F_r. F_rs indicates if we need to update a child pointer 
+           at this level by skipping the current child in the direction of 
+           traversal. We do this in two cases (i) and (ii).
+
+    F_r cases:
+        (i) F_d & (!F_2) : If we delete here, and this node does not have
+            2 children (;i.e., we are not in the finding successor case)
+       (ii) F_sf: Found the successor (no more left children while
+            traversing to find successor)
+
+       In cases i and ii we skip the next node, and make the current node
+       point to the node after the next node on the path.
+
+      (iii) We did rotation(s) at the lower level, changing the child in
+            that position. So we update it to the correct node in that
+            position now.
+
+   Whether skip happens or just update happens is handled by F_r and
+   the ret_struct.ret_ptr that is set.
 */
 
-void AVL::updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_2, RegBS F_c2, 
-        RegBS F_c4, RegBS lf, RegBS F_ri, RegBS &found, RegBS &bal_upd, 
-        avl_del_return &ret_struct) {
+void AVL::updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_rs, RegBS F_dh,
+          RegBS F_ri, RegBS &bal_upd, avl_del_return &ret_struct) {
+
     bool player0 = tio.player()==0;
     RegBS s0, s1;
     s1.set(tio.player()==1);
-    RegBS F_dh, F_sf, F_rs;
-    RegBS not_found = found;
-    if(player0) {
-        not_found^=1;
-    }
-
-    run_coroutines(tio, [&tio, &ret_struct, F_c2](yield_t &yield)
-        { mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);},
-        [&tio, &F_dh, lf, not_found] (yield_t &yield)
-        { mpc_and(tio, yield, F_dh, lf, not_found);});
-
-    //[&tio, &ret_struct, F_dh, ptr] (yield_t &yield)
-    mpc_select(tio, yield, ret_struct.N_d, F_dh, ret_struct.N_d, ptr);
-
-    // F_sf = Successor found = F_c4 = Finding successor & no more left child
-    F_sf = F_c4;
-    if(player0)
-        F_2^=1;
-    // If we have to i) delete here, and it doesn't have two children
-    // we have to update child pointer in parent with the returned pointer
-    mpc_and(tio, yield, F_rs, F_dh, F_2);
-    // ii) if we found successor here
-    run_coroutines(tio, [&tio, &F_rs, F_sf](yield_t &yield)
-        { mpc_or(tio, yield, F_rs, F_rs, F_sf);},
-        [&tio, &ret_struct, F_sf, ptr] (yield_t &yield)
-        { mpc_select(tio, yield, ret_struct.N_s, F_sf, ret_struct.N_s, ptr);});
 
     // F_rs and F_ri will never trigger together. So the line below
     // set ret_ptr to the correct pointer to handle either case
@@ -1355,10 +1335,13 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
             [&tio, &r0, right, &aes_ops, &cdpf](yield_t &yield)
             { r0 = cdpf.is_zero(tio, yield, right, aes_ops);});
 
-        RegBS F_0, F_1, F_2;
-        RegBS F_c1, F_c2, F_c3, F_c4;
+        RegBS F_0, F_1, F_2, F_n2;
+        RegBS F_c1, F_c2, F_c3, F_c4, c_prime, F_dh, F_rs;
         RegXS next_ptr, cs_ptr;
-        RegBS c_prime;
+        RegBS not_found = found;
+        if(player0) {
+            not_found^=1;
+        }
 
         // F_1 = l0 \xor r0
         F_1 = l0 ^ r0;
@@ -1368,10 +1351,15 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         run_coroutines(tio, [&tio, &F_0, l0, r0](yield_t &yield)
             { mpc_and(tio, yield, F_0, l0, r0);},
             [&tio, &F_c1, lf, F_1](yield_t &yield)
-            { mpc_and(tio, yield, F_c1, lf, F_1);});
+            { mpc_and(tio, yield, F_c1, lf, F_1);},
+            // Premptively computing flags for updateRetStruct in parallel 
+            // with above operations.
+            [&tio, &F_dh, not_found, lf](yield_t &yield)
+            { mpc_and(tio, yield, F_dh, not_found, lf);});
 
-        // F_2 = !(F_0 + F_1) (Only 1 of F_0, F_1, and F_2 can be true)
-        F_2 = F_0 ^ F_1;
+        // F_2 = !(F_0 ^ F_1) (Only 1 of F_0, F_1, and F_2 can be true)
+        F_n2 = F_0 ^ F_1;
+        F_2 = F_n2;
         if(player0)
             F_2^=1;
         // s1: shares of 1 bit, s0: shares of 0 bit
@@ -1386,7 +1374,13 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         run_coroutines(tio, [&tio, &c_prime, F_c1, c, l0](yield_t &yield)
             { mpc_select(tio, yield, c_prime, F_c1, c, l0);},
             [&tio, &F_c2, lf, F_2](yield_t &yield)
-            { mpc_and(tio, yield, F_c2, lf, F_2);});
+            { mpc_and(tio, yield, F_c2, lf, F_2);},
+            // Premptively computing flags for updateRetStruct in parallel 
+            // with above operations.
+            // If we have to i) delete here, and it doesn't have two children
+            // we have to update child pointer in parent with the returned pointer
+            [&tio, &F_rs, F_dh, F_n2](yield_t &yield)
+            { mpc_and(tio, yield, F_rs, F_dh, F_n2);});
 
         // Case 2: found the node here (lf) and node has both children (F_2)
         // In find successor case, so we find inorder successor for node to be deleted
@@ -1406,10 +1400,24 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         run_coroutines(tio, [&tio, &c_prime, F_c3, s0](yield_t &yield) 
             { mpc_select(tio, yield, c_prime, F_c3, c_prime, s0);},
             [&tio, &F_c4, find_successor, l0](yield_t &yield)
-            { mpc_and(tio, yield, F_c4, find_successor, l0);});
+            { mpc_and(tio, yield, F_c4, find_successor, l0);},
+            // Premptively computing flags for updateRetStruct in parallel 
+            // with above operations.
+            [&tio, &ret_struct, F_c2](yield_t &yield)
+            { mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);},
+            [&tio, &ret_struct, F_dh, ptr](yield_t &yield)
+            { mpc_select(tio, yield, ret_struct.N_d, F_dh, ret_struct.N_d, ptr);});
 
         RegBS found_prime, find_successor_prime;
-        mpc_select(tio, yield, c_prime, F_c4, c_prime, l0);
+        // F_sf = Flag for successor found.
+        RegBS F_sf = F_c4;
+        run_coroutines(tio, [&tio, &c_prime, F_c4, l0](yield_t &yield)
+        { mpc_select(tio, yield, c_prime, F_c4, c_prime, l0);},
+        [&tio, &F_rs, F_sf](yield_t &yield)
+        { mpc_or(tio, yield, F_rs, F_rs, F_sf);},
+        [&tio, &ret_struct, F_sf, ptr](yield_t &yield)
+        { mpc_select(tio, yield, ret_struct.N_s, F_sf, ret_struct.N_s, ptr);});
+
         // Set next_ptr
         mpc_select(tio, yield, next_ptr, c_prime, left, right, AVL_PTR_SIZE);
         // cs_ptr: child's sibling pointer
@@ -1471,7 +1479,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
           rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd); 
           printf("imb (after fixImbalance) = %d, bal_upd = %d\n", rec_imb, rec_bal_upd);
         #endif
-        updateRetStruct(tio, yield, ptr, F_2, F_c2, F_c4, lf, F_ri, found, bal_upd, ret_struct); 
+        updateRetStruct(tio, yield, ptr, F_rs, F_dh, F_ri, bal_upd, ret_struct); 
 
         #ifdef DEBUG
           rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
