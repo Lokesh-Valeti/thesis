@@ -21,8 +21,7 @@
 #define KWHT  "\x1B[37m"
 
 #define OPT_ON 0
-#define RANDOMIZE 0
-#define SANITY_TEST 0
+// #define RANDOMIZE 0
 // #define DEBUG 0
 // #define DEBUG_BB 0
 

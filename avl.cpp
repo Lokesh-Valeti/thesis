@@ -1665,11 +1665,24 @@ void AVL::initialize(MPCTIO &tio, yield_t &yield, size_t depth) {
 void avl(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
-    size_t depth=4, n_inserts=0, n_deletes=0;
-    if (*args) {
-        depth = atoi(args[0]);
-        n_inserts = atoi(args[1]);
-        n_deletes = atoi(args[2]);
+    int argc = 8;
+    int depth = 0;          // Initialization depth
+    size_t n_inserts = 0;   // Max ORAM_SIZE = 2^depth + n_inserts
+    size_t n_deletes = 0;
+    bool run_sanity = 0;
+
+    // Process command line arguments
+    for (int i = 0; i < argc; i += 2) {
+        std::string option = args[i];
+        if (option == "-m" && i + 1 < argc) {
+            depth = std::atoi(args[i + 1]);
+        } else if (option == "-i" && i + 1 < argc) {
+            n_inserts = std::atoi(args[i + 1]);
+        } else if (option == "-e" && i + 1 < argc) {
+            n_deletes = std::atoi(args[i + 1]);
+        } else if (option == "-s" && i + 1 < argc) {
+            run_sanity = std::atoi(args[i + 1]);
+        }
     }
 
     /* The ORAM will be initialized with 2^depth-1 items, but the 0 slot is reserved.
@@ -1681,7 +1694,7 @@ void avl(MPCIO &mpcio,
     // +1 because init_size does not account for slot at 0.
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, &mpcio, depth, oram_size, init_size, n_inserts, n_deletes] (yield_t &yield) {
+    run_coroutines(tio, [&tio, &mpcio, depth, oram_size, init_size, n_inserts, n_deletes, run_sanity] (yield_t &yield) {
         //printf("ORAM init_size = %ld, oram_size = %ld\n", init_size, oram_size);
         std::cout << "\n===== SETUP =====\n";
         AVL tree(tio.player(), oram_size);
@@ -1706,10 +1719,10 @@ void avl(MPCIO &mpcio,
             printf("Insert key = %ld\n", ikey);
             node.key.set(ikey * tio.player());
             tree.insert(tio, yield, node);
-            #ifdef SANITY_TEST
+            if(run_sanity) {
                 tree.pretty_print(tio, yield);
                 tree.check_avl(tio, yield);
-            #endif
+            }
             //tree.print_oram(tio, yield);
         }
 
@@ -1729,10 +1742,10 @@ void avl(MPCIO &mpcio,
             del_key.set(dkey * tio.player());
             printf("Deletion key = %ld\n", dkey);
             tree.del(tio, yield, del_key);
-            #ifdef SANITY_TEST
+            if(run_sanity) {
                 tree.pretty_print(tio, yield);
                 tree.check_avl(tio, yield);
-            #endif
+            }
         }
     });
 }
