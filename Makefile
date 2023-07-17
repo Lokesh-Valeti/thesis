@@ -56,5 +56,5 @@ cell.o: types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 cell.o: coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
 cell.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc cell.hpp options.hpp
 heap.o: heap.hpp types.hpp bitutils.hpp mpcio.hpp corotypes.hpp mpcio.tcc
-heap.o: coroutine.hpp   mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
+heap.o: coroutine.hpp duoram.hpp mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
 heap.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc

@@ -542,21 +542,22 @@ public:
     }
 
 
-    auto unit_vector(MPCTIO &tio, yield_t &yield, size_t nitems, RegXS foundidx)
-    {
-//      std::cout << "unit_vector .... \n";
-      std::vector<RegBS> standard_basis(nitems+1); 
-      if(player < 2)  
+   // The function unit_vector takes in an XOR-share of an index foundindx
+   // The function outputs _boolean shares_ of a standard-basis vector (with the non-zero index at foundindx) 
+   auto unit_vector(MPCTIO &tio, yield_t &yield, size_t nitems, RegXS foundidx)
+   {
+      std::vector<RegBS> standard_basis(nitems); 
+      if(player < 2)
       {
         U indoffset;
         dt->get_target(indoffset);
         indoffset -= foundidx;
         U peerindoffset;
-        tio.queue_peer(&indoffset, 64);
+        tio.queue_peer(&indoffset, BITBYTES(curdepth));
         yield();
-        tio.recv_peer(&peerindoffset, 64);
+        tio.recv_peer(&peerindoffset, BITBYTES(curdepth));
  
-        auto indshift = combine(indoffset, peerindoffset, 64);
+        auto indshift = combine(indoffset, peerindoffset, curdepth);
  
         // std::cout << "nitems = " << nitems << std::endl;
         // std::cout << "indshift = " << indshift << std::endl;
@@ -564,8 +565,8 @@ public:
         for(size_t j = 0; j < nitems; ++j)
         {
           RDPF<1>::LeafNode  leaf = se.next();
-          RegBS leaf_bs_share = dt->dpf[1].unit_bs(leaf);
-          standard_basis[j] = leaf_bs_share;        
+          //RegBS leaf_bs_share = dt->dpf[1].unit_bs(leaf);
+          standard_basis[j] = dt->dpf[1].unit_bs(leaf); // leaf_bs_share
         } 
        }
        else
@@ -574,7 +575,7 @@ public:
        }
        
        return standard_basis;
-    } 
+    }
 
     // Incrementally append a (shared) bit to the oblivious index
     void incr(RegBS bit)
@@ -592,7 +593,7 @@ public:
     // Get a copy of the index
     U index() { return idx; }
 
-    nbits_t depth() {return maxdepth;}
+    nbits_t depth() {return curdepth;}
 
     // Get the next wide-RDPF index
     nbits_t windex() { assert(next_windex < WIDTH); return next_windex++; }

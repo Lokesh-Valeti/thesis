@@ -156,9 +156,12 @@ int MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
     #endif
     
     auto HeapArray = oram.flat(tio, yield);
-    uint64_t heapreconstruction[num_items];
-    for (size_t j = 0; j <= num_items; ++j) {
+    uint64_t * heapreconstruction = new uint64_t[num_items + 1];
+    for (size_t j = 0; j < num_items; ++j) {
         heapreconstruction[j] = mpc_reconstruct(tio, yield,  HeapArray[j]);
+        //#ifdef VERBOSE
+        if(tio.player() < 2) std::cout << j << " -----> heapreconstruction[" << j << "] = " << heapreconstruction[j] << std::endl;
+        //#endif
     }
     
     for (size_t j = 1; j < num_items / 2; ++j) {
@@ -179,6 +182,9 @@ int MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
         assert(heapreconstruction[j] <= heapreconstruction[2 * j]);
         assert(heapreconstruction[j] <= heapreconstruction[2 * j + 1]);
     }
+
+    delete [] heapreconstruction;
+
     return 1;
 }
 
@@ -584,15 +590,15 @@ void Heap(MPCIO & mpcio,
     
     const PRACOptions & opts, char ** args) {
     // nbits_t depth     = atoi(args[0]);
-    // nbits_t depth2    = atoi(args[1]);
+    // nbits_t heapdepth    = atoi(args[1]);
     // size_t n_inserts  = atoi(args[2]);
     // size_t n_extracts = atoi(args[3]);
     // int is_optimized  = atoi(args[4]);
     // int run_sanity    = atoi(args[5]);
     int argc = 12;
 
-    int depth = 0;
-    int depth2 = 0;
+    int maxdepth = 0;
+    int heapdepth = 0;
     size_t n_inserts = 0;
     size_t n_extracts = 0;
     int is_optimized = 0;
@@ -602,9 +608,9 @@ void Heap(MPCIO & mpcio,
     for (int i = 0; i < argc; i += 2) {
         std::string option = args[i];
         if (option == "-m" && i + 1 < argc) {
-            depth = std::atoi(args[i + 1]);
+            maxdepth = std::atoi(args[i + 1]);
         } else if (option == "-d" && i + 1 < argc) {
-            depth2 = std::atoi(args[i + 1]);
+            heapdepth = std::atoi(args[i + 1]);
         } else if (option == "-i" && i + 1 < argc) {
             n_inserts = std::atoi(args[i + 1]);
         } else if (option == "-e" && i + 1 < argc) {
@@ -617,8 +623,8 @@ void Heap(MPCIO & mpcio,
     }
 
     // Use the values
-    std::cout << "depth: " << depth << std::endl;
-    std::cout << "depth2: " << depth2 << std::endl;
+    std::cout << "maxdepth: " << maxdepth << std::endl;
+    std::cout << "heapdepth: " << heapdepth << std::endl;
     std::cout << "n_inserts: " << n_inserts << std::endl;
     std::cout << "n_extracts: " << n_extracts << std::endl;
     std::cout << "is_optimized: " << is_optimized << std::endl;
@@ -628,8 +634,7 @@ void Heap(MPCIO & mpcio,
     //     depth = atoi( * args);
     //     ++args;
     // }
-    
-     size_t items = (size_t(1) << depth) - 1;
+
     
     // if ( * args) {
     //     items = atoi( * args);
@@ -638,11 +643,11 @@ void Heap(MPCIO & mpcio,
     
     MPCTIO tio(mpcio, 0, opts.num_threads);
     
-    run_coroutines(tio, [ & tio, depth, depth2, items, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
-        size_t size = size_t(1) << depth;
+    run_coroutines(tio, [ & tio, maxdepth, heapdepth, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
+        size_t size = size_t(1) << maxdepth;
         MinHeap tree(tio.player(), size);
         tree.initialize(tio, yield);
-        tree.num_items = (size_t(1) << depth2) - 1;
+        tree.num_items = (size_t(1) << heapdepth) - 1;
         tree.initialize_heap(tio, yield);
         std::cout << "\n===== Init Stats =====\n";
         tio.sync_lamport();
@@ -668,7 +673,7 @@ void Heap(MPCIO & mpcio,
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
         
-        if(run_sanity == 1) tree.verify_heap_property(tio, yield);
+        if(run_sanity == 1 && n_inserts != 0) tree.verify_heap_property(tio, yield);
          
         mpcio.reset_stats();
         tio.reset_lamport();
@@ -706,7 +711,7 @@ void Heap(MPCIO & mpcio,
         tree.print_heap(tio, yield);
         #endif
 
-        if(run_sanity == 1) tree.verify_heap_property(tio, yield);
+        if(run_sanity == 1 && n_extracts != 0) tree.verify_heap_property(tio, yield);
     }
     );
 }
