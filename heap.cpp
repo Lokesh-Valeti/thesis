@@ -306,6 +306,8 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 }
 
 // This Protocol 7 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+// This is an optimized version of restoring the heap property
+
 auto MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, size_t depth, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > (oidx)) {
     
     auto HeapArray = oram.flat(tio, yield);
@@ -425,6 +427,8 @@ void MinHeap::initialize_heap(MPCTIO tio, yield_t & yield) {
   run_coroutines(tio, coroutines);
 }
 
+
+// Prints the heap
 void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
     uint64_t * Pjreconstruction = new uint64_t[num_items + 1];
@@ -439,6 +443,15 @@ void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
 
     delete[] Pjreconstruction;
 }
+
+
+// Restore the head property at the root.
+//             root
+//             /  \ 
+//    leftchild    rightchild
+// In the first step we compare left and right children
+// Next, we compare the smaller child with the root
+// If the smaller child is smaller than the root, we swap the smallerchild it with the root
 
 auto MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield, size_t index = 1) {
     auto HeapArray = oram.flat(tio, yield);
@@ -547,8 +560,13 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
     return minval;
 }
 
-// This function is not used in the evaluation in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
-// This function is called by heapify which takes in a random array and turns it into a heap
+//  This function is *NOT USED* in the evaluation in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+//  This function is called by heapify which takes in a random array and turns it into a heap
+//   \   
+//    a
+//   / \
+//  b   c
+//  
 void MinHeap::heapify_at_level(MPCIO & mpcio, MPCTIO tio, yield_t & yield, size_t index = 1) {
     auto outroot = restore_heap_property_at_root(tio, yield, index);
     RegXS smaller = outroot.first;
@@ -577,7 +595,7 @@ void MinHeap::heapify_at_level(MPCIO & mpcio, MPCTIO tio, yield_t & yield, size_
    }
 }
 
-// This function is not used in the evaluation in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+// This function is *NOT USED* in the evaluation in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
 // This function takes in a random array turns into a heap
 void MinHeap::heapify(MPCIO & mpcio, MPCTIO tio, yield_t & yield) {
     size_t startIdx = ((num_items + 1) / 2) - 1;
