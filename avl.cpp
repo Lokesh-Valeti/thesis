@@ -1313,28 +1313,28 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
             node = A[ptr];
         #endif
 
+        RegXS left = getAVLLeftPtr(node.pointers);
+        RegXS right = getAVLRightPtr(node.pointers);
+
         // Compare key
         CDPF cdpf = tio.cdpf(yield);
-        auto [lt, eq, gt] = cdpf.compare(tio, yield, del_key - node.key, tio.aes_ops());
+
+        size_t &aes_ops = tio.aes_ops();
+        RegBS l0, r0, lt, eq, gt;
+        // Check if left and right children are 0, and compute F_0, F_1, F_2
+        run_coroutines(tio, [&tio, &l0, left, &aes_ops, &cdpf](yield_t &yield)
+            { l0 = cdpf.is_zero(tio, yield, left, aes_ops);},
+            [&tio, &r0, right, &aes_ops, &cdpf](yield_t &yield)
+            { r0 = cdpf.is_zero(tio, yield, right, aes_ops);},
+            [&tio, &lt, &eq, &gt, &cdpf, del_key, node, aes_ops](yield_t &yield)
+            { auto [a, b, c] = cdpf.compare(tio, yield, del_key - node.key, tio.aes_ops());
+              lt = a; eq = b; gt = c;});
 
         // c is the direction bit for next_ptr
         // (c=0: go left or c=1: go right)
         RegBS c = gt;
         // lf = local found. We found the key to delete in this level.
         RegBS lf = eq;
-
-        // Select the next ptr
-        RegXS left = getAVLLeftPtr(node.pointers);
-        RegXS right = getAVLRightPtr(node.pointers);
-
-        size_t &aes_ops = tio.aes_ops();
-        RegBS l0, r0;
-        // Check if left and right children are 0, and compute F_0, F_1, F_2
-        run_coroutines(tio, [&tio, &l0, left, &aes_ops, &cdpf](yield_t &yield)
-            { l0 = cdpf.is_zero(tio, yield, left, aes_ops);},
-            [&tio, &r0, right, &aes_ops, &cdpf](yield_t &yield)
-            { r0 = cdpf.is_zero(tio, yield, right, aes_ops);});
-
         RegBS F_0, F_1, F_2, F_n2;
         RegBS F_c1, F_c2, F_c3, F_c4, c_prime, F_dh, F_rs;
         RegXS next_ptr, cs_ptr;
