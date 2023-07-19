@@ -5,19 +5,38 @@
 #include "rdpf.hpp"
 #include "shapes.hpp"
 #include "heap.hpp"   
+/*  
+ _Protocol 4_ from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+  Consider the following insertion path with:  (x0 < x1 < x2 < x3 < x4)
 
+        x0                      x0                                 x0           
+         \                        \                                 \ 
+          x1                       x1                                x1
+           \                        \                                 \
+            x2                       x2                                x2
+             \                        \                                 \         
+              x3                                                       NewElement
+               \                        \                                 \
+                x4                       x3                                x3
+                 \                        \                                 \
+            NewElement                    x4                                 x4
+            
+      (Path with new element)       (binary search to determine             (After insertion)
+                                     the point where New Element 
+                                     should be and shift the elements 
+                                     from that point down the path 
+                                     from the point)     
 
-// The protocol begins by adding an empty node at the end of the heap array.
-// The key observation is that after \heapinsert is complete, the only entries
-// that might change are the ones on the path from the root to this new node. 
-// Further, since the number of entries in the heap is public, \emph{which} entries in $\database$ form this path is also public. 
-// We form the accessible set $\pdatabase$ of the nodes from the root to the newly added (empty) node. 
-// The next observation is that this path (from root to leaf) starts off sorted, and will end up with the new element $\insertval$ inserted into the correct position so as to keep the path sorted. 
-// The path is of length $\lg \heapsize$, so we use our binary search to find the appropriate insertion position with a single IDPF of height $\lg \lg \heapsize$.
-// The advice bits of that IDPF will then be bit shares of a vector $\flag = [0,0,1,0,\dots,0]$ with the $1$ indicating the position at which the new value must be inserted.
-// The shares of $\flag$ are (locally) converted to shares of $\u = [0,0,1,1,\dots,1]$ by taking running XORs.
-// The bits of $\flag$ and $\u$ are used in $2 \lg \heapsize$ parallel Flag-Word multiplications to shift the elements greater than $\insertval$ down one position, and to write $\insertval$ into the resulting hole, with a single message of communication. 
-// This Protocol 4 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+ The protocol begins by adding an empty node at the end of the heap array.
+ The key observation is that after \heapinsert is complete, the only entries
+ that might change are the ones on the path from the root to this new node. 
+ Further, since the number of entries in the heap is public, \emph{which} entries in $\database$ form this path is also public. 
+ The Observation is that this path (from root to leaf) starts off sorted, and will end up with the new element NewElement inserted into the correct position so as to keep the path sorted. 
+ The path is of length $\lg \heapsize$, so we use our binary search to find the appropriate insertion position with a single IDPF of height $\lg \lg \heapsize$.
+ The advice bits of that IDPF will then be bit shares of a vector $\flag = [0,0,1,0,\dots,0]$ with the $1$ indicating the position at which the new value must be inserted.
+ The shares of $\flag$ are (locally) converted to shares of $\u = [0,0,1,1,\dots,1]$ by taking running XORs.
+ The bits of $\flag$ and $\u$ are used in $2 \lg \heapsize$ parallel Flag-Word multiplications to shift the elements greater than $\insertval$ down one position, and to write $\insertval$ into the resulting hole, with a single message of communication. 
+*/
 int MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);
     num_items++;
@@ -159,9 +178,9 @@ int MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
     uint64_t * heapreconstruction = new uint64_t[num_items + 1];
     for (size_t j = 0; j < num_items; ++j) {
         heapreconstruction[j] = mpc_reconstruct(tio, yield,  HeapArray[j]);
-        //#ifdef VERBOSE
+        #ifdef VERBOSE
         if(tio.player() < 2) std::cout << j << " -----> heapreconstruction[" << j << "] = " << heapreconstruction[j] << std::endl;
-        //#endif
+        #endif
     }
     
     for (size_t j = 1; j < num_items / 2; ++j) {
@@ -188,21 +207,54 @@ int MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
     return 1;
 }
 
-//This is only for debugging purposes
+// This is only for debugging purposes
+// The function asserts the fact that both the left and child's reconstruction is <= parent's reconstruction
 void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, RegAS leftchild, RegAS rightchild) {
     uint64_t parent_reconstruction = mpc_reconstruct(tio, yield, parent);
     uint64_t leftchild_reconstruction = mpc_reconstruct(tio, yield, leftchild);
     uint64_t rightchild_reconstruction = mpc_reconstruct(tio, yield, rightchild);
     #ifdef VERBOSE
-        std::cout << "parent_reconstruction = " << parent_reconstruction << std::endl;
+    std::cout << "parent_reconstruction = " << parent_reconstruction << std::endl;
     std::cout << "leftchild_reconstruction = " << leftchild_reconstruction << std::endl;
     std::cout << "rightchild_reconstruction = " << rightchild_reconstruction << std::endl << std::endl << std::endl;
     #endif
-        assert(parent_reconstruction <= leftchild_reconstruction);
+    assert(parent_reconstruction <= leftchild_reconstruction);
     assert(parent_reconstruction <= rightchild_reconstruction);
 }
 
-// This Protocol 6 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+/*
+    Protocol 6 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+    Basic restore heap property has the following functionality:
+
+
+    Before restoring heap property:                      z
+                                                        /  \ 
+                                                       y    x
+
+
+    After restoring heap property:        if(y < x AND z < y)       if(y < x AND z > y)        if(y > x AND z < x)           if(y > x AND z > x)
+
+                                                    z                         x                        y                              x    
+                                                   /  \                      / \                      / \                            / \ 
+                                                  y    x                    y   z                    x    z                         y   z
+
+                                               
+    The protocol works as follows:
+    In the first step we compare left and right children
+    Next, we compare the smaller child with the parent
+    If the smaller child is smaller than the parent, we swap the smallerchild it with the root
+    Requires three DORAM reads (in parallel) to read the parent, leftchild, and rightchild
+    Requires two comparisons a) comparing left and right child b) comparing the smaller child and parent
+    Next, we compute the offsets by which the parent and children need to be updated
+    Offset computation requires 
+      - one flag-flag multiplication
+      - two flag-word multiplications
+    Requires three DORAM update operations (in parallel) to update the parent, leftchild, and rightchild
+    In total we need 3 DORAM reads, 2 Comparisons, 1 Flag-Flag Multiplication, 2-Flag-Word-Multiplication, and 3 DORAM Updates
+    
+    The function returns the XOR-share of the smallerchild's index
+*/
+
 RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield, RegXS index) {
     RegAS smallest;
     auto HeapArray = oram.flat(tio, yield);
@@ -213,9 +265,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     RegXS rightchildindex;
     rightchildindex.xshare = leftchildindex.xshare ^ (tio.player());
     
-    RegAS parent;
-    RegAS leftchild;
-    RegAS rightchild;
+    RegAS parent, leftchild, rightchild;
     
     #ifdef VERBOSE
     auto index_reconstruction = mpc_reconstruct(tio, yield, index);
@@ -307,7 +357,9 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 
 // This Protocol 7 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
 // This is an optimized version of restoring the heap property
-
+// The onlydifference between the optimized and the basic versions is that, the reads and writes in the optimized are performed using a wide DPF
+// Unlike the basic heap property, the function also returns (leftchild > rightchild)
+// (leftchild > rightchild) is used in the extract_min to increment the oblivindx by 
 auto MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, size_t depth, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > (oidx)) {
     
     auto HeapArray = oram.flat(tio, yield);
@@ -323,20 +375,19 @@ auto MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS
     typename Duoram < RegAS > ::Stride L(C, tio, yield, 0, 2);
     typename Duoram < RegAS > ::Stride R(C, tio, yield, 1, 2);
 
-
     RegAS parent_tmp, leftchild_tmp, rightchild_tmp; 
 
     std::vector<coro_t> coroutines_read;
     coroutines_read.emplace_back( 
     [&tio, &parent_tmp, &P, &oidx](yield_t &yield) { 
             auto Acoro = P.context(yield); 
-            parent_tmp = Acoro[oidx]; //inserted_val;
+            parent_tmp = Acoro[oidx];
      });             
    
     coroutines_read.emplace_back( 
     [&tio, &L, &leftchild_tmp, &oidx](yield_t &yield) { 
             auto Acoro = L.context(yield); 
-            leftchild_tmp  = Acoro[oidx]; //inserted_val;
+            leftchild_tmp  = Acoro[oidx];  
      }); 
 
     coroutines_read.emplace_back( 
@@ -380,20 +431,20 @@ auto MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS
     std::vector<coro_t> coroutines;
 
     coroutines.emplace_back( 
-    [&tio, &P, &oidx, update_index_by](yield_t &yield) { 
+    [&tio, &P, &oidx, update_index_by](yield_t &yield) {
             auto Acoro = P.context(yield); 
-            Acoro[oidx] += update_index_by; //inserted_val;
+            Acoro[oidx] += update_index_by;
      });             
    
     coroutines.emplace_back( 
-    [&tio, &L,  &oidx, update_leftindex_by](yield_t &yield) { 
-            auto Acoro = L.context(yield); 
-            Acoro[oidx] += update_leftindex_by; //inserted_val;
-     }); 
+    [&tio, &L,  &oidx, update_leftindex_by](yield_t &yield) {
+            auto Acoro = L.context(yield);
+            Acoro[oidx] += update_leftindex_by;
+     });
 
     coroutines.emplace_back( 
-    [&tio, &R,  &oidx, update_leftindex_by, update_index_by](yield_t &yield) { 
-            auto Acoro = R.context(yield); 
+    [&tio, &R,  &oidx, update_leftindex_by, update_index_by](yield_t &yield) {
+            auto Acoro = R.context(yield);
             Acoro[oidx] += -(update_leftindex_by + update_index_by);
      }); 
 
@@ -402,6 +453,8 @@ auto MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS
     return std::make_pair(smallerindex, gt);
 }
 
+
+// Intializes the heap array with 0x7fffffffffffff
 void MinHeap::initialize(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
     HeapArray.init(0x7fffffffffffff);
@@ -415,7 +468,7 @@ void MinHeap::initialize_heap(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
     std::vector<coro_t> coroutines;
     for (size_t j = 1; j <= num_items; ++j) {
-        coroutines.emplace_back( 
+        coroutines.emplace_back(
             [&tio, &HeapArray, j](yield_t &yield) {
             auto Acoro = HeapArray.context(yield);
             RegAS v;
@@ -445,13 +498,38 @@ void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
 }
 
 
-// Restore the head property at the root.
-//             root
-//             /  \ 
-//    leftchild    rightchild
-// In the first step we compare left and right children
-// Next, we compare the smaller child with the root
-// If the smaller child is smaller than the root, we swap the smallerchild it with the root
+/*
+    Restore the head property at the root.
+       
+                root
+                /  \ 
+       leftchild    rightchild
+
+After restoring heap property:        
+if(leftchild < rightchild AND root < leftchild)       if(leftchild < rightchild AND root > leftchild)     if(leftchild > rightchild AND root < rightchild)     if(leftchild > rightchild AND root > rightchild)
+
+
+               root                                                     rightchild                                              leftchild                                             rightchild    
+               /  \                                                        / \                                                     / \                                                     /  \ 
+         leftchild  rightchild                                      leftchild  root                                       rightchild  root                                          leftchild   root
+
+
+    In the first step we compare left and right children
+    Next, we compare the smaller child with the root
+    If the smaller child is smaller than the root, we swap the smallerchild it with the root
+    
+    Unlike restore_heap_property, restore_heap_property_at_root begins with three regular (non-DORAM) read operations
+    Requires two comparisons a) comparing left and right child b) comparing the smaller child and parent
+    Next, we compute the offsets by which the parent and children need to be updated
+    Offset computation requires 
+      - one flag-flag multiplication
+      - two flag-word multiplications
+    Requires three DORAM update operations (in parallel) to update the parent, leftchild, and rightchild
+    In total we need  2 Comparisons, 1 Flag-Flag Multiplication, 2-Flag-Word-Multiplication, and 3 DORAM Updates
+    
+    The function returns the XOR-share of the smallerchild's index
+
+*/
 
 auto MinHeap::restore_heap_property_at_root(MPCTIO tio, yield_t & yield, size_t index = 1) {
     auto HeapArray = oram.flat(tio, yield);
@@ -560,13 +638,9 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
     return minval;
 }
 
-//  This function is *NOT USED* in the evaluation in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
-//  This function is called by heapify which takes in a random array and turns it into a heap
-//   \   
-//    a
-//   / \
-//  b   c
-//  
+/*
+ This function is *NOT USED* in the evaluation in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+*/  
 void MinHeap::heapify_at_level(MPCIO & mpcio, MPCTIO tio, yield_t & yield, size_t index = 1) {
     auto outroot = restore_heap_property_at_root(tio, yield, index);
     RegXS smaller = outroot.first;
@@ -607,12 +681,6 @@ void MinHeap::heapify(MPCIO & mpcio, MPCTIO tio, yield_t & yield) {
 void Heap(MPCIO & mpcio,
     
     const PRACOptions & opts, char ** args) {
-    // nbits_t depth     = atoi(args[0]);
-    // nbits_t heapdepth    = atoi(args[1]);
-    // size_t n_inserts  = atoi(args[2]);
-    // size_t n_extracts = atoi(args[3]);
-    // int is_optimized  = atoi(args[4]);
-    // int run_sanity    = atoi(args[5]);
     int argc = 12;
 
     int maxdepth = 0;
@@ -640,7 +708,6 @@ void Heap(MPCIO & mpcio,
         }
     }
 
-    // Use the values
     std::cout << "maxdepth: " << maxdepth << std::endl;
     std::cout << "heapdepth: " << heapdepth << std::endl;
     std::cout << "n_inserts: " << n_inserts << std::endl;
@@ -648,16 +715,6 @@ void Heap(MPCIO & mpcio,
     std::cout << "is_optimized: " << is_optimized << std::endl;
     std::cout << "run_sanity: " << run_sanity << std::endl;
 
-    // if ( * args) {
-    //     depth = atoi( * args);
-    //     ++args;
-    // }
-
-    
-    // if ( * args) {
-    //     items = atoi( * args);
-    //     ++args;
-    // }
     
     MPCTIO tio(mpcio, 0, opts.num_threads);
     
