@@ -456,16 +456,16 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
     RegBS bal_r = getRightBal(cnode.pointers);
    
     /*
-    size_t rec_left = reconstruct_RegXS(tio, yield, left);
-    size_t rec_right = reconstruct_RegXS(tio, yield, right);
-    size_t rec_key = reconstruct_RegAS(tio, yield, cnode.key);
+    size_t rec_left = mpc_reconstruct(tio, yield, left, AVL_PTR_SIZE);
+    size_t rec_right = mpc_reconstruct(tio, yield, right, AVL_PTR_SIZE);
+    size_t rec_key = mpc_reconstruct(tio, yield, cnode.key, 64);
     printf("\n\n(Before recursing) Key = %ld\n", rec_key);
     printf("rec_left = %ld, rec_right = %ld\n", rec_left, rec_right);
     */
 
     mpc_select(tio, yield, next_ptr, gt, left, right, AVL_PTR_SIZE);
     /*
-    size_t rec_next_ptr = reconstruct_RegXS(tio, yield, next_ptr);
+    size_t rec_next_ptr = mpc_reconstruct(tio, yield, next_ptr, AVL_PTR_SIZE);
     printf("rec_next_ptr = %ld\n", rec_next_ptr);
     */
 
@@ -482,11 +482,11 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
     auto [bal_upd, F_gp, prev_node, prev_dir] = insert(tio, yield,
           next_ptr, ins_addr, insert_key, A, TTL-1, isDummy, ret);
     /*
-    rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
-    rec_F_gp = reconstruct_RegBS(tio, yield, F_gp);
+    rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
+    rec_F_gp = mpc_reconstruct(tio, yield, F_gp, 1);
     printf("Insert returns: rec_bal_upd = %d, rec_F_gp = %d\n",
           rec_bal_upd, rec_F_gp);
-    size_t rec_ptr = reconstruct_RegXS(tio, yield, ptr);
+    size_t rec_ptr = mpc_reconstruct(tio, yield, pt);
     printf("\nrec_ptr = %ld\n", rec_ptr);
     */
 
@@ -550,10 +550,10 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
 
     /*
     bool rec_F_ir, rec_F_il;
-    rec_F_ir = reconstruct_RegBS(tio, yield, F_ir);
-    rec_F_il = reconstruct_RegBS(tio, yield, F_il);
-    rec_left = reconstruct_RegXS(tio, yield, left);
-    rec_right = reconstruct_RegXS(tio, yield, right);
+    rec_F_ir = mpc_reconstruct(tio, yield, F_ir, 1);
+    rec_F_il = mpc_reconstruct(tio, yield, F_il, 1);
+    rec_left = mpc_reconstruct(tio, yield, left, AVL_PTR_SIZE);
+    rec_right = mpc_reconstruct(tio, yield, right, AVL_PTR_SIZE);
     printf("(After recursing) F_il = %d, left = %ld, F_ir = %d, right = %ld\n",
         rec_F_il, rec_left, rec_F_ir, rec_right);
     */
@@ -618,10 +618,10 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         /*
         // Debug code
         bool rec_bal_upd, rec_F_gp, ret_dir_pc, ret_dir_cn;
-        rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
-        rec_F_gp = reconstruct_RegBS(tio, yield, F_gp);
-        ret_dir_pc = reconstruct_RegBS(tio, yield, ret.dir_pc);
-        ret_dir_cn = reconstruct_RegBS(tio, yield, ret.dir_cn);
+        rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
+        rec_F_gp = mpc_reconstruct(tio, yield, F_gp, 1);
+        ret_dir_pc = mpc_reconstruct(tio, yield, ret.dir_pc, 1);
+        ret_dir_cn = mpc_reconstruct(tio, yield, ret.dir_cn, 1);
         printf("(Top level) Insert returns: rec_bal_upd = %d, rec_F_gp = %d\n",
               rec_bal_upd, rec_F_gp);
         printf("(Top level) Insert returns: ret.dir_pc = %d, rt.dir_cn = %d\n",
@@ -658,15 +658,15 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
             child_pointers = A[oidx_c].NODE_POINTERS;
             */
             /*
-            size_t rec_gp_key = reconstruct_RegAS(tio, yield, A[oidx_gp].NODE_KEY);
-            size_t rec_p_key = reconstruct_RegAS(tio, yield, A[oidx_p].NODE_KEY);
-            size_t rec_c_key = reconstruct_RegAS(tio, yield, A[oidx_c].NODE_KEY);
-            size_t rec_gp_lptr = reconstruct_RegXS(tio, yield, getAVLLeftPtr(A[oidx_gp].NODE_POINTERS));
-            size_t rec_gp_rptr = reconstruct_RegXS(tio, yield, getAVLRightPtr(A[oidx_gp].NODE_POINTERS));
-            size_t rec_p_lptr = reconstruct_RegXS(tio, yield, getAVLLeftPtr(A[oidx_p].NODE_POINTERS));
-            size_t rec_p_rptr = reconstruct_RegXS(tio, yield, getAVLRightPtr(A[oidx_p].NODE_POINTERS));
-            size_t rec_c_lptr = reconstruct_RegXS(tio, yield, getAVLLeftPtr(A[oidx_c].NODE_POINTERS));
-            size_t rec_c_rptr = reconstruct_RegXS(tio, yield, getAVLRightPtr(A[oidx_c].NODE_POINTERS));
+            size_t rec_gp_key = mpc_reconstruct(tio, yield, A[oidx_gp].NODE_KEY, 1);
+            size_t rec_p_key = mpc_reconstruct(tio, yield, A[oidx_p].NODE_KEY, 1);
+            size_t rec_c_key = mpc_reconstruct(tio, yield, A[oidx_c].NODE_KEY, 1);
+            size_t rec_gp_lptr = mpc_reconstruct(tio, iyield, getAVLLeftPtr(A[oidx_gp].NODE_POINTERS), AVL_PTR_SIZE);
+            size_t rec_gp_rptr = mpc_reconstruct(tio, yield, getAVLRightPtr(A[oidx_gp].NODE_POINTERS), AVL_PTR_SIZE);
+            size_t rec_p_lptr = mpc_reconstruct(tio, yield, getAVLLeftPtr(A[oidx_p].NODE_POINTERS), AVL_PTR_SIZE);
+            size_t rec_p_rptr = mpc_reconstruct(tio, yield, getAVLRightPtr(A[oidx_p].NODE_POINTERS), AVL_PTR_SIZE);
+            size_t rec_c_lptr = mpc_reconstruct(tio, yield, getAVLLeftPtr(A[oidx_c].NODE_POINTERS), AVL_PTR_SIZE);
+            size_t rec_c_rptr = mpc_reconstruct(tio, yield, getAVLRightPtr(A[oidx_c].NODE_POINTERS), AVL_PTR_SIZE);
             printf("Reconstructed:\ngp_key = %ld, gp_left_ptr = %ld, gp_right_ptr = %ld\n", 
                 rec_gp_key, rec_gp_lptr, rec_gp_rptr);
             printf("p_key = %ld, p_left_ptr = %ld, p_right_ptr = %ld\n", 
@@ -1454,8 +1454,8 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         p_bal_r = getRightBal(node.pointers);
 
         #ifdef DEBUG
-          size_t rec_key = reconstruct_RegAS(tio, yield, node.key);
-          bool rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
+          size_t rec_key = mpc_reconstruct(tio, yield, node.key, 64);
+          bool rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
           printf("current_key = %ld, bal_upd (before updateBalanceDel) = %d\n", rec_key, rec_bal_upd);
         #endif
 
@@ -1464,8 +1464,8 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         bal_upd = new_bal_upd;
 
         #ifdef DEBUG
-          bool rec_imb = reconstruct_RegBS(tio, yield, imb);
-          bool rec_new_bal_upd = reconstruct_RegBS(tio, yield, new_bal_upd);
+          bool rec_imb = mpc_reconstruct(tio, yield, imb, 1);
+          bool rec_new_bal_upd = mpc_reconstruct(tio, yield, new_bal_upd, 1);
           printf("new_bal_upd (after updateBalanceDel) = %d, imb = %d\n", rec_new_bal_upd, rec_imb);
         #endif
         
@@ -1475,14 +1475,14 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
               c_prime, cs_ptr, imb, F_ri, ret_struct);
 
         #ifdef DEBUG
-          rec_imb = reconstruct_RegBS(tio, yield, imb);
-          rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd); 
+          rec_imb = mpc_reconstruct(tio, yield, imb, 1);
+          rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1); 
           printf("imb (after fixImbalance) = %d, bal_upd = %d\n", rec_imb, rec_bal_upd);
         #endif
         updateRetStruct(tio, yield, ptr, F_rs, F_dh, F_ri, bal_upd, ret_struct); 
 
         #ifdef DEBUG
-          rec_bal_upd = reconstruct_RegBS(tio, yield, bal_upd);
+          rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
           printf("bal_upd (after updateRetStruct) = %d\n", rec_bal_upd);
         #endif
 
@@ -1562,9 +1562,9 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
             mpc_select(tio, yield, root, ret_struct.F_r, root, ret_struct.ret_ptr);
 
             /*
-            bool rec_F_ss = reconstruct_RegBS(tio, yield, ret_struct.F_ss);
-            size_t rec_del_key = reconstruct_RegAS(tio, yield, del_node.key);
-            size_t rec_suc_key = reconstruct_RegAS(tio, yield, suc_node.key);
+            bool rec_F_ss = mpc_reconstruct(tio, yield, ret_struct.F_ss, 1);
+            size_t rec_del_key = mpc_reconstruct(tio, yield, del_node.key, 64);
+            size_t rec_suc_key = mpc_reconstruct(tio, yield, suc_node.key, 64);
             printf("rec_F_ss = %d, del_node.key = %lu, suc_nod.key = %lu\n",
                 rec_F_ss, rec_del_key, rec_suc_key);
             */            
@@ -1793,7 +1793,7 @@ void avl_tests(MPCIO &mpcio,
             }
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
 
@@ -1871,7 +1871,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n3, n7, n9, n12;
@@ -1955,7 +1955,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
 
@@ -2025,7 +2025,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n3, n7, n5, n12;
@@ -2109,7 +2109,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             
@@ -2189,7 +2189,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n3, n7, n5, n12;
@@ -2273,7 +2273,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n9, n5;
@@ -2351,7 +2351,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n3, n7, n9, n12;
@@ -2440,7 +2440,8 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
+
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
 
@@ -2458,7 +2459,7 @@ void avl_tests(MPCIO &mpcio,
             if(left_node.key.share()!=5 || right_node.key.share()!=9) {
                 success = false;
             }
-
+            
             //To check that left and right have no children and 0 balances
             size_t sum = left_node.pointers.share() + right_node.pointers.share();
             if(sum!=0) {
@@ -2471,6 +2472,7 @@ void avl_tests(MPCIO &mpcio,
                     print_red("T9 : FAIL\n");
                 }
             }
+            
             A.init();
             tree.init();
         }
@@ -2513,7 +2515,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n1, n3, n7, n9, n12;
@@ -2605,7 +2607,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
 
@@ -2684,7 +2686,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n3, n7, n5, n12, n15;
@@ -2776,7 +2778,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n9, n5;
@@ -2860,7 +2862,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n3, n7, n5, n12;
@@ -2948,7 +2950,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n9, n5;
@@ -3031,7 +3033,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n1, n3, n8, n9, n12;
@@ -3137,7 +3139,7 @@ void avl_tests(MPCIO &mpcio,
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
-            size_t root = reconstruct_RegXS(tio, yield, root_xs);
+            size_t root = mpc_reconstruct(tio, yield, root_xs, 64);
             auto A = oram->flat(tio, yield);
             auto R = A.reconstruct();
             Node root_node, n3, n7, n9;

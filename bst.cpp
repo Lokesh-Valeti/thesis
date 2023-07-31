@@ -3,7 +3,6 @@
 #include "bst.hpp"
 
 // Helper functions to reconstruct shared RegBS, RegAS or RegXS
-
 bool reconstruct_RegBS(MPCTIO &tio, yield_t &yield, RegBS flag) {
     RegBS reconstructed_flag;
     if (tio.player() < 2) {
@@ -24,7 +23,7 @@ bool reconstruct_RegBS(MPCTIO &tio, yield_t &yield, RegBS flag) {
     }
     return reconstructed_flag.bshare;
 }
-
+    
 size_t reconstruct_RegAS(MPCTIO &tio, yield_t &yield, RegAS variable) {
     RegAS reconstructed_var;
     if (tio.player() < 2) {
@@ -42,10 +41,10 @@ size_t reconstruct_RegAS(MPCTIO &tio, yield_t &yield, RegAS variable) {
         tio.recv_p1(&p1_var, sizeof(variable));
         reconstructed_var = p0_var;
         reconstructed_var += p1_var;
-    }
+    }   
     return reconstructed_var.ashare;
 }
-
+    
 size_t reconstruct_RegXS(MPCTIO &tio, yield_t &yield, RegXS variable) {
     RegXS reconstructed_var;
     if (tio.player() < 2) {
@@ -63,9 +62,11 @@ size_t reconstruct_RegXS(MPCTIO &tio, yield_t &yield, RegXS variable) {
         tio.recv_p1(&p1_var, sizeof(variable));
         reconstructed_var = p0_var;
         reconstructed_var ^= p1_var;
-    }
+    }   
     return reconstructed_var.xshare;
 }
+
+
 
 std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, Node n1, Node n2) {
     CDPF cdpf = tio.cdpf(yield);
@@ -357,7 +358,7 @@ bool BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>
     if(TTL==0) {
         // Reconstruct and return isDummy
         // If we found the key, then isDummy will be true
-        bool found = reconstruct_RegBS(tio, yield, isDummy);
+        bool found = mpc_reconstruct(tio, yield, isDummy, 1);
         return found;
     }
 
@@ -432,12 +433,12 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         /*
         // Reconstruct and Debug Block 0
         bool lt_rec, eq_rec, gt_rec;
-        lt_rec = reconstruct_RegBS(tio, yield, lt);
-        eq_rec = reconstruct_RegBS(tio, yield, eq);
-        gt_rec = reconstruct_RegBS(tio, yield, gt);
+        lt_rec = mpc_reconstruct(tio, yield, lt, 1);
+        eq_rec = mpc_reconstruct(tio, yield, eq, 1);
+        gt_rec = mpc_reconstruct(tio, yield, gt, 1);
         size_t del_key_rec, node_key_rec;
-        del_key_rec = reconstruct_RegAS(tio, yield, del_key);
-        node_key_rec = reconstruct_RegAS(tio, yield, node.key);
+        del_key_rec = mpc_reconstruct(tio, yield, del_key, 64);
+        node_key_rec = mpc_reconstruct(tio, yield, node.key, 64);
         printf("node.key = %ld, del_key= %ld\n", node_key_rec, del_key_rec);
         printf("cdpf.compare results: lt = %d, eq = %d, gt = %d\n", lt_rec, eq_rec, gt_rec);
         */
@@ -483,10 +484,10 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         /*
         // Reconstruct and Debug Block 1
         bool F_0_rec, F_1_rec, F_2_rec, c_prime_rec;
-        F_0_rec = reconstruct_RegBS(tio, yield, F_0);
-        F_1_rec = reconstruct_RegBS(tio, yield, F_1);
-        F_2_rec = reconstruct_RegBS(tio, yield, F_2);
-        c_prime_rec = reconstruct_RegBS(tio, yield, c_prime);
+        F_0_rec = mpc_reconstruct(tio, yield, F_0, 1);
+        F_1_rec = mpc_reconstruct(tio, yield, F_1, 1);
+        F_2_rec = mpc_reconstruct(tio, yield, F_2, 1);
+        c_prime_rec = mpc_reconstruct(tio, yield, c_prime, 1);
         printf("F_0 = %d, F_1 = %d, F_2 = %d, c_prime = %d\n", F_0_rec, F_1_rec, F_2_rec, c_prime_rec);
         */
 
@@ -502,9 +503,9 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         /*
         // Reconstruct and Debug Block 2
         bool F_c2_rec, s1_rec;
-        F_c2_rec = reconstruct_RegBS(tio, yield, F_c2);
-        s1_rec = reconstruct_RegBS(tio, yield, s1); 
-        c_prime_rec = reconstruct_RegBS(tio, yield, c_prime); 
+        F_c2_rec = mpc_reconstruct(tio, yield, F_c2, 1);
+        s1_rec = mpc_reconstruct(tio, yield, s1, 1); 
+        c_prime_rec = mpc_reconstruct(tio, yield, c_prime, 1); 
         printf("c_prime = %d, F_c2 = %d, s1 = %d\n", c_prime_rec, F_c2_rec, s1_rec);
         */
 
@@ -553,9 +554,9 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         // Reconstruct and Debug Block 3
         bool F_rs_rec, F_ls_rec;
         size_t ret_ptr_rec;
-        F_rs_rec = reconstruct_RegBS(tio, yield, F_rs);
-        F_ls_rec = reconstruct_RegBS(tio, yield, F_rs);
-        ret_ptr_rec = reconstruct_RegXS(tio, yield, ret_struct.ret_ptr);
+        F_rs_rec = mpc_reconstruct(tio, yield, F_rs, 1);
+        F_ls_rec = mpc_reconstruct(tio, yield, F_rs, 1);
+        ret_ptr_rec = mpc_reconstruct(tio, yield, ret_struct.ret_ptr, 64);
         printf("F_rs_rec = %d, F_ls_rec = %d, ret_ptr_rec = %ld\n", F_rs_rec, F_ls_rec, ret_ptr_rec);
         */
         RegXS new_ptr;
@@ -754,8 +755,8 @@ void bst(MPCIO &mpcio,
         tree.pretty_print(tio, yield);
         if(found) {
           printf("Lookup Success\n");
-          size_t value = reconstruct_RegXS(tio, yield, node.value);
-          printf("value = %lx\n", value);    
+          size_t value = mpc_reconstruct(tio, yield, node.value, 64);
+          printf("value = %lx\n", value);
         } else {
           printf("Lookup Failed\n");
         }
@@ -768,7 +769,7 @@ void bst(MPCIO &mpcio,
         tree.pretty_print(tio, yield);
         if(found) {
           printf("Lookup Success\n");
-          size_t value = reconstruct_RegXS(tio, yield, node.value);
+          size_t value = mpc_reconstruct(tio, yield, node.value, 64);
           printf("value = %lx\n", value);    
         } else {
           printf("Lookup Failed\n");
