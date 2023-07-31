@@ -7,6 +7,8 @@
 #include "mpcio.hpp"
 #include "options.hpp"
 
+// #define BST_DEBUG
+
 // Some simple utility functions:
 bool reconstruct_RegBS(MPCTIO &tio, yield_t &yield, RegBS flag);
 
@@ -117,9 +119,13 @@ struct Node {
     }
 };
 
-void newnode(Node &a);
-
-std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, Node n1, Node n2);
+/*
+    A function to perform key comparsions for BST traversal. 
+    Inputs: k1 = key of node in the tree, k2 = insertion/deletion/lookup key.
+    Evaluates (k2-k1), and combines the lt and eq flag into one (flag to go 
+    left), and keeps the gt flag as is (flag to go right) during traversal.
+    Returns the shared bit flags lteq (go left) and gt (go right).
+*/
 std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1, RegAS k2);
 
 // I/O operations (for sending over the network)
@@ -156,7 +162,7 @@ struct del_return {
 
 class BST {
   private: 
-    Duoram<Node> *oram;
+    Duoram<Node> oram;
     RegXS root;
 
     size_t num_items = 0;
@@ -175,58 +181,52 @@ class BST {
     bool lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, 
         Duoram<Node>::Flat &A, int TTL, RegBS isDummy, Node *ret_node);
 
+    void pretty_print(const std::vector<Node> &R, value_t node,
+        const std::string &prefix, bool is_left_child, bool is_right_child);
+
+    std::tuple<bool, address_t> check_bst(const std::vector<Node> &R,
+        value_t node, value_t min_key, value_t max_key);
+
   public:
-    BST(int num_players, size_t size) {
-      this->initialize(num_players, size);
+    BST(int num_players, size_t size) : oram(num_players, size) {  
+        this->MAX_SIZE = size;
     };
 
-    ~BST() {
-      if(oram)
-        delete oram;
-    };
 
-    size_t numEmptyLocations(){
-      return(empty_locations.size());
-    };
-
-    void initialize(int num_players, size_t size);
+    // Inserts the provided node into the BST
     void insert(MPCTIO &tio, yield_t &yield, Node &node);
 
-    // Deletes the first node that matches del_key
+    // Deletes the first node that matches del_key from the BST
     bool del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
 
-    // Returns the first node that matches key 
+    // Returns the first node that matches key in the BST
     bool lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node);
 
     // Display and correctness check functions
+
+    // Print the BST
     void pretty_print(MPCTIO &tio, yield_t &yield);
-    void pretty_print(const std::vector<Node> &R, value_t node,
-        const std::string &prefix, bool is_left_child, bool is_right_child);
+
+    // Check BST correctness
     void check_bst(MPCTIO &tio, yield_t &yield);
-    std::tuple<bool, address_t> check_bst(const std::vector<Node> &R,
-        value_t node, value_t min_key, value_t max_key);
-    void print_oram(MPCTIO &tio, yield_t &yield);
-};
 
-/*
-class BST_OP {
-  private:
-    MPCTIO tio;
-    yield_t yield;    
-    BST *ptr; 
+    // Debugging Functions    
 
-  public:
-    BST_OP* init(MPCTIO &tio, yield_t &yield, BST *bst_ptr) {
-      this->tio = tio;
-      this->yield = yield;
-      this->ptr = bst_ptr;
-      return this;
-    }
+    #ifdef BST_DEBUG
+
+        // Print the underlying ORAM state
+        void print_oram(MPCTIO &tio, yield_t &yield);
+
+        // Check the number of empty locations in ORAM 
+        // (Locations freed up after a delete operation, reusable for next insert.)
+        size_t numEmptyLocations(){
+            return(empty_locations.size());
+        };
+
+    #endif
 };
-*/
 
 void bst(MPCIO &mpcio,
     const PRACOptions &opts, char **args);
-
 
 #endif

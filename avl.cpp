@@ -2,6 +2,12 @@
 
 #include "avl.hpp"
 
+static void randomize_node(Node &a) {
+    a.key.randomize(8);
+    a.pointers.set(0);
+    a.value.randomize();
+}
+
 void print_green(std::string line) {
     printf("%s%s%s", KGRN, line.c_str(), KNRM);
 }
@@ -70,8 +76,10 @@ void AVL::pretty_print(MPCTIO &tio, yield_t &yield) {
     RegXS reconstructed_root = root;
     if (tio.player() == 1) {
         tio.queue_peer(&root, sizeof(root));
+        yield();
     } else {
         RegXS peer_root;
+        yield();
         tio.recv_peer(&peer_root, sizeof(peer_root));
         reconstructed_root += peer_root;
     }
@@ -1709,7 +1717,7 @@ void avl(MPCIO &mpcio,
         tio.reset_lamport();
 
         for(size_t i = 1; i<=n_inserts; i++) {
-            newnode(node);
+            randomize_node(node);
             size_t ikey;
             #ifdef RANDOMIZE
                 ikey = (1+(rand()%oram_size));
@@ -1786,7 +1794,7 @@ void avl_tests(MPCIO &mpcio,
             Node node;
 
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -1863,7 +1871,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 4;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -1947,7 +1955,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 2;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2017,7 +2025,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 4;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2101,7 +2109,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 2;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2181,7 +2189,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 4;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2265,7 +2273,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 2;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2343,7 +2351,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 4;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2427,7 +2435,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 3;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2502,7 +2510,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 6;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2594,7 +2602,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 3;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2673,7 +2681,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 6;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2765,7 +2773,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 3;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2849,7 +2857,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 4;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -2937,7 +2945,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 3;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -3020,7 +3028,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 6;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
@@ -3126,7 +3134,7 @@ void avl_tests(MPCIO &mpcio,
             size_t insert_array_size = 12;
             Node node;
             for(size_t i = 0; i<=insert_array_size; i++) {
-              newnode(node);
+              randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
               tree.check_avl(tio, yield);
