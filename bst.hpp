@@ -9,8 +9,6 @@
 
 // Some simple utility functions:
 bool reconstruct_RegBS(MPCTIO &tio, yield_t &yield, RegBS flag);
-size_t reconstruct_RegAS(MPCTIO &tio, yield_t &yield, RegAS variable);
-size_t reconstruct_RegXS(MPCTIO &tio, yield_t &yield, RegXS variable);
 
 struct Node {
     RegAS key;
