@@ -338,7 +338,6 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
     }
 
 
-    RegBS isNotDummy = isDummy ^ (!tio.player());
     Node cnode = A[ptr];
     // Compare key
     CDPF cdpf = tio.cdpf(yield);
@@ -356,9 +355,11 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
     RegBS F_found;
     // If we haven't found the key yet, and the lookup matches the current node key,
     // then we found the node to return
+    RegBS isNotDummy = isDummy ^ (!tio.player());
     mpc_and(tio, yield, F_found, isNotDummy, eq);
     mpc_select(tio, yield, ret_node->key, eq, ret_node->key, cnode.key); 
     mpc_select(tio, yield, ret_node->value, eq, ret_node->value, cnode.value); 
+    mpc_or(tio, yield, isDummy, isDummy, eq);
 
     #ifdef BST_DEBUG 
         size_t ckey = mpc_reconstruct(tio, yield, cnode.key, 64);
@@ -371,8 +372,7 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
         printf("rec_lt = %d, rec_eq = %d, rec_gt = %d\n", rec_lt, rec_eq, rec_gt);
         printf("rec_isDummy/found = %d ,rec_f_found = %d, cnode.key = %ld, lookup key = %ld\n", rec_found, rec_f_found, ckey, lkey);
     #endif
-
-    isDummy^=F_found;
+    
     RegBS found = lookup(tio, yield, next_ptr, key, A, TTL-1, isDummy, ret_node);
 
     return found;    
