@@ -490,8 +490,8 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
     auto [bal_upd, F_gp, prev_node, prev_dir] = insert(tio, yield,
           next_ptr, ins_addr, insert_key, A, TTL-1, isDummy, ret);
     /*
-    rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
-    rec_F_gp = mpc_reconstruct(tio, yield, F_gp, 1);
+    rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd);
+    rec_F_gp = mpc_reconstruct(tio, yield, F_gp);
     printf("Insert returns: rec_bal_upd = %d, rec_F_gp = %d\n",
           rec_bal_upd, rec_F_gp);
     size_t rec_ptr = mpc_reconstruct(tio, yield, pt);
@@ -558,8 +558,8 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
 
     /*
     bool rec_F_ir, rec_F_il;
-    rec_F_ir = mpc_reconstruct(tio, yield, F_ir, 1);
-    rec_F_il = mpc_reconstruct(tio, yield, F_il, 1);
+    rec_F_ir = mpc_reconstruct(tio, yield, F_ir);
+    rec_F_il = mpc_reconstruct(tio, yield, F_il);
     rec_left = mpc_reconstruct(tio, yield, left, AVL_PTR_SIZE);
     rec_right = mpc_reconstruct(tio, yield, right, AVL_PTR_SIZE);
     printf("(After recursing) F_il = %d, left = %ld, F_ir = %d, right = %ld\n",
@@ -626,10 +626,10 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
         /*
         // Debug code
         bool rec_bal_upd, rec_F_gp, ret_dir_pc, ret_dir_cn;
-        rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
-        rec_F_gp = mpc_reconstruct(tio, yield, F_gp, 1);
-        ret_dir_pc = mpc_reconstruct(tio, yield, ret.dir_pc, 1);
-        ret_dir_cn = mpc_reconstruct(tio, yield, ret.dir_cn, 1);
+        rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd);
+        rec_F_gp = mpc_reconstruct(tio, yield, F_gp);
+        ret_dir_pc = mpc_reconstruct(tio, yield, ret.dir_pc);
+        ret_dir_cn = mpc_reconstruct(tio, yield, ret.dir_cn);
         printf("(Top level) Insert returns: rec_bal_upd = %d, rec_F_gp = %d\n",
               rec_bal_upd, rec_F_gp);
         printf("(Top level) Insert returns: ret.dir_pc = %d, rt.dir_cn = %d\n",
@@ -666,9 +666,9 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
             child_pointers = A[oidx_c].NODE_POINTERS;
             */
             /*
-            size_t rec_gp_key = mpc_reconstruct(tio, yield, A[oidx_gp].NODE_KEY, 1);
-            size_t rec_p_key = mpc_reconstruct(tio, yield, A[oidx_p].NODE_KEY, 1);
-            size_t rec_c_key = mpc_reconstruct(tio, yield, A[oidx_c].NODE_KEY, 1);
+            size_t rec_gp_key = mpc_reconstruct(tio, yield, A[oidx_gp].NODE_KEY);
+            size_t rec_p_key = mpc_reconstruct(tio, yield, A[oidx_p].NODE_KEY);
+            size_t rec_c_key = mpc_reconstruct(tio, yield, A[oidx_c].NODE_KEY);
             size_t rec_gp_lptr = mpc_reconstruct(tio, iyield, getAVLLeftPtr(A[oidx_gp].NODE_POINTERS), AVL_PTR_SIZE);
             size_t rec_gp_rptr = mpc_reconstruct(tio, yield, getAVLRightPtr(A[oidx_gp].NODE_POINTERS), AVL_PTR_SIZE);
             size_t rec_p_lptr = mpc_reconstruct(tio, yield, getAVLLeftPtr(A[oidx_p].NODE_POINTERS), AVL_PTR_SIZE);
@@ -1463,7 +1463,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
 
         #ifdef DEBUG
           size_t rec_key = mpc_reconstruct(tio, yield, node.key, 64);
-          bool rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
+          bool rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd);
           printf("current_key = %ld, bal_upd (before updateBalanceDel) = %d\n", rec_key, rec_bal_upd);
         #endif
 
@@ -1472,8 +1472,8 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         bal_upd = new_bal_upd;
 
         #ifdef DEBUG
-          bool rec_imb = mpc_reconstruct(tio, yield, imb, 1);
-          bool rec_new_bal_upd = mpc_reconstruct(tio, yield, new_bal_upd, 1);
+          bool rec_imb = mpc_reconstruct(tio, yield, imb);
+          bool rec_new_bal_upd = mpc_reconstruct(tio, yield, new_bal_upd);
           printf("new_bal_upd (after updateBalanceDel) = %d, imb = %d\n", rec_new_bal_upd, rec_imb);
         #endif
         
@@ -1483,14 +1483,14 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
               c_prime, cs_ptr, imb, F_ri, ret_struct);
 
         #ifdef DEBUG
-          rec_imb = mpc_reconstruct(tio, yield, imb, 1);
-          rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1); 
+          rec_imb = mpc_reconstruct(tio, yield, imb);
+          rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd); 
           printf("imb (after fixImbalance) = %d, bal_upd = %d\n", rec_imb, rec_bal_upd);
         #endif
         updateRetStruct(tio, yield, ptr, F_rs, F_dh, F_ri, bal_upd, ret_struct); 
 
         #ifdef DEBUG
-          rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd, 1);
+          rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd);
           printf("bal_upd (after updateRetStruct) = %d\n", rec_bal_upd);
         #endif
 
@@ -1570,7 +1570,7 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
             mpc_select(tio, yield, root, ret_struct.F_r, root, ret_struct.ret_ptr);
 
             /*
-            bool rec_F_ss = mpc_reconstruct(tio, yield, ret_struct.F_ss, 1);
+            bool rec_F_ss = mpc_reconstruct(tio, yield, ret_struct.F_ss);
             size_t rec_del_key = mpc_reconstruct(tio, yield, del_node.key, 64);
             size_t rec_suc_key = mpc_reconstruct(tio, yield, suc_node.key, 64);
             printf("rec_F_ss = %d, del_node.key = %lu, suc_nod.key = %lu\n",

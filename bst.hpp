@@ -178,7 +178,7 @@ class BST {
         Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL, 
         del_return &ret_struct);
 
-    bool lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, 
+    RegBS lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, 
         Duoram<Node>::Flat &A, int TTL, RegBS isDummy, Node *ret_node);
 
     void pretty_print(const std::vector<Node> &R, value_t node,
@@ -200,7 +200,7 @@ class BST {
     bool del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
 
     // Returns the first node that matches key in the BST
-    bool lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node);
+    RegBS lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node);
 
     // Display and correctness check functions
 

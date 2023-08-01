@@ -330,16 +330,15 @@ void BST::insert(MPCTIO &tio, yield_t &yield, Node &node) {
     */
 }
 
-bool BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>::Flat &A,
+RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>::Flat &A,
     int TTL, RegBS isDummy, Node *ret_node) {
     if(TTL==0) {
-        // Reconstruct and return isDummy
         // If we found the key, then isDummy will be true
-        bool found = mpc_reconstruct(tio, yield, isDummy, 1);
-        return found;
+        return isDummy;
     }
 
-    RegBS isNotDummy = isDummy ^ (tio.player());
+
+    RegBS isNotDummy = isDummy ^ (!tio.player());
     Node cnode = A[ptr];
     // Compare key
     CDPF cdpf = tio.cdpf(yield);
@@ -360,19 +359,31 @@ bool BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>
     mpc_and(tio, yield, F_found, isNotDummy, eq);
     mpc_select(tio, yield, ret_node->key, eq, ret_node->key, cnode.key); 
     mpc_select(tio, yield, ret_node->value, eq, ret_node->value, cnode.value); 
-  
+
+    #ifdef BST_DEBUG 
+        size_t ckey = mpc_reconstruct(tio, yield, cnode.key, 64);
+        size_t lkey = mpc_reconstruct(tio, yield, key, 64);
+        bool rec_lt = mpc_reconstruct(tio, yield, lt);
+        bool rec_eq = mpc_reconstruct(tio, yield, eq);
+        bool rec_gt = mpc_reconstruct(tio, yield, gt);
+        bool rec_found = mpc_reconstruct(tio, yield, isDummy);
+        bool rec_f_found = mpc_reconstruct(tio, yield, F_found);
+        printf("rec_lt = %d, rec_eq = %d, rec_gt = %d\n", rec_lt, rec_eq, rec_gt);
+        printf("rec_isDummy/found = %d ,rec_f_found = %d, cnode.key = %ld, lookup key = %ld\n", rec_found, rec_f_found, ckey, lkey);
+    #endif
+
     isDummy^=F_found;
-    bool found = lookup(tio, yield, next_ptr, key, A, TTL-1, isDummy, ret_node);
+    RegBS found = lookup(tio, yield, next_ptr, key, A, TTL-1, isDummy, ret_node);
 
     return found;    
 }
 
-bool BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
+RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
     auto A = oram.flat(tio, yield);
 
     RegBS isDummy;
 
-    bool found = lookup(tio, yield, root, key, A, num_items, isDummy, ret_node);
+    RegBS found = lookup(tio, yield, root, key, A, num_items, isDummy, ret_node);
     /*
     // To visualize database and tree after each lookup:
     auto R = A.reconstruct();
@@ -410,9 +421,9 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         /*
         // Reconstruct and Debug Block 0
         bool lt_rec, eq_rec, gt_rec;
-        lt_rec = mpc_reconstruct(tio, yield, lt, 1);
-        eq_rec = mpc_reconstruct(tio, yield, eq, 1);
-        gt_rec = mpc_reconstruct(tio, yield, gt, 1);
+        lt_rec = mpc_reconstruct(tio, yield, lt);
+        eq_rec = mpc_reconstruct(tio, yield, eq);
+        gt_rec = mpc_reconstruct(tio, yield, gt);
         size_t del_key_rec, node_key_rec;
         del_key_rec = mpc_reconstruct(tio, yield, del_key, 64);
         node_key_rec = mpc_reconstruct(tio, yield, node.key, 64);
@@ -461,10 +472,10 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         /*
         // Reconstruct and Debug Block 1
         bool F_0_rec, F_1_rec, F_2_rec, c_prime_rec;
-        F_0_rec = mpc_reconstruct(tio, yield, F_0, 1);
-        F_1_rec = mpc_reconstruct(tio, yield, F_1, 1);
-        F_2_rec = mpc_reconstruct(tio, yield, F_2, 1);
-        c_prime_rec = mpc_reconstruct(tio, yield, c_prime, 1);
+        F_0_rec = mpc_reconstruct(tio, yield, F_0);
+        F_1_rec = mpc_reconstruct(tio, yield, F_1);
+        F_2_rec = mpc_reconstruct(tio, yield, F_2);
+        c_prime_rec = mpc_reconstruct(tio, yield, c_prime);
         printf("F_0 = %d, F_1 = %d, F_2 = %d, c_prime = %d\n", F_0_rec, F_1_rec, F_2_rec, c_prime_rec);
         */
 
@@ -480,9 +491,9 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         /*
         // Reconstruct and Debug Block 2
         bool F_c2_rec, s1_rec;
-        F_c2_rec = mpc_reconstruct(tio, yield, F_c2, 1);
-        s1_rec = mpc_reconstruct(tio, yield, s1, 1); 
-        c_prime_rec = mpc_reconstruct(tio, yield, c_prime, 1); 
+        F_c2_rec = mpc_reconstruct(tio, yield, F_c2);
+        s1_rec = mpc_reconstruct(tio, yield, s1); 
+        c_prime_rec = mpc_reconstruct(tio, yield, c_prime); 
         printf("c_prime = %d, F_c2 = %d, s1 = %d\n", c_prime_rec, F_c2_rec, s1_rec);
         */
 
@@ -531,8 +542,8 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         // Reconstruct and Debug Block 3
         bool F_rs_rec, F_ls_rec;
         size_t ret_ptr_rec;
-        F_rs_rec = mpc_reconstruct(tio, yield, F_rs, 1);
-        F_ls_rec = mpc_reconstruct(tio, yield, F_rs, 1);
+        F_rs_rec = mpc_reconstruct(tio, yield, F_rs);
+        F_ls_rec = mpc_reconstruct(tio, yield, F_rs);
         ret_ptr_rec = mpc_reconstruct(tio, yield, ret_struct.ret_ptr, 64);
         printf("F_rs_rec = %d, F_ls_rec = %d, ret_ptr_rec = %ld\n", F_rs_rec, F_ls_rec, ret_ptr_rec);
         */
@@ -713,11 +724,13 @@ void bst(MPCIO &mpcio,
         printf("\n\nLookup %x\n", 8);
         randomize_node(node);
         RegAS lookup_key;
-        bool found;
+        RegBS found;
+        bool rec_found;
         lookup_key.set(8 * tio.player());
         found = tree.lookup(tio, yield, lookup_key, &node);
+        rec_found = mpc_reconstruct(tio, yield, found);
         tree.pretty_print(tio, yield);
-        if(found) {
+        if(rec_found) {
           printf("Lookup Success\n");
           size_t value = mpc_reconstruct(tio, yield, node.value, 64);
           printf("value = %lx\n", value);
@@ -725,12 +738,14 @@ void bst(MPCIO &mpcio,
           printf("Lookup Failed\n");
         }
 
-        printf("\n\nLookup %x\n", 99);
+        printf("\n\nLookup %x\n", 63);
         randomize_node(node);
-        lookup_key.set(99 * tio.player());
+        lookup_key.set(63 * tio.player());
         found = tree.lookup(tio, yield, lookup_key, &node);
+        rec_found = mpc_reconstruct(tio, yield, found);
+        //rec_found = reconstruct_RegBS(tio, yield, found);
         tree.pretty_print(tio, yield);
-        if(found) {
+        if(rec_found) {
           printf("Lookup Success\n");
           size_t value = mpc_reconstruct(tio, yield, node.value, 64);
           printf("value = %lx\n", value);    
