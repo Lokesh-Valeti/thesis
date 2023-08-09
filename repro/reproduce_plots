@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Replace "python3" with your Python interpreter if needed
+DS="Heap" 
+Operation="Extract" 
+output=$(python3 extract_data.py out2)
+# Read the output into an array
+IFS=$'\n' read -d '' -r -a values <<< "$output"
+
+# Store each value in different variables
+heapsize=${values[0]}
+optimization_flag=${values[1]}
+insert_wc=${values[2]}
+insert_bw=${values[3]}
+extract_wc=${values[4]}
+extract_bw=${values[5]}
+datafile="data"
+# Print the values to verify
+echo "heapsize: $heapsize"
+echo "is_optimized: $optimization_flag"
+echo "insert heaps, wallclock : $insert_wc"
+echo "insert heaps, bw: $insert_bw"
+echo "extract heaps, wallclock: $extract_wc"
+echo "extract heaps, bw: $extract_bw"
+
+python3 append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $insert_wc
+
