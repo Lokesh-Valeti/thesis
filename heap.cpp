@@ -756,13 +756,14 @@ void Heap(MPCIO & mpcio,
     
     const PRACOptions & opts, char ** args) {
     
-    int argc = 12;
+    int argc = 14;
     int maxdepth = 0;
     int heapdepth = 0;
     size_t n_inserts = 0;
     size_t n_extracts = 0;
     int is_optimized = 0;
     int run_sanity = 0;
+    int itr = 0;
 
     // Process command line arguments
     for (int i = 0; i < argc; i += 2) {
@@ -779,15 +780,18 @@ void Heap(MPCIO & mpcio,
             is_optimized = std::atoi(args[i + 1]);
         } else if (option == "-s" && i + 1 < argc) {
             run_sanity = std::atoi(args[i + 1]);
+        } else if (option == "-itr" && i + 1 < argc) {
+            itr = std::atoi(args[i + 1]);
         }
     }
 
-    std::cout << "maxdepth: " << maxdepth << std::endl;
-    std::cout << "heapdepth: " << heapdepth << std::endl;
+    //std::cout << "maxdepth: " << maxdepth << std::endl;
+    //std::cout << "run_sanity: " << run_sanity << std::endl;
+    std::cout << "heapsize: " << heapdepth << std::endl;
     std::cout << "n_inserts: " << n_inserts << std::endl;
     std::cout << "n_extracts: " << n_extracts << std::endl;
     std::cout << "is_optimized: " << is_optimized << std::endl;
-    std::cout << "run_sanity: " << run_sanity << std::endl;
+    std::cout << "itr: " << itr << std::endl;
 
     
     MPCTIO tio(mpcio, 0, opts.num_threads);

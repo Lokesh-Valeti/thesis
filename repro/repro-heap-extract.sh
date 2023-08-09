@@ -14,8 +14,6 @@
    ./run-experiment heap -m 18 -d 18 -i 0 -e 1 -opt 0 -s 0 > basic_heap_extract_online_18
    echo "preprocessing_heap_18 (basic online)"
 
-
-
    ./run-experiment -p m:80 a:20 s:19 r20:114 c:40 p:128 > basic_heap_extract_preproc_20
    echo "preprocessing_heap_20 (basic preproc)"
    
