@@ -503,18 +503,14 @@ void MinHeap::initialize(MPCTIO tio, yield_t & yield) {
 
 void MinHeap::initialize_heap(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
-    std::vector<coro_t> coroutines;
+
+    HeapArray.explicitonly(true);
     for (size_t j = 1; j <= num_items; ++j) {
-        coroutines.emplace_back(
-            [&tio, &HeapArray, j](yield_t &yield) {
-            auto Acoro = HeapArray.context(yield);
-            RegAS v;
-            v.ashare = j * tio.player();
-            Acoro[j] = v;
-        }
-       );
+        RegAS v;
+        v.ashare = j * tio.player();
+        HeapArray[j] = v;
     }
-  run_coroutines(tio, coroutines);
+    HeapArray.explicitonly(false);
 }
 
 
