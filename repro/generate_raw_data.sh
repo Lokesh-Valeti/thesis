@@ -1,7 +1,9 @@
   
 echo "Running the Heap Extract Experiments (Basic)"
 cd ..
-for itr in $(seq 1 1); do
+nitrs=2
+for itr in $(seq 1 $nitrs); do
+    echo $itr
     echo "heapsize: 16\nis_optimized: 0\n" > "repro/data/log_basic_heap_extract_preproc_16_itr_$itr"	
     ./docker/run-experiment -p m:63 a:16 s:15 r16:90 c:32 p:128 >> "repro/data/log_basic_heap_extract_preproc_16_itr_$itr"
     echo "preprocessing_heap_16 (basic preproc) - iteration $itr"
@@ -50,7 +52,7 @@ done
 
 echo "Running the Heap Extract Experiments (Optimized)"
 
-for itr in $(seq 1 1); do
+for itr in $(seq 1 $nitrs); do
    echo "heapsize: 16\nis_optimized: 1\n" 				  >  "repro/data/log_opt_heap_extract_preproc_16_itr_$itr"	 
   ./docker/run-experiment -p  m:63 a:16 s:15  i15.3:1 c:32 p:128 	  >> "repro/data/log_opt_heap_extract_preproc_16_itr_$itr"
   echo "preprocessing_heap_16 (opt preproc)"
@@ -97,16 +99,16 @@ done
 
 echo "Basic Insert Experiments\n"
 
-for itr in $(seq 1 1); do
+for itr in $(seq 1 $nitrs); do
 
 echo "heapsize: 16\nis_optimized: 0\n" > "repro/data/log_basic_heap_insert_preproc_16_itr_$itr"
 ./docker/run-experiment -p m:16 c:16 >>  "repro/data/log_basic_heap_insert_preproc_16_itr_$itr"
- echo "heapsize: 16\nis_optimized: 0\n" >                                "repro/data/log_basic_heap_insert_online_16_itr_$itr"
+ echo "heapsize: 16\nis_optimized: 0\n" >                                         "repro/data/log_basic_heap_insert_online_16_itr_$itr"
  ./docker/run-experiment -t 64 heap -m 17 -d 16 -i 1 -e 0 -opt 0 -s 0 -itr itr >> "repro/data/log_basic_heap_insert_online_16_itr_$itr"
 
 echo "heapsize: 18\nis_optimized: 0\n" > "repro/data/log_basic_heap_insert_preproc_18_itr_$itr"
  ./docker/run-experiment -p m:18 c:18 >> "repro/data/log_basic_heap_insert_preproc_18_itr_$itr"
- echo "heapsize: 18\nis_optimized: 0\n" >                                 "repro/data/log_basic_heap_insert_online_18_itr_$itr"
+ echo "heapsize: 18\nis_optimized: 0\n" >                                           "repro/data/log_basic_heap_insert_online_18_itr_$itr"
  ./docker/run-experiment -t 64 heap -m 19 -d 18 -i 1 -e 0 -opt 0 -s 0  -itr itr  >> "repro/data/log_basic_heap_insert_online_18_itr_$itr"
 
 echo "heapsize: 20\nis_optimized: 0\n" >       "repro/data/log_basic_heap_insert_preproc_20_itr_$itr"
@@ -133,38 +135,35 @@ done
 
 
 echo "Optimized Insert Experiments\n"
-
-for itr in $(seq 1 1); do
-
- echo "heapsize: 16\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_preproc_16_itr_$itr"
- ./docker/run-experiment -p m:36 r6:1 i4:1 c:5 >>                        "repro/data/log_opt_heap_insert_preproc_16_itr_$itr"
- echo "heapsize: 16\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_online_16_itr_$itr"
- ./docker/run-experiment -t 64 heap -m 17 -d 16 -i 1 -e 0 -opt 1 -s 0 -itr itr >> "repro/data/log_opt_heap_insert_online_16_itr_$itr"
-echo "done"	
- echo "heapsize: 18\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_preproc_18_itr_$itr"
- ./docker/run-experiment -p m:40 r6:1 i4:1 c:5  >>                       "repro/data/log_opt_heap_insert_preproc_18_itr_$itr"
- echo "heapsize: 18\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_online_18_itr_$itr"
- ./docker/run-experiment -t 64 heap -m 19 -d 18 -i 1 -e 0 -opt 1 -s 0  -itr itr >> "repro/data/log_opt_heap_insert_online_18_itr_$itr"
-echo "done"
- echo "heapsize: 20\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_preproc_20_itr_$itr"
- ./docker/run-experiment -p T0 m:44 r6:1 i4:1 c:5               >> "repro/data/log_opt_heap_insert_preproc_20_itr_$itr"
- echo "heapsize: 20\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_online_20_itr_$itr"
- ./docker/run-experiment heap -m 21 -d 20 -i 1 -e 0 -opt 1 -s 0  -itr itr >> "repro/data/log_opt_heap_insert_online_20_itr_$itr"
-echo "done"
- echo "heapsize: 22\nis_optimized: 1\n" >             "repro/data/log_opt_heap_insert_preproc_22_itr_$itr"
- ./docker/run-experiment -p T0 m:48 r6:1 i4:1 c:5  >> "repro/data/log_opt_heap_insert_preproc_22_itr_$itr"
- echo "heapsize: 22\nis_optimized: 1\n" >                           "repro/data/log_opt_heap_insert_online_22_itr_$itr"
- ./docker/run-experiment  heap -m 23 -d 22 -i 1 -e 0 -opt 1 -s 0  -itr itr >> "repro/data/log_opt_heap_insert_online_22_itr_$itr"
-echo "done"
- echo "heapsize: 24\nis_optimized: 1\n" >             "repro/data/log_opt_heap_insert_preproc_24_itr_$itr"
- ./docker/run-experiment -p T0 m:52 r6:1 i4:1 c:5  >> "repro/data/log_opt_heap_insert_preproc_24_itr_$itr"
- echo "heapsize: 24\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_online_24_itr_$itr"
- ./docker/run-experiment heap -m 25 -d 24 -i 1 -e 0 -opt 1 -s 0 -itr itr >> "repro/data/log_opt_heap_insert_online_24_itr_$itr"
-echo "done"
- echo "heapsize: 26\nis_optimized: 1\n" >             "repro/data/log_opt_heap_insert_preproc_26_itr_$itr"
- ./docker/run-experiment -p T0 m:56 r6:1 i4:1 c:5  >> "repro/data/log_opt_heap_insert_preproc_26_itr_$itr"
- echo "heapsize: 26\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_online_26_itr_$itr"
- ./docker/run-experiment heap -m 27 -d 26 -i 1 -e 0 -opt 1 -s 0 -itr itr >> "repro/data/log_opt_heap_insert_online_26_itr_$itr"
- echo "done"  	
+for itr in $(seq 1 $nitrs); do
+  echo "heapsize: 16\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_preproc_16_itr_$itr"
+  ./docker/run-experiment -p m:36 r6:1 i4:1 c:5 >>                        "repro/data/log_opt_heap_insert_preproc_16_itr_$itr"
+  echo "heapsize: 16\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_online_16_itr_$itr"
+  ./docker/run-experiment -t 64 heap -m 17 -d 16 -i 1 -e 0 -opt 1 -s 0 -itr itr >> "repro/data/log_opt_heap_insert_online_16_itr_$itr"
+  echo "done"	
+  echo "heapsize: 18\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_preproc_18_itr_$itr"
+  ./docker/run-experiment -p m:40 r6:1 i4:1 c:5  >>                       "repro/data/log_opt_heap_insert_preproc_18_itr_$itr"
+  echo "heapsize: 18\nis_optimized: 1\n" >                                "repro/data/log_opt_heap_insert_online_18_itr_$itr"
+  ./docker/run-experiment -t 64 heap -m 19 -d 18 -i 1 -e 0 -opt 1 -s 0  -itr itr >> "repro/data/log_opt_heap_insert_online_18_itr_$itr"
+  echo "done"
+  echo "heapsize: 20\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_preproc_20_itr_$itr"
+  ./docker/run-experiment -p T0 m:44 r6:1 i4:1 c:5               >> "repro/data/log_opt_heap_insert_preproc_20_itr_$itr"
+  echo "heapsize: 20\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_online_20_itr_$itr"
+  ./docker/run-experiment heap -m 21 -d 20 -i 1 -e 0 -opt 1 -s 0  -itr itr >> "repro/data/log_opt_heap_insert_online_20_itr_$itr"
+  echo "done"
+  echo "heapsize: 22\nis_optimized: 1\n" >             "repro/data/log_opt_heap_insert_preproc_22_itr_$itr"
+  ./docker/run-experiment -p T0 m:48 r6:1 i4:1 c:5  >> "repro/data/log_opt_heap_insert_preproc_22_itr_$itr"
+  echo "heapsize: 22\nis_optimized: 1\n" >                           "repro/data/log_opt_heap_insert_online_22_itr_$itr"
+  ./docker/run-experiment  heap -m 23 -d 22 -i 1 -e 0 -opt 1 -s 0  -itr itr >> "repro/data/log_opt_heap_insert_online_22_itr_$itr"
+  echo "done"
+  echo "heapsize: 24\nis_optimized: 1\n" >             "repro/data/log_opt_heap_insert_preproc_24_itr_$itr"
+  ./docker/run-experiment -p T0 m:52 r6:1 i4:1 c:5  >> "repro/data/log_opt_heap_insert_preproc_24_itr_$itr"
+  echo "heapsize: 24\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_online_24_itr_$itr"
+  ./docker/run-experiment heap -m 25 -d 24 -i 1 -e 0 -opt 1 -s 0 -itr itr >> "repro/data/log_opt_heap_insert_online_24_itr_$itr"
+  echo "done"
+  echo "heapsize: 26\nis_optimized: 1\n" >             "repro/data/log_opt_heap_insert_preproc_26_itr_$itr"
+  ./docker/run-experiment -p T0 m:56 r6:1 i4:1 c:5  >> "repro/data/log_opt_heap_insert_preproc_26_itr_$itr"
+  echo "heapsize: 26\nis_optimized: 1\n" >                          "repro/data/log_opt_heap_insert_online_26_itr_$itr"
+  ./docker/run-experiment heap -m 27 -d 26 -i 1 -e 0 -opt 1 -s 0 -itr itr >> "repro/data/log_opt_heap_insert_online_26_itr_$itr"
+  echo "done"  	
 done
--- INSERT --

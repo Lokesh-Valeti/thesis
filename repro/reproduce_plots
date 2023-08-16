@@ -5,69 +5,73 @@ DS="Heap"
 Operation="Extract" 
 cd ..
 
+rm "repro/experimentaldata_preproc_wallclock"  "repro/experimentaldata_wallclock"
+touch "repro/experimentaldata_preproc_wallclock"  "repro/experimentaldata_wallclock"
+nitrs=2
+minsize=18
+maxsize=26
+stepsize=2
+for itr in $(seq 1 $nitrs); do
+ for heapsize in $(seq $minsize $stepsize $maxsize); do
+ 	input_file="repro/data/log_basic_heap_extract_online_${heapsize}_itr_${itr}"
+	echo $input_file
+ 	output=$(python3 repro/extract_data.py "$input_file")
 
+ 	# Read the output into an array
+	 IFS=$'\n' read -d '' -r -a values <<< "$output"
 
-
-for itr in $(seq 1 1); do
- for heapsize in $(seq 16 2 26); do
+	 # Store each value in different variables
+	 heapsize=${values[0]}  
+ 	 optimization_flag=${values[1]} 
+	 extract_wc=${values[4]} 
  
- input_file="repro/data/log_basic_heap_extract_online_${heapsize}_itr_${itr}"
- output=$(python3 repro/extract_data.py "$input_file")
+	 datafile="repro/experimentaldata_wallclock"
+ 	 python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $extract_wc
 
- # Read the output into an array
- IFS=$'\n' read -d '' -r -a values <<< "$output"
+ 	 input_file="repro/data/log_opt_heap_extract_online_${heapsize}_itr_${itr}"
+ 	 echo $input_file
+ 	 output=$(python3 repro/extract_data.py "$input_file")
 
- # Store each value in different variables
- heapsize=${values[0]}  
- optimization_flag=${values[1]} 
- extract_wc=${values[4]} 
- 
- datafile="repro/experimentaldata_wallclock"
- python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $extract_wc
+	 # Read the output into an array
+ 	 IFS=$'\n' read -d '' -r -a values <<< "$output"
 
- input_file="repro/data/log_opt_heap_extract_online_${heapsize}_itr_${itr}"
- output=$(python3 repro/extract_data.py "$input_file")
-
- # Read the output into an array
- IFS=$'\n' read -d '' -r -a values <<< "$output"
-
- # Store each value in different variables
- heapsize=${values[0]}  optimization_flag=${values[1]} extract_wc=${values[4]}
- datafile="repro/experimentaldata_wallclock"
- python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $extract_wc
+ 	# Store each value in different variables
+	 heapsize=${values[0]}  optimization_flag=${values[1]} extract_wc=${values[4]}
+ 	 datafile="repro/experimentaldata_wallclock"
+ 	 python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $extract_wc
  done	
 done
-
+echo "OnlineTable"
 cat $datafile
 echo -e "\n\n"
 
-for itr in $(seq 1 1); do
-  for heapsize in $(seq 16 2 26); do
-  input_file="repro/data/log_basic_heap_extract_preproc_${heapsize}_itr_$itr"
-  output=$(python3 repro/extract_data_from_preproc.py "$input_file")
+for itr in $(seq 1 $nitrs); do
+  for heapsize in $(seq $minsize $stepsize $maxsize); do
+	input_file="repro/data/log_basic_heap_extract_preproc_${heapsize}_itr_$itr"
+  	output=$(python3 repro/extract_data_from_preproc.py "$input_file")
 
-  # Read the output into an array
-  IFS=$'\n' read -d '' -r -a values <<< "$output"
+  	# Read the output into an array
+  	IFS=$'\n' read -d '' -r -a values <<< "$output"
 
-  # Store each value in different variables
-  heapsize=${values[0]}  optimization_flag=${values[1]} preproc_wc=${values[2]} 
-  datafile="repro/experimentaldata_preproc_wallclock"
-  python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $preproc_wc
+  	# Store each value in different variables
+ 	 heapsize=${values[0]}  optimization_flag=${values[1]} preproc_wc=${values[2]} 
+  	datafile="repro/experimentaldata_preproc_wallclock"
+  	python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $preproc_wc
 
-  input_file="repro/data/log_opt_heap_extract_preproc_${heapsize}_itr_$itr"
-  output=$(python3 repro/extract_data_from_preproc.py "$input_file")
+  	input_file="repro/data/log_opt_heap_extract_preproc_${heapsize}_itr_$itr"
+  	output=$(python3 repro/extract_data_from_preproc.py "$input_file")
 
-  # Read the output into an array
-  IFS=$'\n' read -d '' -r -a values <<< "$output"
+ 	 # Read the output into an array
+  	IFS=$'\n' read -d '' -r -a values <<< "$output"
 
-  # Store each value in different variables
-  heapsize=${values[0]}  optimization_flag=${values[1]} preproc_wc=${values[2]}
-  datafile="repro/experimentaldata_preproc_wallclock"
-  python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $preproc_wc
- done
+  	# Store each value in different variables
+  	heapsize=${values[0]}  optimization_flag=${values[1]} preproc_wc=${values[2]}
+  	datafile="repro/experimentaldata_preproc_wallclock"
+  	python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $preproc_wc
+  done
 done
 
-
+echo "Preproc Table"
 cat $datafile
 echo -e "\n\n"
 
@@ -75,8 +79,8 @@ echo -e "\n\n"
 DS="Heap"
 Operation="Insert"
 
-for itr in $(seq 1 1); do
-  for heapsize in $(seq 16 2 26); do
+for itr in $(seq 1 $niters); do
+  for heapsize in $(seq $minsize $stepsize $maxsize); do
 	 input_file="repro/data/log_basic_heap_insert_online_${heapsize}_itr_$itr"
 	 output=$(python3 repro/extract_data.py "$input_file")
 
@@ -98,11 +102,12 @@ for itr in $(seq 1 1); do
   done
 done
 
+echo "Online Table"
 cat $datafile
 echo -e "\n\n"
 
-for itr in $(seq 1 1); do
-    for heapsize in $(seq 16 2 26); do	
+for itr in $(seq 1 $niters); do
+    for heapsize in $(seq $minsize $stepsize $maxsize); do	
 	 
 	input_file="repro/data/log_basic_heap_insert_preproc_${heapsize}_itr_$itr"
  	output=$(python3 repro/extract_data_from_preproc.py "$input_file")
@@ -123,5 +128,6 @@ for itr in $(seq 1 1); do
 	 python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $preproc_wc
    done
 done
+echo "Preproc Table"
 cat $datafile
 
