@@ -8,8 +8,8 @@ touch "repro/experimentaldata_bs_preproc_wallclock"  "repro/experimentaldata_bs_
 rm "repro/experimentaldata_bs_preproc_wallclock"  "repro/experimentaldata_bs_wallclock"
 touch "repro/experimentaldata_bs_preproc_wallclock"  "repro/experimentaldata_bs_wallclock"
 nitrs=1
-minsize=18
-maxsize=22
+minsize=16
+maxsize=24
 stepsize=2
 for itr in $(seq 1 $nitrs); do
  for bssize in $(seq $minsize $stepsize $maxsize); do
@@ -54,7 +54,7 @@ for itr in $(seq 1 $nitrs); do
   	IFS=$'\n' read -d '' -r -a values <<< "$output"
 
   	# Store each value in different variables
- 	bssize=$bssize  optimization_flag=0 preproc_wc=${values[1]} 
+ 	bssize=$bssize  optimization_flag=0 preproc_wc=${values[2]} 
   	datafile="repro/experimentaldata_bs_preproc_wallclock"
   	python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $bssize $preproc_wc
 
@@ -65,8 +65,13 @@ for itr in $(seq 1 $nitrs); do
   	IFS=$'\n' read -d '' -r -a values <<< "$output"
 
   	# Store each value in different variables
-  	bssize=$bssize  optimization_flag=1 preproc_wc=${values[1]}
+  	bssize=$bssize  optimization_flag=1 preproc_wc=${values[2]}
   	datafile="repro/experimentaldata_bs_preproc_wallclock"
   	python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $bssize $preproc_wc
   done
 done
+
+echo "PrprocTable"
+cat $datafile
+echo -e "\n\n"
+
