@@ -1,52 +1,59 @@
-./run-experiment -p  m:316 a:80 s:76 r20:456 c:160 p:128 > log_heap_extract_basic_pre_20_4
-echo "preprocessing_heap_16 (basic preproc)"
-./run-experiment -t 16 heap 20 20 0 4 0 > log_heap_extract_basic_online_20_4
- echo "preprocessing_heap_16 (basic online)"
 
-./run-experiment -p  m:316 a:80 s:76 i19.3:4 c:160 p:128 > log_heap_extract_opt_pre_20_4
- echo "preprocessing_heap_16 (opt preproc)"
-./run-experiment -t 16 heap 20 20 0 4 1 > log_heap_extract_opt_online_20_4
-echo "preprocessing_heap_16 (opt online)":
-
-
-./run-experiment -p m:632 a:160 s:152 r20:912 c:320 p:128 > log_heap_extract_basic_pre_20_8
-echo "preprocessing_heap_16 (basic preproc)"
-./run-experiment -t 16 heap 20 20 0 8 0 > log_heap_extract_basic_online_20_8
-echo "preprocessing_heap_16 (basic online)"
-
-./run-experiment -p  m:632 a:160 s:152 i19.3:8 c:320 p:128 > log_heap_extract_opt_pre_20_8
- echo "preprocessing_heap_16 (opt preproc)"
-./run-experiment -t 16 heap 20 20 0 8 1 > log_heap_extract_opt_online_20_8
- echo "preprocessing_heap_16 (opt online)":
-
-
-
-./run-experiment -p  m:1264 a:320 s:304 r20:1824 c:640 p:128 > log_heap_extract_basic_pre_20_16
- echo "preprocessing_heap_16 (basic preproc)"
-./run-experiment -t 16 heap 20 20 0 16 0 > log_heap_extract_basic_online_20_16
- echo "preprocessing_heap_16 (basic online)"
-
-./run-experiment -p  m:1264 a:320 s:304 i19.3:16 c:640 p:128 > log_heap_extract_opt_pre_20_16
- echo "preprocessing_heap_16 (opt preproc)"
-./run-experiment -t 16 heap 20 20 0 16 1 > log_heap_extract_opt_online_20_16
- echo "preprocessing_heap_16 (opt online)":
-
-
-
- ./run-experiment -p m:2528 a:640 s:608 r20:3648 c:1280 p:128 > log_heap_extract_basic_pre_20_32
-  echo "preprocessing_heap_32 (basic preproc)"
- ./run-experiment -t 16 heap 20 20 0 32 0 > log_heap_extract_basic_online_20_32
- echo "preprocessing_heap_32 (basic online)"
-
-./run-experiment -p  m:2528 a:640 s:608 i19.3:32 c:1280 p:128 > log_heap_extract_opt_pre_20_32
- echo "preprocessing_heap_32 (opt preproc)"
- ./run-experiment -t 16 heap 20 20 0 32 1 > log_heap_extract_opt_online_20_32
- echo "preprocessing_heap_32 (opt online)":  
-
-
-echo "Running the Heap Extract Experiments (Basic)"
 cd ..
 nitrs=10
+for itr in $(seq 1 $nitrs); do
+echo "heapsize: 4\nis_optimized: 0\n" > "repro/data/log_heap_extract_basic_pre_20_4_itr_$itr"
+./run-experiment -p  m:316 a:80 s:76 r20:456 c:160 p:128 >> "repro/data/log_heap_extract_basic_pre_20_4_itr_$itr"
+echo "preprocessing_heap_16 (basic preproc)"
+echo "heapsize: 4\nis_optimized: 0\n" > "repro/data/log_heap_extract_basic_pre_20_4_itr_$itr"
+./run-experiment -t 16 heap 20 20 0 4 0 >> "repro/data/log_heap_extract_basic_online_20_4_itr_$itr"
+echo "preprocessing_heap_16 (basic online)"
+echo "heapsize: 4\nis_optimized: 0\n" > "repro/data/log_heap_extract_basic_pre_20_4_itr_$itr"
+./run-experiment -p  m:316 a:80 s:76 i19.3:4 c:160 p:128 >> "repro/data/log_heap_extract_opt_pre_20_4_itr_$itr"
+ echo "preprocessing_heap_16 (opt preproc)"
+ echo "heapsize: 4\nis_optimized: 0\n" > "repro/data/log_heap_extract_basic_pre_20_4_itr_$itr"
+ ./run-experiment -t 16 heap 20 20 0 4 1 >> "repro/data/log_heap_extract_opt_online_20_4_itr_$itr"
+ echo "preprocessing_heap_16 (opt online)":
+
+
+./run-experiment -p m:632 a:160 s:152 r20:912 c:320 p:128 >> "repro/data/log_heap_extract_basic_pre_20_8_itr_$itr"
+echo "preprocessing_heap_16 (basic preproc)"
+./run-experiment -t 16 heap 20 20 0 8 0 >> "repro/data/log_heap_extract_basic_online_20_8_itr_$itr"
+echo "preprocessing_heap_16 (basic online)"
+
+./run-experiment -p  m:632 a:160 s:152 i19.3:8 c:320 p:128 >> "repro/data/log_heap_extract_opt_pre_20_8_itr_$itr"
+ echo "preprocessing_heap_16 (opt preproc)"
+./run-experiment -t 16 heap 20 20 0 8 1 >> "repro/data/log_heap_extract_opt_online_20_8_itr_$itr"
+ echo "preprocessing_heap_16 (opt online)":
+
+
+
+./run-experiment -p  m:1264 a:320 s:304 r20:1824 c:640 p:128 >> "repro/data/log_heap_extract_basic_pre_20_16_itr_$itr"
+ echo "preprocessing_heap_16 (basic preproc)"
+./run-experiment -t 16 heap 20 20 0 16 0 >> "repro/data/log_heap_extract_basic_online_20_16_itr_$itr"
+ echo "preprocessing_heap_16 (basic online)"
+
+./run-experiment -p  m:1264 a:320 s:304 i19.3:16 c:640 p:128 >> "repro/data/log_heap_extract_opt_pre_20_16_itr_$itr"
+ echo "preprocessing_heap_16 (opt preproc)"
+./run-experiment -t 16 heap 20 20 0 16 1 >> "repro/data/log_heap_extract_opt_online_20_16_itr_$itr"
+ echo "preprocessing_heap_16 (opt online)":
+
+
+
+ ./run-experiment -p m:2528 a:640 s:608 r20:3648 c:1280 p:128 >> "repro/data/log_heap_extract_basic_pre_20_32_itr_$itr"
+  echo "preprocessing_heap_32 (basic preproc)"
+ ./run-experiment -t 16 heap 20 20 0 32 0 >> "repro/data/log_heap_extract_basic_online_20_32_itr_$itr"
+ echo "preprocessing_heap_32 (basic online)"
+
+ ./run-experiment -p  m:2528 a:640 s:608 i19.3:32 c:1280 p:128 >> "repro/data/log_heap_extract_opt_pre_20_32_itr_$itr"
+ echo "preprocessing_heap_32 (opt preproc)"
+ ./run-experiment -t 16 heap 20 20 0 32 1 >> "repro/data/log_heap_extract_opt_online_20_32_itr_$itr"
+ echo "preprocessing_heap_32 (opt online)":  
+done
+
+echo "Running the Heap Extract Experiments (Basic)"
+
+
 for itr in $(seq 1 $nitrs); do
     echo $itr
     echo "heapsize: 16\nis_optimized: 0\n" > "repro/data/log_basic_heap_extract_preproc_16_itr_$itr"	

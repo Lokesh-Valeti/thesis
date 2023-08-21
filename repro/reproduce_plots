@@ -7,8 +7,8 @@ cd ..
 
 rm "repro/experimentaldata_preproc_wallclock"  "repro/experimentaldata_wallclock"
 touch "repro/experimentaldata_preproc_wallclock"  "repro/experimentaldata_wallclock"
-nitrs=2
-minsize=18
+nitrs=10
+minsize=16
 maxsize=26
 stepsize=2
 for itr in $(seq 1 $nitrs); do
@@ -23,8 +23,16 @@ for itr in $(seq 1 $nitrs); do
 	 # Store each value in different variables
 	 heapsize=${values[0]}  
  	 optimization_flag=${values[1]} 
-	 extract_wc=${values[4]} 
+	 milliseconds=${values[4]}
+         #seconds=$((milliseconds / 1000))
+	 seconds=$(echo "scale=3; $milliseconds / 1000" | bc)  # Use bc for decimal division
+	 extract_wc=$seconds
  
+	 echo $optimization_flag 
+	 echo $heapsize 
+	 echo $milliseconds
+	 echo "$extract_wc"
+
 	 datafile="repro/experimentaldata_wallclock"
  	 python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $extract_wc
 
@@ -36,7 +44,9 @@ for itr in $(seq 1 $nitrs); do
  	 IFS=$'\n' read -d '' -r -a values <<< "$output"
 
  	# Store each value in different variables
-	 heapsize=${values[0]}  optimization_flag=${values[1]} extract_wc=${values[4]}
+	 milliseconds=${values[4]}
+	 seconds=$(echo "scale=3; $milliseconds / 1000" | bc)  # Use bc for decimal division
+	 heapsize=${values[0]}  optimization_flag=${values[1]} extract_wc=$seconds
  	 datafile="repro/experimentaldata_wallclock"
  	 python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $extract_wc
  done	
@@ -45,6 +55,7 @@ echo "OnlineTable"
 cat $datafile
 echo -e "\n\n"
 
+nitrs=2
 for itr in $(seq 1 $nitrs); do
   for heapsize in $(seq $minsize $stepsize $maxsize); do
 	input_file="repro/data/log_basic_heap_extract_preproc_${heapsize}_itr_$itr"
@@ -74,7 +85,7 @@ done
 echo "Preproc Table"
 cat $datafile
 echo -e "\n\n"
-
+nitrs=0
 # Replace "python3" with your Python interpreter if needed
 DS="Heap"
 Operation="Insert"

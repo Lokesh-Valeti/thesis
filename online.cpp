@@ -1258,7 +1258,7 @@ static void bsearch_test(MPCIO &mpcio,
         mpcio.reset_stats();
         tio.reset_lamport();
         // Create a random database and sort it
-        // size_t &aes_ops = tio.aes_ops();
+        //size_t &aes_ops = tio.aes_ops();
         Duoram<RegAS> oram(tio.player(), len);
         auto A = oram.flat(tio, yield);
         A.explicitonly(true);
@@ -1266,15 +1266,16 @@ static void bsearch_test(MPCIO &mpcio,
         std::vector<coro_t> coroutines;
         for (address_t i=0; i<len; ++i) {
             coroutines.emplace_back(
-                [&A, i](yield_t &yield) {
+                [&A, i, &tio](yield_t &yield) {
                     auto Acoro = A.context(yield);
                     RegAS v;
-                    v.randomize(62);
-                    Acoro[i] += v;
+                    //v.randomize(62);
+                    v.ashare = tio.player() * i;
+		    Acoro[i] = v;
                 });
         }
         run_coroutines(yield, coroutines);
-        A.bitonic_sort(0, len);
+        //A.bitonic_sort(0, len);
         A.explicitonly(false);
 
         tio.sync_lamport();

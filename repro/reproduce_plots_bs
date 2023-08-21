@@ -7,7 +7,7 @@ cd ..
 touch "repro/experimentaldata_bs_preproc_wallclock"  "repro/experimentaldata_bs_wallclock"
 rm "repro/experimentaldata_bs_preproc_wallclock"  "repro/experimentaldata_bs_wallclock"
 touch "repro/experimentaldata_bs_preproc_wallclock"  "repro/experimentaldata_bs_wallclock"
-nitrs=1
+nitrs=2
 minsize=16
 maxsize=24
 stepsize=2
