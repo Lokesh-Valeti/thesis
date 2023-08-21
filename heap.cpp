@@ -292,8 +292,6 @@ void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, Reg
 RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield, RegXS index) {
     RegAS smallest;
     auto HeapArray = oram.flat(tio, yield);
-    mpcio.reset_stats();
-    tio.reset_lamport();
     RegXS leftchildindex = index;
     leftchildindex = index << 1;
     RegXS rightchildindex;
