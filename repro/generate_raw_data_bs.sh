@@ -18,7 +18,7 @@ for itr in $(seq 1 $nitrs); do
     ./docker/run-experiment -p m:19 r19:19 c:19 p:64 >> "repro/data/log_basic_bs_preproc_18_itr_$itr"
     echo "preprocessing_bs_18 (basic online)"
     echo "bssize: 18\nis_optimized: 0\n" > "repro/data/log_basic_bs_online_18_itr_$itr"
-    ./docker/run-experiment  -t 64 bbsearch 16 >> "repro/data/log_basic_bs_online_18_itr_$itr"
+    ./docker/run-experiment  -t 64 bbsearch 18 >> "repro/data/log_basic_bs_online_18_itr_$itr"
     echo "preprocessing_bs_18 (basic online)"	
 done
 
@@ -28,7 +28,7 @@ for itr in $(seq 1 $nitrs); do
     ./docker/run-experiment -p m:21 r21:21 c:21 p:64 >> "repro/data/log_basic_bs_preproc_20_itr_$itr"
     echo "preprocessing_bs_20 (basic preproc)"
     echo "bssize: 20\nis_optimized: 0\n" > "repro/data/log_basic_bs_online_20_itr_$itr"
-    ./docker/run-experiment  -t 64 bbsearch 16 >> "repro/data/log_basic_bs_online_20_itr_$itr"
+    ./docker/run-experiment  -t 64 bbsearch 20 >> "repro/data/log_basic_bs_online_20_itr_$itr"
     echo "preprocessing_bs_20 (basic online)"
 done
 
@@ -38,7 +38,7 @@ for itr in $(seq 1 $nitrs); do
    ./docker/run-experiment -p m:23 r23:23 c:23 p:64 >> "repro/data/log_basic_bs_preproc_22_itr_$itr"
    echo "preprocessing_bs_22 (basic preproc)"
    echo "bssize: 22\nis_optimized: 0\n" > "repro/data/log_basic_bs_online_22_itr_$itr"
-   ./docker/run-experiment  -t 64 bbsearch 16 >>  "repro/data/log_basic_bs_online_22_itr_$itr"
+   ./docker/run-experiment  -t 64 bbsearch 22 >>  "repro/data/log_basic_bs_online_22_itr_$itr"
    echo "preprocessing_bs_22 (basic online)"
 done
 
@@ -48,7 +48,7 @@ for itr in $(seq 1 $nitrs); do
   ./docker/run-experiment -p m:25 r25:25 c:25 p:64 >>  "repro/data/log_basic_bs_preproc_24_itr_$itr"
   echo "preprocessing_bs_24 (basic preproc)"
   echo "bssize: 24\nis_optimized: 0\n" > "repro/data/log_basic_bs_online_24_itr_$itr"
-  ./docker/run-experiment  -t 64 bbsearch 16 >>   "repro/data/log_basic_bs_online_24_itr_$itr"
+  ./docker/run-experiment  -t 64 bbsearch 24 >>   "repro/data/log_basic_bs_online_24_itr_$itr"
   echo "preprocessing_bs_24 (basic online)"
 done
 
@@ -57,7 +57,7 @@ for itr in $(seq 1 $nitrs); do
   echo "bssize: 26\nis_optimized: 0\n" > "repro/data/log_basic_bs_preproc_26_itr_$itr"
   ./docker/run-experiment -p m:27 r27:27 c:27 p:64 >>  "repro/data/log_basic_bs_preproc_26_itr_$itr"
   echo "bssize: 26\nis_optimized: 0\n" > "repro/data/log_basic_bs_online_26_itr_$itr"
-  ./docker/run-experiment  -t 64 bbsearch 16 >> "repro/data/log_basic_bs_online_26_itr_$itr"
+  ./docker/run-experiment  -t 64 bbsearch 26 >> "repro/data/log_basic_bs_online_26_itr_$itr"
   echo "preprocessing_bs_26 (basic online)"
 done
 
