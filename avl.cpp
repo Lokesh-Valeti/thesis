@@ -1745,7 +1745,7 @@ void avl(MPCIO &mpcio,
             #ifdef RANDOMIZE
                 dkey = 1 + (rand()%init_size);
             #else
-                dkey = i + init_size;
+                dkey = i + 0;
             #endif
             del_key.set(dkey * tio.player());
             printf("Deletion key = %ld\n", dkey);
