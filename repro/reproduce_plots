@@ -9,7 +9,7 @@ rm "repro/experimentaldata_preproc_wallclock"  "repro/experimentaldata_wallclock
 touch "repro/experimentaldata_preproc_wallclock"  "repro/experimentaldata_wallclock"
 nitrs=10
 minsize=16
-maxsize=26
+maxsize=30
 stepsize=2
 for itr in $(seq 1 $nitrs); do
  for heapsize in $(seq $minsize $stepsize $maxsize); do
@@ -65,8 +65,10 @@ for itr in $(seq 1 $nitrs); do
   	IFS=$'\n' read -d '' -r -a values <<< "$output"
 
   	# Store each value in different variables
- 	heapsize=${values[0]}  optimization_flag=${values[1]} preproc_wc=${values[2]} 
-  	datafile="repro/experimentaldata_preproc_wallclock"
+ 	heapsize=${values[0]}  optimization_flag=${values[1]} milliseconds=${values[2]} 
+	seconds=$(echo "scale=3; $milliseconds / 1000" | bc)  # Use bc for decimal division
+	preproc_wc=$seconds
+	datafile="repro/experimentaldata_preproc_wallclock"
   	python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $preproc_wc
 
   	input_file="repro/data/log_opt_heap_extract_preproc_${heapsize}_itr_$itr"
@@ -76,7 +78,9 @@ for itr in $(seq 1 $nitrs); do
   	IFS=$'\n' read -d '' -r -a values <<< "$output"
 
   	# Store each value in different variables
-  	heapsize=${values[0]}  optimization_flag=${values[1]} preproc_wc=${values[2]}
+  	heapsize=${values[0]}  optimization_flag=${values[1]} milliseconds=${values[2]}
+	seconds=$(echo "scale=3; $milliseconds / 1000" | bc)  # Use bc for decimal division
+        preproc_wc=$seconds
   	datafile="repro/experimentaldata_preproc_wallclock"
   	python3 repro/append-experiment-results.py $datafile $DS $Operation $optimization_flag $heapsize $preproc_wc
   done
