@@ -1,4 +1,7 @@
   
+# This generates the raw data for all all the small (n <= 2^26) heap experiments
+
+
 echo "Running the Heap Extract Experiments (Basic)"
 cd ..
 nitrs=1
