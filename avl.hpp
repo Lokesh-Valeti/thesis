@@ -11,19 +11,26 @@
 #include "options.hpp"
 #include "bst.hpp"
 
-#define KNRM  "\x1B[0m"
-#define KRED  "\x1B[31m"
-#define KGRN  "\x1B[32m"
-#define KYEL  "\x1B[33m"
-#define KBLU  "\x1B[34m"
-#define KMAG  "\x1B[35m"
-#define KCYN  "\x1B[36m"
-#define KWHT  "\x1B[37m"
+/*
+    Macro definitions:
+ 
+    AVL_OPT_ON: Turn AVL optimizations on
+        Optimizations:
+        - Use incremental DPFs for traversing the tree
+        - Use updates instead of writes when possible
 
-#define OPT_ON 0
-// #define RANDOMIZE 0
-// #define DEBUG 0
-// #define DEBUG_BB 0
+    RANDOMIZE: Randomize keys of items inserted. When turned off, items 
+    with incremental keys are inserted  
+
+    DEBUG: General debug flag
+
+    DEBUG_BB: Debug flag for balance bit computations
+*/
+
+#define AVL_OPT_ON
+// #define AVL_RANDOMIZE_INSERTS
+// #define AVL_DEBUG
+// #define AVL_DEBUG_BB
 
 /*
   For AVL tree we'll treat the pointers fields as:
@@ -49,11 +56,11 @@ inline int AVL_TTL(size_t n) {
 }
 
 inline RegXS getAVLLeftPtr(RegXS pointer){
-    return ((pointer&(0xFFFFFFFF00000000))>>33);
+    return (pointer>>33);
 }
 
 inline RegXS getAVLRightPtr(RegXS pointer){
-    return ((pointer&(0x00000001FFFFFFFF))>>2);
+    return ((pointer&(0x00000001FFFFFFFC))>>2);
 }
 
 inline void setAVLLeftPtr(RegXS &pointer, RegXS new_ptr){
@@ -68,14 +75,14 @@ inline void setAVLRightPtr(RegXS &pointer, RegXS new_ptr){
 
 inline RegBS getLeftBal(RegXS pointer){
     RegBS bal_l;
-    bool bal_l_bit = ((pointer.share() & (0x0000000000000002))>>1) & 1;
+    bool bal_l_bit = ((pointer.share() & (0x0000000000000002))>>1);
     bal_l.set(bal_l_bit);
     return bal_l;
 }
 
 inline RegBS getRightBal(RegXS pointer){
     RegBS bal_r;
-    bool bal_r_bit = (pointer.share() & (0x0000000000000001)) & 1;
+    bool bal_r_bit = (pointer.share() & (0x0000000000000001));
     bal_r.set(bal_r_bit);
     return bal_r;
 }
@@ -142,7 +149,7 @@ class AVL {
 
     std::tuple<RegBS, RegBS, RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
         RegXS ins_addr, RegAS ins_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy, 
-        avl_insert_return *ret);
+        avl_insert_return &ret);
 
     void rotate(MPCTIO &tio, yield_t &yield, RegXS &gp_pointers, RegXS p_ptr,
         RegXS &p_pointers, RegXS c_ptr, RegXS &c_pointers, RegBS dir_gpp,
@@ -152,7 +159,7 @@ class AVL {
         RegBS bal_l, RegBS bal_r, RegBS bal_upd, RegBS child_dir);
 
     void updateChildPointers(MPCTIO &tio, yield_t &yield, RegXS &left, RegXS &right,
-          RegBS c_prime, avl_del_return ret_struct);
+          RegBS c_prime, const avl_del_return &ret_struct);
 
     void fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A, 
         Duoram<Node>::OblivIndex<RegXS,1> oidx, RegXS oidx_oldptrs, RegXS ptr, 
@@ -172,6 +179,12 @@ class AVL {
     bool lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key,
         Duoram<Node>::Flat &A, int TTL, RegBS isDummy, Node *ret_node);
 
+    void pretty_print(const std::vector<Node> &R, value_t node,
+        const std::string &prefix, bool is_left_child, bool is_right_child);
+
+    std::tuple<bool, bool, bool, address_t> check_avl(const std::vector<Node> &R,
+        value_t node, value_t min_key, value_t max_key);
+
   public:
     AVL(int num_players, size_t size) : oram(num_players, size) {
         this->MAX_SIZE = size;
@@ -188,13 +201,11 @@ class AVL {
         empty_locations.clear();
     }
 
-    size_t numEmptyLocations(){
-        return(empty_locations.size());
-    };
-
     void insert(MPCTIO &tio, yield_t &yield, const Node &node);
 
-    // Deletes the first node that matches del_key
+    // Deletes the first node that matches del_key. If an item with del_key
+    // does not exist in the tree, it results in an explicit (non-oblivious)
+    //  failure.
     bool del(MPCTIO &tio, yield_t &yield, RegAS del_key);
 
     // Returns the first node that matches key
@@ -205,11 +216,7 @@ class AVL {
 
     // Display and correctness check functions
     void pretty_print(MPCTIO &tio, yield_t &yield);
-    void pretty_print(const std::vector<Node> &R, value_t node,
-        const std::string &prefix, bool is_left_child, bool is_right_child);
     void check_avl(MPCTIO &tio, yield_t &yield);
-    std::tuple<bool, bool, bool, address_t> check_avl(const std::vector<Node> &R,
-        value_t node, value_t min_key, value_t max_key);
     void print_oram(MPCTIO &tio, yield_t &yield);
 
     // For test functions ONLY:

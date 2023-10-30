@@ -37,8 +37,8 @@ bool reconstruct_RegBS(MPCTIO &tio, yield_t &yield, RegBS flag) {
     return reconstructed_flag.bshare;
 }
 
-/* 
-    A function to assign a new random 8-bit key to a node, and resets its 
+/*
+    A function to assign a new random 8-bit key to a node, and resets its
     pointers to zeroes. The node is assigned a new random 64-bit value.
 */
 static void randomize_node(Node &a) {
@@ -48,13 +48,13 @@ static void randomize_node(Node &a) {
 }
 
 /*
-    A function to perform key comparsions for BST traversal. 
+    A function to perform key comparsions for BST traversal.
     Inputs: k1 = key of node in the tree, k2 = insertion/deletion/lookup key.
-    Evaluates (k2-k1), and combines the lt and eq flag into one (flag to go 
+    Evaluates (k2-k1), and combines the lt and eq flag into one (flag to go
     left), and keeps the gt flag as is (flag to go right) during traversal.
-    
+
 */
-std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1, 
+std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1,
         RegAS k2) {
     CDPF cdpf = tio.cdpf(yield);
     auto [lt, eq, gt] = cdpf.compare(tio, yield, k2 - k1, tio.aes_ops());
@@ -65,17 +65,17 @@ std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1,
 // Assuming pointer of 64 bits is split as:
 // - 32 bits Left ptr (L)
 // - 32 bits Right ptr (R)
-// The pointers are stored as: (L << 32) | R 
+// The pointers are stored as: (L << 32) | R
 
-inline RegXS extractLeftPtr(RegXS pointer){ 
-    return ((pointer&(0xFFFFFFFF00000000))>>32); 
+inline RegXS extractLeftPtr(RegXS pointer){
+    return ((pointer&(0xFFFFFFFF00000000))>>32);
 }
 
 inline RegXS extractRightPtr(RegXS pointer){
-    return (pointer&(0x00000000FFFFFFFF)); 
+    return (pointer&(0x00000000FFFFFFFF));
 }
 
-inline void setLeftPtr(RegXS &pointer, RegXS new_ptr){ 
+inline void setLeftPtr(RegXS &pointer, RegXS new_ptr){
     pointer&=(0x00000000FFFFFFFF);
     pointer+=(new_ptr<<32);
 }
@@ -207,9 +207,9 @@ void BST::check_bst(MPCTIO &tio, yield_t &yield) {
 
 /*
     The recursive insert() call, invoked by the wrapper insert() function.
-    
+
     Takes as input the pointer to the current node in tree traversal (ptr),
-    the new node to be inserted (new_node), the underlying Duoram as a 
+    the new node to be inserted (new_node), the underlying Duoram as a
     flat (A), and the Time-To_live TTL, and a shared flag (isDummy) which
     tracks if the operation is dummy/real.
 
@@ -228,10 +228,10 @@ std::tuple<RegXS, RegBS> BST::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
 
     // Depending on [lteq, gt] select the next ptr/index as
     // upper 32 bits of cnode.pointers if lteq
-    // lower 32 bits of cnode.pointers if gt 
+    // lower 32 bits of cnode.pointers if gt
     RegXS left = extractLeftPtr(cnode.pointers);
     RegXS right = extractRightPtr(cnode.pointers);
-    
+
     RegXS next_ptr;
     mpc_select(tio, yield, next_ptr, gt, left, right, 32);
 
@@ -241,13 +241,13 @@ std::tuple<RegXS, RegBS> BST::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
     RegBS F_z = dpf.is_zero(tio, yield, next_ptr, aes_ops);
     RegBS F_i;
 
-    // F_i: If this was last node on path (F_z) && isNotDummy: 
+    // F_i: If this was last node on path (F_z) && isNotDummy:
     //          insert new_node here.
     mpc_and(tio, yield, F_i, (isNotDummy), F_z);
-     
+
     isDummy^=F_i;
     auto [wptr, direction] = insert(tio, yield, next_ptr, new_node, A, TTL-1, isDummy);
-    
+
     RegXS ret_ptr;
     RegBS ret_direction;
     // If we insert here (F_i), return the ptr to this node as wptr
@@ -258,7 +258,7 @@ std::tuple<RegXS, RegBS> BST::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
         //ret_direction = direction + F_i (direction - gt)
         { mpc_and(tio, yield, ret_direction, F_i, direction^gt);});
 
-    ret_direction^=direction;  
+    ret_direction^=direction;
 
     return {ret_ptr, ret_direction};
 }
@@ -288,7 +288,7 @@ void BST::insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Fl
         bool insertAtEmptyLocation = (empty_locations.size() > 0);
         if(insertAtEmptyLocation) {
             insert_address = empty_locations.back();
-            empty_locations.pop_back(); 
+            empty_locations.pop_back();
             A[insert_address] = node;
         } else {
             new_id = 1 + num_items;
@@ -305,14 +305,14 @@ void BST::insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Fl
         RegXS left_ptr = extractLeftPtr(pointers);
         RegXS right_ptr = extractRightPtr(pointers);
         RegXS new_right_ptr, new_left_ptr;
-    
-        RegBS not_direction = direction; 
+
+        RegBS not_direction = direction;
         if (player0) {
             not_direction^=1;
         }
-    
-        run_coroutines(tio, 
-            [&tio, &new_right_ptr, direction, right_ptr, insert_address](yield_t &yield) 
+
+        run_coroutines(tio,
+            [&tio, &new_right_ptr, direction, right_ptr, insert_address](yield_t &yield)
             { mpc_select(tio, yield, new_right_ptr, direction, right_ptr, insert_address);},
             [&tio, &new_left_ptr, not_direction, left_ptr, insert_address](yield_t &yield)
             { mpc_select(tio, yield, new_left_ptr, not_direction, left_ptr, insert_address);});
@@ -320,7 +320,7 @@ void BST::insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Fl
         setLeftPtr(pointers, new_left_ptr);
         setRightPtr(pointers, new_right_ptr);
         A[wptr].NODE_POINTERS = pointers;
-    } 
+    }
 }
 
 /*
@@ -360,10 +360,10 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
 
     // Depending on [lteq, gt] select the next ptr/index as
     // upper 32 bits of cnode.pointers if lteq
-    // lower 32 bits of cnode.pointers if gt 
+    // lower 32 bits of cnode.pointers if gt
     RegXS left = extractLeftPtr(cnode.pointers);
     RegXS right = extractRightPtr(cnode.pointers);
-    
+
     RegXS next_ptr;
 
     RegBS F_found;
@@ -371,7 +371,7 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
     // then we found the node to return
     RegBS isNotDummy = isDummy ^ (!tio.player());
 
-    // Note: This logic returns the last matched key and value. 
+    // Note: This logic returns the last matched key and value.
     // Returning the first one incurs an additional round.
     std::vector<coro_t> coroutines;
     coroutines.emplace_back(
@@ -391,7 +391,7 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
         { mpc_or(tio, yield, isDummy, isDummy, eq);});
     run_coroutines(tio, coroutines);
 
-    #ifdef BST_DEBUG 
+    #ifdef BST_DEBUG
         size_t ckey = mpc_reconstruct(tio, yield, cnode.key, 64);
         size_t lkey = mpc_reconstruct(tio, yield, key, 64);
         bool rec_lt = mpc_reconstruct(tio, yield, lt);
@@ -402,10 +402,10 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
         printf("rec_lt = %d, rec_eq = %d, rec_gt = %d\n", rec_lt, rec_eq, rec_gt);
         printf("rec_isDummy/found = %d ,rec_f_found = %d, cnode.key = %ld, lookup key = %ld\n", rec_found, rec_f_found, ckey, lkey);
     #endif
-    
+
     RegBS found = lookup(tio, yield, next_ptr, key, A, TTL-1, isDummy, ret_node);
 
-    return found;    
+    return found;
 }
 
 RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
@@ -432,10 +432,10 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
 
 /*
     The recursive del() call, invoked by the wrapper del() function.
-    
+
     Takes as input the pointer to the current node in tree traversal (ptr),
-    the key to be deleted (del_key), the underlying Duoram as a 
-    flat (A), Flags af (already found) and fs (find successor), the 
+    the key to be deleted (del_key), the underlying Duoram as a
+    flat (A), Flags af (already found) and fs (find successor), the
     Time-To_live TTL. Finally, a return structure ret_struct that tracks
     the location of the successor node and the node to delete to perform
     the actual deletion after the recursive traversal; which is required in
@@ -446,15 +446,15 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
 */
 
 bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
-     Duoram<Node>::Flat &A, RegBS af, RegBS fs, int TTL, 
+     Duoram<Node>::Flat &A, RegBS af, RegBS fs, int TTL,
     del_return &ret_struct) {
     bool player0 = tio.player()==0;
     //printf("TTL = %d\n", TTL);
     if(TTL==0) {
         //Reconstruct and return af
         bool success = reconstruct_RegBS(tio, yield, af);
-        //printf("Reconstructed flag = %d\n", success); 
-        if(player0) { 
+        //printf("Reconstructed flag = %d\n", success);
+        if(player0) {
             ret_struct.F_r^=1;
         }
         return success;
@@ -466,11 +466,11 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         Node node = A[ptr];
         RegXS left = extractLeftPtr(node.pointers);
         RegXS right = extractRightPtr(node.pointers);
-        
+
         CDPF cdpf = tio.cdpf(yield);
         size_t &aes_ops = tio.aes_ops();
         RegBS l0, r0, lt, eq, gt;
-        // l0: Is left child 0 
+        // l0: Is left child 0
         // r0: Is right child 0
         run_coroutines(tio,
             [&tio, &l0, left, &aes_ops, &cdpf](yield_t &yield)
@@ -495,7 +495,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         printf("cdpf.compare results: lt = %d, eq = %d, gt = %d\n", lt_rec, eq_rec, gt_rec);
         */
 
-        // c is the direction bit for next_ptr 
+        // c is the direction bit for next_ptr
         // (c=0: go left or c=1: go right)
         RegBS c = gt;
         // lf = local found. We found the key to delete in this level.
@@ -507,12 +507,12 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         // F_1 = l0 \xor r0
         F_1 = l0 ^ r0;
 
-        // We set next ptr based on c, but we need to handle three 
+        // We set next ptr based on c, but we need to handle three
         // edge cases where we do not go by just the comparison result
         RegXS next_ptr;
         RegBS c_prime;
         // Case 1: found the node here (lf): we traverse down the lone child path.
-        // or we are finding successor (fs) and there is no left child. 
+        // or we are finding successor (fs) and there is no left child.
         RegBS F_c1, F_c2, F_c3, F_c4;
 
         // Case 1: lf & F_1
@@ -522,7 +522,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
             [&tio, &F_0, l0, r0] (yield_t &yield)
             // F_0 = l0 & r0
             { mpc_and(tio, yield, F_0, l0, r0);});
-        
+
         // F_2 = !(F_0 + F_1) (Only 1 of F_0, F_1, and F_2 can be true)
         F_2 = F_0 ^ F_1;
         if(player0)
@@ -547,13 +547,13 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
             // In find successor case, so find inorder successor
             // (Go right and then find leftmost child.)
             { mpc_and(tio, yield, F_c2, lf, F_2);});
-        
+
         /*
         // Reconstruct and Debug Block 2
         bool F_c2_rec, s1_rec;
         F_c2_rec = mpc_reconstruct(tio, yield, F_c2);
-        s1_rec = mpc_reconstruct(tio, yield, s1); 
-        c_prime_rec = mpc_reconstruct(tio, yield, c_prime); 
+        s1_rec = mpc_reconstruct(tio, yield, s1);
+        c_prime_rec = mpc_reconstruct(tio, yield, c_prime);
         printf("c_prime = %d, F_c2 = %d, s1 = %d\n", c_prime_rec, F_c2_rec, s1_rec);
         */
 
@@ -562,7 +562,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
             { mpc_select(tio, yield, c_prime, F_c2, c_prime, s1);},
             [&tio, &F_c3, fs, F_2](yield_t &yield)
             // Case 3: finding successor (fs) and node has both children (F_2)
-            // Go left. 
+            // Go left.
             { mpc_and(tio, yield, F_c3, fs, F_2);});
 
         run_coroutines(tio,
@@ -577,7 +577,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         mpc_select(tio, yield, c_prime, F_c4, c_prime, l0);
 
         RegBS af_prime, fs_prime;
-        run_coroutines(tio, 
+        run_coroutines(tio,
             [&tio, &next_ptr, c_prime, left, right](yield_t &yield)
             // Set next_ptr
             { mpc_select(tio, yield, next_ptr, c_prime, left, right, 32);},
@@ -597,7 +597,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
             return 0;
         }
 
-        //printf("TTL = %d\n", TTL); 
+        //printf("TTL = %d\n", TTL);
         RegBS F_rs_right, F_rs_left, not_c_prime=c_prime;
         if(player0) {
             not_c_prime^=1;
@@ -630,22 +630,22 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         setRightPtr(new_ptr, right);
         A[ptr].NODE_POINTERS = new_ptr;
 
-        // Update the return structure 
+        // Update the return structure
         RegBS F_nd, F_ns, F_r, not_af = af, not_F_2 = F_2;
         if(player0) {
             not_af^=1;
             not_F_2^=1;
         }
-        // F_ns = fs & l0 
+        // F_ns = fs & l0
         // Finding successor flag & no more left child = F_c4
         F_ns = F_c4;
-    
-        run_coroutines(tio, 
+
+        run_coroutines(tio,
             [&tio, &ret_struct, F_c2](yield_t &yield)
             { mpc_or(tio, yield, ret_struct.F_ss, ret_struct.F_ss, F_c2);},
             [&tio, &F_nd, lf, not_af](yield_t &yield)
             { mpc_and(tio, yield, F_nd, lf, not_af);});
-            
+
 
         // F_r = F_d.(!F_2)
         // If we have to delete here, and it doesn't have two children we have to
@@ -662,13 +662,15 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
             [&tio, &ret_struct, F_r, ptr](yield_t &yield)
             { mpc_select(tio, yield, ret_struct.ret_ptr, F_r, ptr, ret_struct.ret_ptr);});
 
-        //We don't empty the key and value of the node with del_key in the ORAM 
+        //We don't empty the key and value of the node with del_key in the ORAM
         return 1;
     }
 }
 
 /*
     The main del() function.
+    Trying to delete an item that does not exist in the tree will result in
+    an explicit (non-oblivious) failure.
 
     Takes as input the key to delete (del_key).
     Returns success/fail bit.
@@ -684,22 +686,22 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
         empty_locations.emplace_back(root);
         A[root] = zero;
         num_items--;
-        return 1; 
+        return 1;
     } else {
         int TTL = num_items;
         // Flags for already found (af) item to delete and find successor (fs)
         // if this deletion requires a successor swap
         RegBS af;
         RegBS fs;
-        del_return ret_struct; 
+        del_return ret_struct;
         auto A = oram.flat(tio, yield);
-        int success = del(tio, yield, root, del_key, A, af, fs, TTL, ret_struct); 
-        printf ("Success =  %d\n", success); 
+        int success = del(tio, yield, root, del_key, A, af, fs, TTL, ret_struct);
+        printf ("Success =  %d\n", success);
         if(!success){
             return 0;
         }
         else{
-            num_items--; 
+            num_items--;
             /*
             printf("In delete's swap portion\n");
             Node del_node = A.reconstruct(A[ret_struct.N_d]);
@@ -712,8 +714,8 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
             Node suc_node = A[ret_struct.N_s];
             RegAS zero_as; RegXS zero_xs;
             RegXS empty_loc, temp_root = root;
-         
-            run_coroutines(tio, 
+
+            run_coroutines(tio,
                 [&tio, &temp_root, ret_struct](yield_t &yield)
                 { mpc_select(tio, yield, temp_root, ret_struct.F_r, temp_root, ret_struct.ret_ptr);},
                 [&tio, &del_node, ret_struct, suc_node](yield_t &yield)
@@ -771,15 +773,15 @@ void bst(MPCIO &mpcio,
         int insert_array[] = {10, 10, 13, 11, 14, 8, 15, 20, 17, 19, 7, 12};
         //int insert_array[] = {1, 2, 3, 4, 5, 6};
         size_t insert_array_size = sizeof(insert_array)/sizeof(int);
-        Node node; 
+        Node node;
         for(size_t i = 0; i<insert_array_size; i++) {
           randomize_node(node);
           node.key.set(insert_array[i] * tio.player());
           tree.insert(tio, yield, node);
         }
-       
+
         tree.pretty_print(tio, yield);
-         
+
         RegAS del_key;
 
         printf("\n\nDelete %x\n", 20);
@@ -863,7 +865,7 @@ void bst(MPCIO &mpcio,
             if(rec_found) {
                 printf("Lookup Success\n");
                 size_t value = mpc_reconstruct(tio, yield, node.value, 64);
-                printf("value = %lx\n", value);    
+                printf("value = %lx\n", value);
             } else {
                 printf("Lookup Failed\n");
             }

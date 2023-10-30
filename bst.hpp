@@ -120,9 +120,9 @@ struct Node {
 };
 
 /*
-    A function to perform key comparsions for BST traversal. 
+    A function to perform key comparsions for BST traversal.
     Inputs: k1 = key of node in the tree, k2 = insertion/deletion/lookup key.
-    Evaluates (k2-k1), and combines the lt and eq flag into one (flag to go 
+    Evaluates (k2-k1), and combines the lt and eq flag into one (flag to go
     left), and keeps the gt flag as is (flag to go right) during traversal.
     Returns the shared bit flags lteq (go left) and gt (go right).
 */
@@ -161,7 +161,7 @@ struct del_return {
 };
 
 class BST {
-  private: 
+  private:
     Duoram<Node> oram;
     RegXS root;
 
@@ -175,10 +175,10 @@ class BST {
     void insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Flat &A);
 
     bool del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
-        Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL, 
+        Duoram<Node>::Flat &A, RegBS F_af, RegBS F_fs, int TTL,
         del_return &ret_struct);
 
-    RegBS lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, 
+    RegBS lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key,
         Duoram<Node>::Flat &A, int TTL, RegBS isDummy, Node *ret_node);
 
     void pretty_print(const std::vector<Node> &R, value_t node,
@@ -188,7 +188,7 @@ class BST {
         value_t node, value_t min_key, value_t max_key);
 
   public:
-    BST(int num_players, size_t size) : oram(num_players, size) {  
+    BST(int num_players, size_t size) : oram(num_players, size) {
         this->MAX_SIZE = size;
     };
 
@@ -196,8 +196,10 @@ class BST {
     // Inserts the provided node into the BST
     void insert(MPCTIO &tio, yield_t &yield, Node &node);
 
-    // Deletes the first node that matches del_key from the BST
-    bool del(MPCTIO &tio, yield_t &yield, RegAS del_key); 
+    // Deletes the first node that matches del_key from the BST.
+    // If an item with del_key does not exist in the tree, it results in an
+    // explicit (non-oblivious) failure.
+    bool del(MPCTIO &tio, yield_t &yield, RegAS del_key);
 
     // Returns the first node that matches key in the BST
     RegBS lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node);
@@ -210,14 +212,14 @@ class BST {
     // Check BST correctness
     void check_bst(MPCTIO &tio, yield_t &yield);
 
-    // Debugging Functions    
+    // Debugging Functions
 
     #ifdef BST_DEBUG
 
         // Print the underlying ORAM state
         void print_oram(MPCTIO &tio, yield_t &yield);
 
-        // Check the number of empty locations in ORAM 
+        // Check the number of empty locations in ORAM
         // (Locations freed up after a delete operation, reusable for next insert.)
         size_t numEmptyLocations(){
             return(empty_locations.size());
