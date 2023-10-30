@@ -13,14 +13,14 @@
 
 /*
     Macro definitions:
- 
+
     AVL_OPT_ON: Turn AVL optimizations on
         Optimizations:
         - Use incremental DPFs for traversing the tree
         - Use updates instead of writes when possible
 
-    RANDOMIZE: Randomize keys of items inserted. When turned off, items 
-    with incremental keys are inserted  
+    RANDOMIZE: Randomize keys of items inserted. When turned off, items
+    with incremental keys are inserted
 
     DEBUG: General debug flag
 
@@ -148,7 +148,7 @@ class AVL {
     std::vector<RegXS> empty_locations;
 
     std::tuple<RegBS, RegBS, RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
-        RegXS ins_addr, RegAS ins_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy, 
+        RegXS ins_addr, RegAS ins_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy,
         avl_insert_return &ret);
 
     void rotate(MPCTIO &tio, yield_t &yield, RegXS &gp_pointers, RegXS p_ptr,
@@ -161,12 +161,12 @@ class AVL {
     void updateChildPointers(MPCTIO &tio, yield_t &yield, RegXS &left, RegXS &right,
           RegBS c_prime, const avl_del_return &ret_struct);
 
-    void fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A, 
-        Duoram<Node>::OblivIndex<RegXS,1> oidx, RegXS oidx_oldptrs, RegXS ptr, 
-        RegXS nodeptrs, RegBS p_bal_l, RegBS p_bal_r, RegBS &bal_upd, RegBS c_prime, 
+    void fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
+        Duoram<Node>::OblivIndex<RegXS,1> oidx, RegXS oidx_oldptrs, RegXS ptr,
+        RegXS nodeptrs, RegBS p_bal_l, RegBS p_bal_r, RegBS &bal_upd, RegBS c_prime,
         RegXS cs_ptr, RegBS imb, RegBS &F_ri, avl_del_return &ret_struct);
 
-    void updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_rs, 
+    void updateRetStruct(MPCTIO &tio, yield_t &yield, RegXS ptr, RegBS F_rs,
         RegBS F_dh, RegBS F_ri, RegBS &bal_upd, avl_del_return &ret_struct);
 
     std::tuple<bool, RegBS> del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,

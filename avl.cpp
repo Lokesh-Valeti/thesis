@@ -214,7 +214,10 @@ void AVL::rotate(MPCTIO &tio, yield_t &yield, RegXS &gp_pointers, RegXS p_ptr,
     RegXS ptr_upd;
 
     // F_gpp: Flag to update gp -> p link, F_pc: Flag to update p -> c link
+    // F_pc_l/F_pc_r: indicates whether p -> c link is in the l/r direction
+    // F_gpp_l/F_gpp_r: indicates whether gp -> p link is in the l/r direction
     RegBS F_gpp, F_pc_l, F_pc_r, F_gppr, F_gppl;
+
     // We care about !F_gp. If !F_gp, then we do the gp->p link updates.
     // Otherwise, we do NOT do any updates to gp-> p link;
     // since F_gp==1, implies gp does not exist and parent is root.
@@ -927,9 +930,14 @@ bool AVL::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>
     RegBS F_found;
     // If we haven't found the key yet, and the lookup matches the current node key,
     // then we found the node to return
-    mpc_and(tio, yield, F_found, isNotDummy, eq);
-    mpc_select(tio, yield, ret_node->key, F_found, ret_node->key, cnode.key);
-    mpc_select(tio, yield, ret_node->value, F_found, ret_node->value, cnode.value);
+
+    run_coroutines(tio,
+        [&tio, &F_found, isNotDummy, eq](yield_t &yield)
+        { mpc_and(tio, yield, F_found, isNotDummy, eq);},
+        [&tio, &ret_node, F_found, &cnode](yield_t &yield)
+        { mpc_select(tio, yield, ret_node->key, F_found, ret_node->key, cnode.key);},
+        [&tio, &ret_node, F_found, &cnode](yield_t &yield)
+        { mpc_select(tio, yield, ret_node->value, F_found, ret_node->value, cnode.value);});
 
     isDummy^=F_found;
     bool found = lookup(tio, yield, next_ptr, key, A, TTL-1, isDummy, ret_node);
@@ -1365,7 +1373,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         size_t &aes_ops = tio.aes_ops();
         RegBS l0, r0, lt, eq, gt;
         // Check if left and right children are 0
-        // l0: Is left child 0 
+        // l0: Is left child 0
         // r0: Is right child 0
         run_coroutines(tio, [&tio, &l0, left, &aes_ops](yield_t &yield)
             { CDPF cdpf = tio.cdpf(yield);
@@ -1544,7 +1552,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
 
 /*
     The main AVL delete function.
-    Trying to delete an item that does not exist in the tree will result in 
+    Trying to delete an item that does not exist in the tree will result in
     an explicit (non-oblivious) failure.
 */
 bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
@@ -2520,7 +2528,7 @@ void avl_tests(MPCIO &mpcio,
             if(sum!=0) {
                 success = false;
             }
-            success &= del_ret; 
+            success &= del_ret;
 
             if(player0) {
                 if(success) {
@@ -2618,7 +2626,7 @@ void avl_tests(MPCIO &mpcio,
             if(one!=1) {
                 success = false;
             }
-            success &= del_ret; 
+            success &= del_ret;
 
             if(player0) {
                 if(success) {
@@ -2793,7 +2801,7 @@ void avl_tests(MPCIO &mpcio,
             if(one!=1) {
                 success = false;
             }
-            success &= del_ret; 
+            success &= del_ret;
 
             if(player0) {
                 if(success) {
@@ -2876,7 +2884,7 @@ void avl_tests(MPCIO &mpcio,
             if(zero!=0) {
                 success = false;
             }
-            success &= del_ret; 
+            success &= del_ret;
 
             if(player0) {
                 if(success) {
@@ -3150,7 +3158,7 @@ void avl_tests(MPCIO &mpcio,
             if(zero!=0) {
                 success = false;
             }
-            success &= del_ret; 
+            success &= del_ret;
 
             if(player0) {
                 if(success) {
