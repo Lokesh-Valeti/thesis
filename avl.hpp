@@ -216,7 +216,7 @@ class AVL {
 
     // Display and correctness check functions
     void pretty_print(MPCTIO &tio, yield_t &yield);
-    void check_avl(MPCTIO &tio, yield_t &yield);
+    bool check_avl(MPCTIO &tio, yield_t &yield);
     void print_oram(MPCTIO &tio, yield_t &yield);
 
     // For test functions ONLY:
