@@ -931,6 +931,10 @@ bool AVL::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node>
     // If we haven't found the key yet, and the lookup matches the current node key,
     // then we found the node to return
 
+    // If multiple keys in the tree match the lookup key, this returns the last match.
+    // Extracting the first match would add an extra round here, since the 
+    // F_found flag will have to be computed first, then the next two based on F_found
+    // instead of eq
     run_coroutines(tio,
         [&tio, &F_found, isNotDummy, eq](yield_t &yield)
         { mpc_and(tio, yield, F_found, isNotDummy, eq);},
