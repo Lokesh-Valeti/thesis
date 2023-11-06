@@ -205,7 +205,7 @@ class AVL {
 
     // Deletes the first node that matches del_key. If an item with del_key
     // does not exist in the tree, it results in an explicit (non-oblivious)
-    //  failure.
+    // failure.
     bool del(MPCTIO &tio, yield_t &yield, RegAS del_key);
 
     // Returns the first node that matches key

@@ -209,13 +209,15 @@ void BST::check_bst(MPCTIO &tio, yield_t &yield) {
     The recursive insert() call, invoked by the wrapper insert() function.
 
     Takes as input the pointer to the current node in tree traversal (ptr),
-    the new node to be inserted (new_node), the underlying Duoram as a
+    the key to be inserted (insertion_key), the underlying Duoram as a
     flat (A), and the Time-To_live TTL, and a shared flag (isDummy) which
     tracks if the operation is dummy/real.
 
+    Returns a tuple <ptr, dir>,  
+    
 */
 std::tuple<RegXS, RegBS> BST::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
-    const Node &new_node, Duoram<Node>::Flat &A, int TTL, RegBS isDummy) {
+    RegAS insertion_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy) {
     if(TTL==0) {
         RegBS zero;
         return {ptr, zero};
@@ -224,7 +226,7 @@ std::tuple<RegXS, RegBS> BST::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
     RegBS isNotDummy = isDummy ^ (!tio.player());
     Node cnode = A[ptr];
     // Compare key
-    auto [lteq, gt] = compare_keys(tio, yield, cnode.key, new_node.key);
+    auto [lteq, gt] = compare_keys(tio, yield, cnode.key, insertion_key);
 
     // Depending on [lteq, gt] select the next ptr/index as
     // upper 32 bits of cnode.pointers if lteq
@@ -246,7 +248,7 @@ std::tuple<RegXS, RegBS> BST::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
     mpc_and(tio, yield, F_i, (isNotDummy), F_z);
 
     isDummy^=F_i;
-    auto [wptr, direction] = insert(tio, yield, next_ptr, new_node, A, TTL-1, isDummy);
+    auto [wptr, direction] = insert(tio, yield, next_ptr, insertion_key, A, TTL-1, isDummy);
 
     RegXS ret_ptr;
     RegBS ret_direction;
@@ -298,7 +300,7 @@ void BST::insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Fl
 
         RegBS isDummy;
         //Do a recursive insert
-        auto [wptr, direction] = insert(tio, yield, root, node, A, TTL, isDummy);
+        auto [wptr, direction] = insert(tio, yield, root, node.key, A, TTL, isDummy);
 
         //Complete the insertion by reading wptr and updating its pointers
         RegXS pointers = A[wptr].NODE_POINTERS;
@@ -392,8 +394,8 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS key, Duoram<Node
     run_coroutines(tio, coroutines);
 
     #ifdef BST_DEBUG
-        size_t ckey = mpc_reconstruct(tio, yield, cnode.key, 64);
-        size_t lkey = mpc_reconstruct(tio, yield, key, 64);
+        size_t ckey = mpc_reconstruct(tio, yield, cnode.key);
+        size_t lkey = mpc_reconstruct(tio, yield, key);
         bool rec_lt = mpc_reconstruct(tio, yield, lt);
         bool rec_eq = mpc_reconstruct(tio, yield, eq);
         bool rec_gt = mpc_reconstruct(tio, yield, gt);
@@ -437,10 +439,10 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
     the key to be deleted (del_key), the underlying Duoram as a
     flat (A), Flags af (already found) and fs (find successor), the
     Time-To_live TTL. Finally, a return structure ret_struct that tracks
-    the location of the successor node and the node to delete to perform
-    the actual deletion after the recursive traversal; which is required in
-    the case of a deletion that requires a successor swap (,i.e., when node
-    to delete has both children).
+    the location of the successor node and the node to delete, in order to 
+    perform the actual deletion after the recursive traversal. This is required
+    in the case of a deletion that requires a successor swap (,i.e., when the 
+    node to delete has both children).
 
     Returns success/fail bit.
 */
@@ -489,8 +491,8 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         eq_rec = mpc_reconstruct(tio, yield, eq);
         gt_rec = mpc_reconstruct(tio, yield, gt);
         size_t del_key_rec, node_key_rec;
-        del_key_rec = mpc_reconstruct(tio, yield, del_key, 64);
-        node_key_rec = mpc_reconstruct(tio, yield, node.key, 64);
+        del_key_rec = mpc_reconstruct(tio, yield, del_key);
+        node_key_rec = mpc_reconstruct(tio, yield, node.key);
         printf("node.key = %ld, del_key= %ld\n", node_key_rec, del_key_rec);
         printf("cdpf.compare results: lt = %d, eq = %d, gt = %d\n", lt_rec, eq_rec, gt_rec);
         */
@@ -622,7 +624,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,
         size_t ret_ptr_rec;
         F_rs_rec = mpc_reconstruct(tio, yield, F_rs);
         F_ls_rec = mpc_reconstruct(tio, yield, F_rs);
-        ret_ptr_rec = mpc_reconstruct(tio, yield, ret_struct.ret_ptr, 64);
+        ret_ptr_rec = mpc_reconstruct(tio, yield, ret_struct.ret_ptr);
         printf("F_rs_rec = %d, F_ls_rec = %d, ret_ptr_rec = %ld\n", F_rs_rec, F_ls_rec, ret_ptr_rec);
         */
         RegXS new_ptr;
@@ -696,7 +698,7 @@ bool BST::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
         del_return ret_struct;
         auto A = oram.flat(tio, yield);
         int success = del(tio, yield, root, del_key, A, af, fs, TTL, ret_struct);
-        printf ("Success =  %d\n", success);
+        //printf ("Success =  %d\n", success);
         if(!success){
             return 0;
         }
@@ -758,15 +760,10 @@ void bst(MPCIO &mpcio,
     if (*args) {
         depth = atoi(*args);
         ++args;
-    }
-    size_t items = (size_t(1)<<depth)-1;
-    if (*args) {
-        items = atoi(*args);
-        ++args;
-    }
+    } 
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, depth, items] (yield_t &yield) {
+    run_coroutines(tio, [&tio, depth] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         BST tree(tio.player(), size);
 
@@ -847,7 +844,7 @@ void bst(MPCIO &mpcio,
         if(tio.player()!=2) {
             if(rec_found) {
                 printf("Lookup Success\n");
-                size_t value = mpc_reconstruct(tio, yield, node.value, 64);
+                size_t value = mpc_reconstruct(tio, yield, node.value);
                 printf("value = %lx\n", value);
             } else {
                 printf("Lookup Failed\n");
@@ -864,7 +861,7 @@ void bst(MPCIO &mpcio,
         if(tio.player()!=2) {
             if(rec_found) {
                 printf("Lookup Success\n");
-                size_t value = mpc_reconstruct(tio, yield, node.value, 64);
+                size_t value = mpc_reconstruct(tio, yield, node.value);
                 printf("value = %lx\n", value);
             } else {
                 printf("Lookup Failed\n");

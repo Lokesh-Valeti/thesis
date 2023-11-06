@@ -171,7 +171,7 @@ class BST {
     std::vector<RegXS> empty_locations;
 
     std::tuple<RegXS, RegBS> insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
-        const Node &new_node, Duoram<Node>::Flat &A, int TTL, RegBS isDummy);
+        RegAS insertion_key, Duoram<Node>::Flat &A, int TTL, RegBS isDummy);
     void insert(MPCTIO &tio, yield_t &yield, const Node &node, Duoram<Node>::Flat &A);
 
     bool del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS del_key,

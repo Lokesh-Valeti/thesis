@@ -170,8 +170,10 @@ bool AVL::check_avl(MPCTIO &tio, yield_t &yield) {
     RegXS rec_root = this->root;
     if (tio.player() == 1) {
         tio.queue_peer(&(this->root), sizeof(this->root));
+        yield();
     } else {
         RegXS peer_root;
+        yield();
         tio.recv_peer(&peer_root, sizeof(peer_root));
         rec_root+= peer_root;
     }
@@ -182,7 +184,7 @@ bool AVL::check_avl(MPCTIO &tio, yield_t &yield) {
         return (bst_ok && avl_ok && bb_ok);
     }
     else {
-        return 0;
+        return false;
     }
 }
 
@@ -227,26 +229,30 @@ void AVL::rotate(MPCTIO &tio, yield_t &yield, RegXS &gp_pointers, RegXS p_ptr,
     // We care about !F_gp. If !F_gp, then we do the gp->p link updates.
     // Otherwise, we do NOT do any updates to gp-> p link;
     // since F_gp==1, implies gp does not exist and parent is root.
-    if(player0)
+    if(player0) {
         F_gp^=1;
+    }
     mpc_and(tio, yield, F_gpp, F_gp, isReal);
 
     // i) gp[dir_gpp] <-- c_ptr
     RegBS not_dir_gpp = dir_gpp;
-    if(player0)
+    if(player0) {
         not_dir_gpp^=1;
+    }
     mpc_select(tio, yield, ptr_upd, F_gpp, p_ptr, c_ptr);
 
     RegBS not_dir_pc_l = dir_pc, not_dir_pc_r = dir_pc;
-    if(player0)
+    if(player0) {
         not_dir_pc_r^=1;
+    }
     RegXS c_not_dir_pc; //c[!dir_pc]
     // ndpc_right: if not_dir_pc is right
     // ndpc_left: if not_dir_pc is left
     RegBS F_ndpc_right, F_ndpc_left;
     RegBS nt_dir_pc = dir_pc;
-    if(player0)
+    if(player0) {
         nt_dir_pc^=1;
+    }
 
     std::vector<coro_t> coroutines;
     coroutines.emplace_back(
@@ -509,7 +515,7 @@ std::tuple<RegBS, RegBS, RegXS, RegBS> AVL::insert(MPCTIO &tio, yield_t &yield, 
     /*
     size_t rec_left = mpc_reconstruct(tio, yield, left, AVL_PTR_SIZE);
     size_t rec_right = mpc_reconstruct(tio, yield, right, AVL_PTR_SIZE);
-    size_t rec_key = mpc_reconstruct(tio, yield, cnode.key, 64);
+    size_t rec_key = mpc_reconstruct(tio, yield, cnode.key);
     printf("\n\n(Before recursing) Key = %ld\n", rec_key);
     printf("rec_left = %ld, rec_right = %ld\n", rec_left, rec_right);
     */
@@ -968,8 +974,9 @@ void AVL::updateChildPointers(MPCTIO &tio, yield_t &yield, RegXS &left, RegXS &r
     RegBS F_rr; // Flag to resolve F_r by updating right child ptr
     RegBS F_rl; // Flag to resolve F_r by updating left child ptr
     RegBS nt_c_prime = c_prime;
-    if(player0)
+    if(player0) {
         nt_c_prime^=1;
+    }
 
     run_coroutines(tio, [&tio, &F_rr, c_prime, ret_struct](yield_t &yield)
         { mpc_and(tio, yield, F_rr, c_prime, ret_struct.F_r);},
@@ -1430,8 +1437,9 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         // F_2 = !(F_0 ^ F_1) (Exactly 1 of F_0, F_1, and F_2 is true)
         F_n2 = F_0 ^ F_1;
         F_2 = F_n2;
-        if(player0)
+        if(player0) {
             F_2^=1;
+        }
         // s1: shares of 1 bit, s0: shares of 0 bit
         RegBS s1, s0;
         s1.set(tio.player()==1);
@@ -1524,7 +1532,7 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
         p_bal_r = getRightBal(node.pointers);
 
         #ifdef AVL_DEBUG
-          size_t rec_key = mpc_reconstruct(tio, yield, node.key, 64);
+          size_t rec_key = mpc_reconstruct(tio, yield, node.key);
           bool rec_bal_upd = mpc_reconstruct(tio, yield, bal_upd);
           printf("current_key = %ld, bal_upd (before updateBalanceDel) = %d\n", rec_key, rec_bal_upd);
         #endif
@@ -1566,8 +1574,9 @@ std::tuple<bool, RegBS> AVL::del(MPCTIO &tio, yield_t &yield, RegXS ptr, RegAS d
     an explicit (non-oblivious) failure.
 */
 bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
-    if(num_items==0)
+    if(num_items==0) {
         return false;
+    }
 
     auto A = oram.flat(tio, yield, 0, cur_max_index+1);
     if(num_items==1) {
@@ -1637,8 +1646,8 @@ bool AVL::del(MPCTIO &tio, yield_t &yield, RegAS del_key) {
 
             /*
             bool rec_F_ss = mpc_reconstruct(tio, yield, ret_struct.F_ss);
-            size_t rec_del_key = mpc_reconstruct(tio, yield, del_node.key, 64);
-            size_t rec_suc_key = mpc_reconstruct(tio, yield, suc_node.key, 64);
+            size_t rec_del_key = mpc_reconstruct(tio, yield, del_node.key);
+            size_t rec_suc_key = mpc_reconstruct(tio, yield, suc_node.key);
             printf("rec_F_ss = %d, del_node.key = %lu, suc_nod.key = %lu\n",
                 rec_F_ss, rec_del_key, rec_suc_key);
             */
@@ -1806,7 +1815,7 @@ void avl(MPCIO &mpcio,
         for(size_t i = 1; i<=n_deletes; i++) {
             RegAS del_key;
             size_t dkey;
-            #ifdef RANDOMIZE
+            #ifdef AVL_RANDOMIZE_INSERTS
                 dkey = 1 + (rand()%init_size);
             #else
                 dkey = i + 0;
@@ -1852,16 +1861,16 @@ void avl_tests(MPCIO &mpcio,
             - 5 and 9 have no children and 0 balances
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {5, 7, 9};
-            size_t insert_array_size = 2;
+            size_t insert_array_size = 3;
             Node node;
 
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -1890,7 +1899,6 @@ void avl_tests(MPCIO &mpcio,
                 success = false;
             }
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T1 : SUCCESS\n");
                 } else {
@@ -1921,15 +1929,15 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {5, 3, 7, 9, 12};
-            size_t insert_array_size = 4;
+            size_t insert_array_size = 5;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             Duoram<Node>* oram = tree.get_oram();
@@ -1977,7 +1985,6 @@ void avl_tests(MPCIO &mpcio,
             }
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T2 : SUCCESS\n");
                 } else {
@@ -2006,15 +2013,15 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 7, 5};
-            size_t insert_array_size = 2;
+            size_t insert_array_size = 3;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             Duoram<Node>* oram = tree.get_oram();
@@ -2044,7 +2051,6 @@ void avl_tests(MPCIO &mpcio,
                 success = false;
             }
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T3 : SUCCESS\n");
                 } else{
@@ -2077,15 +2083,15 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 12, 7, 5, 3};
-            size_t insert_array_size = 4;
+            size_t insert_array_size = 5;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             Duoram<Node>* oram = tree.get_oram();
@@ -2132,7 +2138,6 @@ void avl_tests(MPCIO &mpcio,
                 success = false;
             }
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T4 : SUCCESS\n");
                 } else {
@@ -2162,15 +2167,15 @@ void avl_tests(MPCIO &mpcio,
         */
 
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 5, 7};
-            size_t insert_array_size = 2;
+            size_t insert_array_size = 3;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             Duoram<Node>* oram = tree.get_oram();
@@ -2209,7 +2214,6 @@ void avl_tests(MPCIO &mpcio,
                 success = false;
             }
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T5 : SUCCESS\n");
                 } else {
@@ -2243,15 +2247,15 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 12, 7, 3, 5};
-            size_t insert_array_size = 4;
+            size_t insert_array_size = 5;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             Duoram<Node>* oram = tree.get_oram();
@@ -2298,7 +2302,6 @@ void avl_tests(MPCIO &mpcio,
                 success = false;
             }
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T6 : SUCCESS\n");
                 } else {
@@ -2328,15 +2331,15 @@ void avl_tests(MPCIO &mpcio,
         */
 
         {
-            bool success = 1;
+            bool success = true;
             int insert_array[] = {5, 9, 7};
-            size_t insert_array_size = 2;
+            size_t insert_array_size = 3;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              tree.check_avl(tio, yield);
+             success &= tree.check_avl(tio, yield);
             }
 
             Duoram<Node>* oram = tree.get_oram();
@@ -2406,15 +2409,15 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {5, 3, 12, 7, 9};
-            size_t insert_array_size = 4;
+            size_t insert_array_size = 5;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             Duoram<Node>* oram = tree.get_oram();
@@ -2461,7 +2464,6 @@ void avl_tests(MPCIO &mpcio,
                 success = false;
             }
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T8 : SUCCESS\n");
                 } else {
@@ -2491,22 +2493,22 @@ void avl_tests(MPCIO &mpcio,
             - 7 has 0 balances
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {5, 3, 7, 9};
-            size_t insert_array_size = 3;
+            size_t insert_array_size = 4;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(3 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -2538,7 +2540,6 @@ void avl_tests(MPCIO &mpcio,
             success &= del_ret;
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T9 : SUCCESS\n");
                 } else {
@@ -2570,22 +2571,22 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {5, 3, 7, 9, 6, 1, 12};
-            size_t insert_array_size = 6;
+            size_t insert_array_size = 7;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(6 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -2637,7 +2638,6 @@ void avl_tests(MPCIO &mpcio,
             success &= del_ret;
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T10 : SUCCESS\n");
                 } else {
@@ -2665,22 +2665,22 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 7, 12, 5};
-            size_t insert_array_size = 3;
+            size_t insert_array_size = 4;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(12 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -2715,7 +2715,6 @@ void avl_tests(MPCIO &mpcio,
             success &= del_ret;
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T11 : SUCCESS\n");
                 } else{
@@ -2739,7 +2738,7 @@ void avl_tests(MPCIO &mpcio,
               3
 
 
-            T4 checks:
+            T12 checks:
             - root is 9
             - 3,5,7,12,15 are in correct positions
             - Nodes 3,7,15 have 0 balance
@@ -2748,22 +2747,22 @@ void avl_tests(MPCIO &mpcio,
             - 12 bal = 0 1
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 12, 7, 5, 8, 15, 3};
-            size_t insert_array_size = 6;
+            size_t insert_array_size = 7;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(8 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -2814,7 +2813,6 @@ void avl_tests(MPCIO &mpcio,
             success &= del_ret;
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T12 : SUCCESS\n");
                 } else {
@@ -2836,7 +2834,7 @@ void avl_tests(MPCIO &mpcio,
                     7               5
 
 
-            T5 checks:
+            T13 checks:
             - root is 7
             - 9,5,7 are in correct positions
             - Nodes 5,7,9 have 0 balance
@@ -2844,22 +2842,22 @@ void avl_tests(MPCIO &mpcio,
         */
 
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 5, 12, 7};
-            size_t insert_array_size = 3;
+            size_t insert_array_size = 4;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(12 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -2898,7 +2896,6 @@ void avl_tests(MPCIO &mpcio,
             success &= del_ret;
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T13 : SUCCESS\n");
                 } else {
@@ -2921,7 +2918,7 @@ void avl_tests(MPCIO &mpcio,
             3   7         (No-op)   3   7
 
 
-            T6 checks:
+            T14 checks:
             - root is 9
             - 3,5,7,12 are in correct positions
             - Nodes 3,7,12 have 0 balance
@@ -2930,22 +2927,22 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 12, 7, 3, 5};
-            size_t insert_array_size = 4;
+            size_t insert_array_size = 5;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(8 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -2993,7 +2990,6 @@ void avl_tests(MPCIO &mpcio,
             success &=(!del_ret);
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T14 : SUCCESS\n");
                 } else {
@@ -3022,22 +3018,22 @@ void avl_tests(MPCIO &mpcio,
         */
 
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {5, 9, 3, 7};
-            size_t insert_array_size = 3;
+            size_t insert_array_size = 4;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(3 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -3076,7 +3072,6 @@ void avl_tests(MPCIO &mpcio,
             success &= del_ret;
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T15 : SUCCESS\n");
                 } else {
@@ -3100,7 +3095,7 @@ void avl_tests(MPCIO &mpcio,
                      9                        12
 
 
-            T8 checks:
+            T16 checks:
             - root is 5
             - 3,9,8,12 are in correct positions
             - Nodes 1,5,8,9,12 have 0 balance
@@ -3109,22 +3104,22 @@ void avl_tests(MPCIO &mpcio,
 
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {5, 3, 8, 7, 1, 12, 9};
-            size_t insert_array_size = 6;
+            size_t insert_array_size = 7;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(7 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -3175,7 +3170,6 @@ void avl_tests(MPCIO &mpcio,
             success &= del_ret;
 
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T16 : SUCCESS\n");
                 } else {
@@ -3219,22 +3213,22 @@ void avl_tests(MPCIO &mpcio,
             - balances and children are correct
         */
         {
-            bool success = 1, check_avl;
+            bool success = true;
             int insert_array[] = {9, 5, 12, 7, 3, 10, 15, 2, 4, 6, 8, 20, 1};
-            size_t insert_array_size = 12;
+            size_t insert_array_size = 13;
             Node node;
-            for(size_t i = 0; i<=insert_array_size; i++) {
+            for(size_t i = 0; i<insert_array_size; i++) {
               randomize_node(node);
               node.key.set(insert_array[i] * tio.player());
               tree.insert(tio, yield, node);
-              check_avl = tree.check_avl(tio, yield);
+              success &= tree.check_avl(tio, yield);
             }
 
             RegAS del_key;
             del_key.set(10 * tio.player());
             bool del_ret;
             del_ret = tree.del(tio, yield, del_key);
-            tree.check_avl(tio, yield);
+            success &= tree.check_avl(tio, yield);
 
             Duoram<Node>* oram = tree.get_oram();
             RegXS root_xs = tree.get_root();
@@ -3318,7 +3312,6 @@ void avl_tests(MPCIO &mpcio,
             }
             success &= del_ret;
             if(player0) {
-                success &= check_avl;
                 if(success) {
                     print_green("T17 : SUCCESS\n");
                 } else {
