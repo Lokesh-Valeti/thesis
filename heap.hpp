@@ -28,8 +28,6 @@ class MinHeap {
     std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t depth, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
     std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield,  size_t index);
     void print_heap(MPCTIO tio, yield_t & yield);
-    void heapify(MPCIO &mpcio, MPCTIO tio, yield_t & yield);
-    void heapify_at_level(MPCIO &mpcio, MPCTIO tio, yield_t & yield, size_t index);
 };
 
 void Heap(MPCIO &mpcio,

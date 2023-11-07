@@ -5,7 +5,14 @@
 #include "rdpf.hpp"
 #include "shapes.hpp"
 #include "heap.hpp"   
-  
+ 
+
+ // The heap datastructure is stored in an array with the starting index as 1 (and not 0)
+ // For nodes stored in index i of the array, the parent is stored at i/2 and 
+ // The left and right children are stored at 2i and 2i + 1
+ // All the unused array indicies have MAX_INT stored in them
+ // TODO: Draw a diagram to show the layout   
+
  // _Protocol 4_ from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
  //  Consider the following insertion path with:  (x0 < x1 < x2 < x3 < x4)
 
@@ -96,12 +103,12 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     for (size_t j = 1; j < height+1; ++j) {
         coroutines.emplace_back( 
                 [&tio, w, u, path, j](yield_t &yield) {
-            mpc_flagmult(tio, yield, w[j], u[j-1], (path[j-1]-path[j]));
+            mpc_flagmult(tio, yield, w[j], u[j-1], path[j-1]-path[j]);
         }
         );
         coroutines.emplace_back( 
                 [&tio, v, flag, val, path, j](yield_t &yield) {
-            mpc_flagmult(tio, yield, v[j-1], flag[j-1], (val - path[j-1]));
+            mpc_flagmult(tio, yield, v[j-1], flag[j-1], val - path[j-1]);
         }
         );
     }
@@ -306,27 +313,16 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     std::cout << "rightchildindex_reconstruction     =  " << rightchildindex_reconstruction << std::endl;
     #endif
     
-    std::vector<coro_t> coroutines_read;
-    coroutines_read.emplace_back( 
-        [&tio, &parent, &HeapArray, index](yield_t &yield) {
-        auto Acoro = HeapArray.context(yield);
-        parent = Acoro[index];
-    }
-    );
-    coroutines_read.emplace_back( 
-        [&tio, &HeapArray, &leftchild, leftchildindex](yield_t &yield) {
-        auto Acoro = HeapArray.context(yield);
-        leftchild  = Acoro[leftchildindex];
-    }
-    );
-    coroutines_read.emplace_back( 
-        [&tio, &rightchild, &HeapArray, rightchildindex](yield_t &yield) {
-        auto Acoro = HeapArray.context(yield);
-        rightchild = Acoro[rightchildindex];
-    }
-    );
-    
-    run_coroutines(tio, coroutines_read);
+   run_coroutines(tio, [&tio, &parent, &HeapArray, index](yield_t &yield) {
+                  auto Acoro = HeapArray.context(yield);
+                  parent = Acoro[index];},
+                  [&tio, &HeapArray, &leftchild, leftchildindex](yield_t &yield) {
+                  auto Acoro = HeapArray.context(yield);
+                  leftchild  = Acoro[leftchildindex];},
+                  [&tio, &rightchild, &HeapArray, rightchildindex](yield_t &yield) {
+                  auto Acoro = HeapArray.context(yield);
+                  rightchild = Acoro[rightchildindex];});
+
     CDPF cdpf = tio.cdpf(yield);
     auto[lt_c, eq_c, gt_c] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
     auto lteq = lt_c ^ eq_c;
@@ -357,27 +353,17 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     }
     );
     
-    std::vector<coro_t> coroutines;
-    coroutines.emplace_back( 
-        [&tio, &HeapArray, index, update_index_by](yield_t &yield) {
-        auto Acoro = HeapArray.context(yield);
-        Acoro[index] += update_index_by;
-    }
-    );
-    coroutines.emplace_back( 
-        [&tio, &HeapArray, leftchildindex, update_leftindex_by](yield_t &yield) {
-        auto Acoro = HeapArray.context(yield);
-        Acoro[leftchildindex] += update_leftindex_by;
-    }
-    );
-    coroutines.emplace_back( 
-        [&tio, &HeapArray, rightchildindex, update_index_by, update_leftindex_by](yield_t &yield) {
-        auto Acoro = HeapArray.context(yield);
-        Acoro[rightchildindex] += -(update_index_by + update_leftindex_by);
-    }
-    );
-    run_coroutines(tio, coroutines);
 
+    run_coroutines(tio, [&tio, &HeapArray, index, update_index_by](yield_t &yield) {
+                   auto Acoro = HeapArray.context(yield);
+                   Acoro[index] += update_index_by;},
+                   [&tio, &HeapArray, leftchildindex, update_leftindex_by](yield_t &yield) {
+                   auto Acoro = HeapArray.context(yield);
+                   Acoro[leftchildindex] += update_leftindex_by;},
+                   [&tio, &HeapArray, rightchildindex, update_index_by, update_leftindex_by](yield_t &yield) {
+                   auto Acoro = HeapArray.context(yield);
+                   Acoro[rightchildindex] += -(update_index_by + update_leftindex_by);});
+    
     #ifdef DEBUG 
             verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
     #endif
@@ -392,7 +378,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 // The (leftchild > rightchild) comparison is utilized in the extract_min operation to increment the oblivindx by a certain value
 // The optimized version achieves improved efficiency by leveraging wide DPF operations for read and write operations
 
-std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, size_t depth, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > (oidx)) {
+std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, size_t depth, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx) {
     
     auto HeapArray = oram.flat(tio, yield);
 
@@ -400,7 +386,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     leftchildindex = index << 1;
 
     RegXS rightchildindex;
-    rightchildindex.xshare = leftchildindex.xshare ^ (tio.player());
+    rightchildindex.xshare = leftchildindex.xshare ^ tio.player();
 
     typename Duoram < RegAS > ::Flat P(HeapArray, tio, yield, 1 << layer, 1 << layer);
     typename Duoram < RegAS > ::Flat C(HeapArray, tio, yield, 2 << layer, 2 << layer);
@@ -409,26 +395,16 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
 
     RegAS parent, leftchild, rightchild; 
 
-    std::vector<coro_t> coroutines_read;
-    coroutines_read.emplace_back( 
-    [&tio, &parent, &P, &oidx](yield_t &yield) { 
-            auto Pcoro = P.context(yield); 
-            parent = Pcoro[oidx];
-     });             
-   
-    coroutines_read.emplace_back( 
-    [&tio, &L, &leftchild, &oidx](yield_t &yield) { 
-            auto Lcoro = L.context(yield); 
-            leftchild  = Lcoro[oidx];  
-     }); 
-
-    coroutines_read.emplace_back( 
-    [&tio, &R, &rightchild, &oidx](yield_t &yield) { 
-           auto Rcoro = R.context(yield); 
-           rightchild = Rcoro[oidx];
-     }); 
-
-    run_coroutines(tio, coroutines_read);
+    run_coroutines(tio, [&tio, &parent, &P, &oidx](yield_t &yield) { 
+                    auto Pcoro = P.context(yield); 
+                    parent = Pcoro[oidx]; }, 
+                    [&tio, &L, &leftchild, &oidx](yield_t &yield) { 
+                    auto Lcoro = L.context(yield); 
+                    leftchild  = Lcoro[oidx];},
+                    [&tio, &R, &rightchild, &oidx](yield_t &yield) { 
+                    auto Rcoro = R.context(yield); 
+                    rightchild = Rcoro[oidx];
+                  });  
 
     CDPF cdpf = tio.cdpf(yield);
 
@@ -439,9 +415,9 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     RegAS smallerchild;
 
     run_coroutines(tio, [&tio, &smallerindex, lteq, rightchildindex, leftchildindex](yield_t &yield)
-            { mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, VALUE_BITS);},
-            [&tio, &smallerchild, lt, rightchild, leftchild](yield_t &yield)
-            { mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild, VALUE_BITS);});
+                  { mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, VALUE_BITS);},
+                  [&tio, &smallerchild, lt, rightchild, leftchild](yield_t &yield)
+                  { mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild, VALUE_BITS);});
 
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
@@ -455,32 +431,21 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     RegAS update_index_by, update_leftindex_by;
 
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield)
-            { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, (parent - leftchild), VALUE_BITS);},
+            { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild, VALUE_BITS);},
             [&tio, &update_index_by, lt1eq1, parent, smallerchild](yield_t &yield)
             {mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent, VALUE_BITS);} 
             );
     
-    std::vector<coro_t> coroutines;
-
-    coroutines.emplace_back( 
-    [&tio, &P, &oidx, update_index_by](yield_t &yield) {
-            auto Pcoro = P.context(yield); 
-            Pcoro[oidx] += update_index_by;
-     });             
-   
-    coroutines.emplace_back( 
-    [&tio, &L,  &oidx, update_leftindex_by](yield_t &yield) {
-            auto Lcoro = L.context(yield);
-            Lcoro[oidx] += update_leftindex_by;
-     });
-
-    coroutines.emplace_back( 
-    [&tio, &R,  &oidx, update_leftindex_by, update_index_by](yield_t &yield) {
-            auto Rcoro = R.context(yield);
-            Rcoro[oidx] += -(update_leftindex_by + update_index_by);
-     }); 
-
-    run_coroutines(tio, coroutines);
+    run_coroutines(tio, [&tio, &P, &oidx, update_index_by](yield_t &yield) {
+                    auto Pcoro = P.context(yield); 
+                    Pcoro[oidx] += update_index_by;},
+                    [&tio, &L,  &oidx, update_leftindex_by](yield_t &yield) {
+                    auto Lcoro = L.context(yield);
+                    Lcoro[oidx] += update_leftindex_by;},
+                    [&tio, &R,  &oidx, update_leftindex_by, update_index_by](yield_t &yield) {
+                    auto Rcoro = R.context(yield);
+                    Rcoro[oidx] += -(update_leftindex_by + update_index_by);
+                    });
 
     return {smallerindex, gt};
 }
@@ -598,7 +563,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     RegAS update_index_by, update_leftindex_by;
    
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield) {
-        mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, (parent - leftchild), VALUE_BITS);
+        mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild, VALUE_BITS);
     }, [&tio, &update_index_by, lt1eq1, parent, smallerchild](yield_t &yield) {
         mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent, VALUE_BITS);
     }
@@ -607,28 +572,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     HeapArray[index] += update_index_by;
     HeapArray[leftchildindex] += update_leftindex_by;
     HeapArray[rightchildindex] += -(update_index_by + update_leftindex_by);
-    // std::vector<coro_t> coroutines;
-    // coroutines.emplace_back( 
-    //     [&tio, &HeapArray, index, update_index_by](yield_t &yield) {
-    //     auto Acoro = HeapArray.context(yield);
-    //     Acoro[index] += update_index_by;
-    // }
-    // );
-    // coroutines.emplace_back( 
-    //     [&tio, &HeapArray, leftchildindex, update_leftindex_by](yield_t &yield) {
-    //     auto Acoro = HeapArray.context(yield);
-    //     Acoro[leftchildindex] += update_leftindex_by;
-    // }
-    // );
-    // coroutines.emplace_back( 
-    //     [&tio, &HeapArray, rightchildindex, update_index_by, update_leftindex_by](yield_t &yield) {
-    //     auto Acoro = HeapArray.context(yield);
-    //     Acoro[rightchildindex] += -(update_index_by + update_leftindex_by);
-    // }
-    // );
 
-    // run_coroutines(tio, coroutines);
-    
     #ifdef VERBOSE
     RegAS new_parent = HeapArray[index];
     RegAS new_left   = HeapArray[leftchildindex];
@@ -700,57 +644,6 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
 }
 
 
-// Note: This function is *NOT USED* in the evaluation in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures.
-// The heapify function calls this function for each node in the range (num_items + 1) / 2) - 1, ..., 0.
-// This function essentially starts at the subtree rooted at the given index and swaps the smaller child with the root of the subtree.
-// It then goes down the subtree along the path of the smaller child, repeating the above process.
-// At each level of the subtree, we swap the parent with the smaller child (if the parent is less than the smaller child).
-// After the swap, we make the smaller child the new parent and continue the process down the subtree.
-// In summary, this function performs a heapify operation on a subtree rooted at the given index by repeatedly swapping the parent with the smaller child and descending down the subtree.
-void MinHeap::heapify_at_level(MPCIO & mpcio, MPCTIO tio, yield_t & yield, size_t index = 1) {
-   
-    // calls restore_heap_property_at_explicit_index with index as the root
-    auto outroot = restore_heap_property_at_explicit_index(tio, yield, index);
-    RegXS smaller = outroot.first;
-    
-    #ifdef VERBOSE
-     uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, VALUE_BITS);
-     std::cout << "smaller_rec = " << smaller_rec << std::endl;
-     std::cout << "num_items = " << num_items << std::endl;
-     std::cout << "index = " << index << std::endl;
-    #endif
-    
-    // _height_ is the height of the subtree rooted at index
-    size_t height =  std::log2(num_items) - std::floor(log2(index)) ;
-    
-    #ifdef VERBOSE
-    std::cout << "height = " << height << std::endl << "===================" << std::endl;
-    #endif
-    
-    for (size_t i = 0; i < height - 1; ++i) {     
-    #ifdef VERBOSE
-     std::cout << "index = " << index <<  ",  i = " << i << std::endl;
-     uint64_t smaller_rec = mpc_reconstruct(tio, yield, smaller, VALUE_BITS);
-     std::cout << "[inside loop] smaller_rec = " << smaller_rec << std::endl;
-    #endif
-    
-    smaller = restore_heap_property(mpcio, tio, yield, smaller);
-   }
-}
-
-// Note: This function is *NOT USED* in the evaluation described in PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures.
-// This function takes in a random array and transforms it into a heap.
-// The process of transforming the array into a heap involves the following steps:
-// 1. Starting from the last non-leaf node (index: (num_items + 1) / 2) - 1), iterate in reverse order through the array.
-// 2. For each node, perform the heapify operation on its subtree to ensure the heap property is maintained.
-//    This involves swapping the parent with the smaller child (if necessary) and descending down the subtree.
-// 3. Repeat this process for all nodes in the array until the entire array is transformed into a heap.
-void MinHeap::heapify(MPCIO & mpcio, MPCTIO tio, yield_t & yield) {
-    size_t start_indx = ((num_items + 1) / 2) - 1;
-    for (size_t i = start_indx; i >= 1; i--) {
-        heapify_at_level(mpcio, tio, yield, i);
-    }
-}
 
 void Heap(MPCIO & mpcio,
     
@@ -784,16 +677,7 @@ void Heap(MPCIO & mpcio,
             //itr = std::atoi(args[i + 1]);
         }
     }
-
-    //std::cout << "maxdepth: " << maxdepth << std::endl;
-    //std::cout << "run_sanity: " << run_sanity << std::endl;
-    // std::cout << "heapsize: " << heapdepth << std::endl;
-    // std::cout << "n_inserts: " << n_inserts << std::endl;
-    // std::cout << "n_extracts: " << n_extracts << std::endl;
-    // std::cout << "is_optimized: " << is_optimized << std::endl;
-    // std::cout << "itr: " << itr << std::endl;
-
-    
+ 
     MPCTIO tio(mpcio, 0, opts.num_threads);
     
     run_coroutines(tio, [ & tio, maxdepth, heapdepth, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
