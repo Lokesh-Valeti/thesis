@@ -14,7 +14,7 @@
  // TODO: Draw a diagram to show the layout   
 
  // _Protocol 4_ from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
- //  Consider the following insertion path with:  (x0 < x1 < x2 < x3 < x4)
+ //  Consider the following insertion path with:  x0 < x1 < x2 < NewElement < x3 < x4
 
  //        x0                      x0                                 x0           
  //         \                        \                                 \ 
@@ -26,7 +26,7 @@
  //               \                        \                                 \
  //                x4                       x3                                x3
  //                 \                        \                                 \
- //            NewElement                    x4                                 x4
+ //                 ( )                       x4                                x4
             
  //      (Path with new element)       (binary search to determine             (After insertion)
  //                                     the point where New Element 
@@ -53,54 +53,54 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     typename Duoram<RegAS>::Path old_P(HeapArray, tio, yield, num_items);
     const RegXS foundidx = old_P.binary_search(val);
     size_t childindex = num_items;
-    uint64_t height = std::ceil(std::log2(num_items  + 1)) + 1;
+    uint64_t height = old_P.size();//std::ceil(std::log2(num_items  + 1)) + 1;
     RegAS zero;
-    zero.ashare = 0;
     HeapArray[childindex] = zero;
     typename Duoram<RegAS>::Path P(HeapArray, tio, yield, num_items);
     
-    #ifdef VERBOSE
+    #ifdef HEAP_VERBOSE
     uint64_t val_reconstruction = mpc_reconstruct(tio, yield, val, VALUE_BITS);
     std::cout << "val_reconstruction = " << val_reconstruction << std::endl;
     #endif
 
-    uint64_t  logheight = std::ceil(double(std::log2(height))) + 1;
-    std::vector<RegBS> flag(height+1);
-    std::vector<RegBS> u(height+1);
+    uint64_t  logheight = std::floor(double(std::log2(height))) + 1;
+
+    std::vector<RegBS> flag;
+    std::vector<RegBS> u(height);
     typename Duoram<RegAS>::template OblivIndex<RegXS,1> oidx(tio, yield, foundidx, logheight);
-    u = oidx.unit_vector(tio, yield, 1 << logheight, foundidx);
-    
-    #ifdef VERBOSE
+    flag = oidx.unit_vector(tio, yield, height, foundidx); // changed the third param to height from 1 << logheight
+
+    #ifdef HEAP_VERBOSE
     uint64_t foundidx_reconstruction = mpc_reconstruct(tio, yield, foundidx);
     std::cout << "foundidx_reconstruction = " << foundidx_reconstruction << std::endl;
     std::cout << std::endl << " =============== " << std::endl;
     for (size_t j = 0; j < height; ++j) {
-        uint64_t reconstruction = mpc_reconstruct(tio, yield, u[j]);
-        std::cout << " --->> u[" << j << "] = " << reconstruction  <<  std::endl;
+        uint64_t reconstruction = mpc_reconstruct(tio, yield, flag[j]);
+        std::cout << " --->> flag[" << j << "] = " << reconstruction  <<  std::endl;
     }
     #endif
 
     for (size_t j = 0; j < height; ++j) {
         if(tio.player() !=2) {
-            flag[j] = u[j];
-            if(j > 0) u[j] = u[j] ^ u[j-1];
+            //flag[j] = u[j];
+            if(j > 0) u[j] = flag[j] ^ u[j-1];
         }
     }
     
-    #ifdef VERBOSE
+    #ifdef HEAP_VERBOSE
     for (size_t j = 0; j < height; ++j) {
         uint64_t reconstruction = mpc_reconstruct(tio, yield, u[j]);
         std::cout << " --->> [0000111111]][" << j << "] = " << reconstruction << std::endl;
     }
     #endif
 
-    RegAS * path = new RegAS[height+1];
-    RegAS * w   = new RegAS[height+1];
-    RegAS * v = new RegAS[height+1];
-    for (size_t j = 0; j < height+1; ++j) path[j] = P[j];
+    RegAS * path = new RegAS[height];
+    RegAS * w   = new RegAS[height];
+    RegAS * v = new RegAS[height];
+    for (size_t j = 0; j < height; ++j) path[j] = P[j];
 
     std::vector<coro_t> coroutines;
-    for (size_t j = 1; j < height+1; ++j) {
+    for (size_t j = 1; j < height; ++j) {
         coroutines.emplace_back( 
                 [&tio, w, u, path, j](yield_t &yield) {
             mpc_flagmult(tio, yield, w[j], u[j-1], path[j-1]-path[j]);
@@ -114,17 +114,21 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     }
     run_coroutines(tio, coroutines);
 
-    for (size_t j = 0; j < height; ++j) P[j] += (w[j] + v[j]);
 
-    #ifdef VERBOSE
+
+    #ifdef HEAP_VERBOSE
     std::cout << "\n\n=================Before===========\n\n";
     for (size_t j = 0; j < height-1; ++j) {
         auto path_rec = mpc_reconstruct(tio, yield, P[j]);
         std::cout << j << " --->: " << path_rec << std::endl;
     }
     std::cout << "\n\n============================\n\n";
+    #endif
     
-    std::cout << "\n\n=================Aftter===========\n\n";
+    for (size_t j = 0; j < height; ++j) P[j] += (w[j] + v[j]);
+
+    #ifdef HEAP_VERBOSE
+    std::cout << "\n\n=================After===========\n\n";
     for (size_t j = 0; j < height-1; ++j) {
         auto path_rec = mpc_reconstruct(tio, yield, P[j]);
         std::cout << j << " --->: " << path_rec << std::endl;
@@ -159,7 +163,7 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
     size_t childindex = num_items;
     size_t parentindex = childindex / 2;
     
-    #ifdef VERBOSE
+    #ifdef HEAP_VERBOSE
     std::cout << "childindex = " << childindex << std::endl;
     std::cout << "parentindex = " << parentindex << std::endl;
     #endif
@@ -193,7 +197,7 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
 
 void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
 
-    #ifdef VERBOSE
+    #ifdef HEAP_VERBOSE
     std::cout << std::endl << std::endl << "verify_heap_property is being called " << std::endl;
     #endif
     
@@ -201,7 +205,7 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
     uint64_t * heapreconstruction = new uint64_t[num_items + 1];
     for (size_t j = 1; j < num_items + 1; ++j) {
         heapreconstruction[j] = mpc_reconstruct(tio, yield,  HeapArray[j]);
-        #ifdef VERBOSE
+        #ifdef HEAP_VERBOSE
         if(tio.player() < 2) std::cout << j << " -----> heapreconstruction[" << j << "] = " << heapreconstruction[j] << std::endl;
         #endif
     }
@@ -238,7 +242,7 @@ void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, Reg
     uint64_t parent_reconstruction = mpc_reconstruct(tio, yield, parent);
     uint64_t leftchild_reconstruction = mpc_reconstruct(tio, yield, leftchild);
     uint64_t rightchild_reconstruction = mpc_reconstruct(tio, yield, rightchild);
-    #ifdef VERBOSE
+    #ifdef HEAP_VERBOSE
     std::cout << "parent_reconstruction = " << parent_reconstruction << std::endl;
     std::cout << "leftchild_reconstruction = " << leftchild_reconstruction << std::endl;
     std::cout << "rightchild_reconstruction = " << rightchild_reconstruction << std::endl << std::endl << std::endl;
@@ -304,7 +308,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     
     RegAS parent, leftchild, rightchild;
     
-    #ifdef VERBOSE
+    #ifdef HEAP_VERBOSE
     auto index_reconstruction = mpc_reconstruct(tio, yield, index);
     auto leftchildindex_reconstruction = mpc_reconstruct(tio, yield, leftchildindex);
     auto rightchildindex_reconstruction = mpc_reconstruct(tio, yield, rightchildindex);
@@ -364,7 +368,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
                    auto Acoro = HeapArray.context(yield);
                    Acoro[rightchildindex] += -(update_index_by + update_leftindex_by);});
     
-    #ifdef DEBUG 
+    #ifdef HEAP_DEBUG 
             verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
     #endif
     
@@ -452,17 +456,17 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
 
 
 // Intializes the heap array with 0x7fffffffffffff
-void MinHeap::initialize(MPCTIO tio, yield_t & yield) {
+void MinHeap::init(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
     HeapArray.init(0x7fffffffffffff);
 }
 
 
-// This function simply initializes a heap with values 1,2,...,n
+// This function simply inits a heap with values 1,2,...,n
 // We use this function only to setup our heap 
 // to do timing experiments on insert and extractmins
 
-void MinHeap::initialize_heap(MPCTIO tio, yield_t & yield) {
+void MinHeap::init(MPCTIO tio, yield_t & yield, size_t which_init) {
     auto HeapArray = oram.flat(tio, yield);
 
     HeapArray.explicitonly(true);
@@ -573,7 +577,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     HeapArray[leftchildindex] += update_leftindex_by;
     HeapArray[rightchildindex] += -(update_index_by + update_leftindex_by);
 
-    #ifdef VERBOSE
+    #ifdef HEAP_VERBOSE
     RegAS new_parent = HeapArray[index];
     RegAS new_left   = HeapArray[leftchildindex];
     RegAS new_right  = HeapArray[rightchildindex];
@@ -585,7 +589,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     std::cout << "right_R = " << right_R << std::endl;
     #endif
     
-    #ifdef DEBUG
+    #ifdef HEAP_DEBUG
     verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
     #endif
     
@@ -645,9 +649,7 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
 
 
 
-void Heap(MPCIO & mpcio,
-    
-    const PRACOptions & opts, char ** args) {
+void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
     
     int argc = 14;
     int maxdepth = 0;
@@ -683,9 +685,9 @@ void Heap(MPCIO & mpcio,
     run_coroutines(tio, [ & tio, maxdepth, heapdepth, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
         size_t size = size_t(1) << maxdepth;
         MinHeap tree(tio.player(), size);
-        tree.initialize(tio, yield);
+        tree.init(tio, yield);
         tree.num_items = (size_t(1) << heapdepth) - 1;
-        tree.initialize_heap(tio, yield);
+        tree.init(tio, yield, 1);
         std::cout << "\n===== Init Stats =====\n";
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
@@ -696,7 +698,7 @@ void Heap(MPCIO & mpcio,
             RegAS inserted_val;
             inserted_val.randomize(10);
            
-            #ifdef VERBOSE
+            #ifdef HEAP_VERBOSE
             inserted_val.ashare = inserted_val.ashare;
             uint64_t inserted_val_rec = mpc_reconstruct(tio, yield, inserted_val, VALUE_BITS);
             std::cout << "inserted_val_rec = " << inserted_val_rec << std::endl << std::endl;
@@ -717,24 +719,24 @@ void Heap(MPCIO & mpcio,
         
 
         
-        #ifdef VERBOSE
+        #ifdef HEAP_VERBOSE
         tree.print_heap(tio, yield);
         #endif
         
         for (size_t j = 0; j < n_extracts; ++j) {
         tree.extract_min(mpcio, tio, yield, is_optimized);
 
-        #ifdef VERBOSE
+        #ifdef HEAP_VERBOSE
         RegAS minval = tree.extract_min(mpcio, tio, yield, is_optimized);
         uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval, VALUE_BITS);
         std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
         #endif
         
-         #ifdef DEBUG
+         #ifdef HEAP_DEBUG
          tree.verify_heap_property(tio, yield);
          #endif 
          
-         #ifdef VERBOSE
+         #ifdef HEAP_VERBOSE
          tree.print_heap(tio, yield);
          #endif
 
@@ -744,7 +746,7 @@ void Heap(MPCIO & mpcio,
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
         
-        #ifdef VERBOSE
+        #ifdef HEAP_VERBOSE
         tree.print_heap(tio, yield);
         #endif
 

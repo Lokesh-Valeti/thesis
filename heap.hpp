@@ -8,19 +8,20 @@
 #include "mpcops.hpp"
 
 class MinHeap {
-    private: Duoram < RegAS > oram;
-      Duoram < RegBS > oram_insert;
+    private: 
+    Duoram < RegAS > oram;
     size_t MAX_SIZE;
 
-    public: size_t num_items = 0;
-    MinHeap(int num_players, size_t size) : oram(num_players, size), oram_insert(num_players, size), MAX_SIZE(size){
+    public: 
+    size_t num_items = 0;
+    MinHeap(int player_num, size_t size) : oram(player_num, size){
 
     };
 
     
     RegAS extract_min(MPCIO &mpcio, MPCTIO tio, yield_t & yield, int is_optimized);
-    void initialize(MPCTIO tio, yield_t & yield);
-    void initialize_heap(MPCTIO tio, yield_t & yield);
+    void init(MPCTIO tio, yield_t & yield);
+    void init(MPCTIO tio, yield_t & yield, size_t which_init);
     int insert(MPCTIO tio, yield_t & yield, RegAS val);
     void insert_optimized(MPCTIO tio, yield_t & yield, RegAS val);
     void verify_heap_property(MPCTIO tio, yield_t & yield);
