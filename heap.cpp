@@ -110,6 +110,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     RegAS * path = new RegAS[height];
     RegAS * w   = new RegAS[height];
     RegAS * v = new RegAS[height];
+    
     for (size_t j = 0; j < height; ++j) path[j] = P[j];
 
     std::vector<coro_t> coroutines;
@@ -125,9 +126,8 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
         }
         );
     }
+
     run_coroutines(tio, coroutines);
-
-
 
     #ifdef HEAP_VERBOSE
     std::cout << "\n\n=================Before===========\n\n";
