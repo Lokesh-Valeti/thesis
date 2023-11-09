@@ -6,47 +6,47 @@
 #include "shapes.hpp"
 #include "heap.hpp"   
  
+/*
+ The heap datastructure is stored in an array with the starting index as 1 (and not 0)
+ For nodes stored in index i of the array, the parent is stored at i/2 and 
+ The left and right children are stored at 2i and 2i + 1
+ All the unused array indicies have MAX_INT stored in them
+ TODO: Draw a diagram to show the layout   
 
- // The heap datastructure is stored in an array with the starting index as 1 (and not 0)
- // For nodes stored in index i of the array, the parent is stored at i/2 and 
- // The left and right children are stored at 2i and 2i + 1
- // All the unused array indicies have MAX_INT stored in them
- // TODO: Draw a diagram to show the layout   
+ _Protocol 4_ from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+  Consider the following insertion path with:  x0 < x1 < x2 < NewElement < x3 < x4
 
- // _Protocol 4_ from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
- //  Consider the following insertion path with:  x0 < x1 < x2 < NewElement < x3 < x4
-
- //        x0                      x0                                 x0           
- //         \                        \                                 \ 
- //          x1                       x1                                x1
- //           \                        \                                 \
- //            x2                       x2                                x2
- //             \                        \                                 \         
- //              x3                      ( )                               NewElement
- //               \                        \                                 \
- //                x4                       x3                                x3
- //                 \                        \                                 \
- //                 ( )                       x4                                x4
+        x0                      x0                                 x0           
+         \                        \                                 \ 
+          x1                       x1                                x1
+           \                        \                                 \
+            x2                       x2                                x2
+             \                        \                                 \         
+              x3                      ( )                               NewElement
+               \                        \                                 \
+                x4                       x3                                x3
+                 \                        \                                 \
+                 ( )                       x4                                x4
             
- //      (Path with new element)       (binary search to determine             (After insertion)
- //                                     the point where New Element 
- //                                     should be and shift the elements 
- //                                     from that point down the path 
- //                                     from the point)     
+      (Path with new element)       (binary search to determine             (After insertion)
+                                     the point where New Element 
+                                     should be and shift the elements 
+                                     from that point down the path 
+                                     from the point)     
 
- // The insert protocol begins by adding an empty node at the end of the heap array
- // The key observation is that after the insert operation, the only entries that might change are the ones on the path from the root to the new node
- // The path from the root to the new node is determined based on the number of entries in the heap, which is publicly known
- // The observation is that this path starts off sorted and will end up with the new element (NewElement) inserted into the correct position, preserving the sorted property of the path
- // The length of the path is logarithmic with respect to the heap size (path length = log(heap size))
- // To find the appropriate insertion position, we use binary search with a single IDPF of height logarithmic with respect to the logarithm of the heap size (IDPF height = log(log(heap size)))
- // The advice bits of the IDPF correspond to the bit shares of a vector 'flag' with a single '1' indicating the position where the new value (insertval) must be inserted.
- // The shares of 'flag' are locally converted to shares of a vector 'u = [000011111]' using running XORs.
- // The bits of 'flag' and 'u' are then used in parallel Flag-Word multiplications, totaling 2 times the logarithm of the heap size, to shift the elements greater than 'insertval' down one position 
- // And write 'insertval' into the resulting empty location in the path
- // This process requires a single message of communication
- // Overall, the insert protocol achieves efficient insertion of a new element into the heap, with a complexity of log(heap size) oblivious comparisons and log(heap size) oblivious swaps
-
+ The insert protocol begins by adding an empty node at the end of the heap array
+ The key observation is that after the insert operation, the only entries that might change are the ones on the path from the root to the new node
+ The path from the root to the new node is determined based on the number of entries in the heap, which is publicly known
+ The observation is that this path starts off sorted and will end up with the new element (NewElement) inserted into the correct position, preserving the sorted property of the path
+ The length of the path is logarithmic with respect to the heap size (path length = log(heap size))
+ To find the appropriate insertion position, we use binary search with a single IDPF of height logarithmic with respect to the logarithm of the heap size (IDPF height = log(log(heap size)))
+ The advice bits of the IDPF correspond to the bit shares of a vector 'flag' with a single '1' indicating the position where the new value (insertval) must be inserted.
+ The shares of 'flag' are locally converted to shares of a vector 'u = [000011111]' using running XORs.
+ The bits of 'flag' and 'u' are then used in parallel Flag-Word multiplications, totaling 2 times the logarithm of the heap size, to shift the elements greater than 'insertval' down one position 
+ And write 'insertval' into the resulting empty location in the path
+ This process requires a single message of communication
+ Overall, the insert protocol achieves efficient insertion of a new element into the heap, with a complexity of log(heap size) oblivious comparisons and log(heap size) oblivious swaps
+*/
 void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);
     num_items++;
@@ -169,7 +169,6 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
     #endif
     
     HeapArray[num_items] = val;
-    //typename Duoram<RegAS>::Path P(HeapArray, tio, yield, childindex);
     
     while (parentindex > 0) {
         RegAS sharechild = HeapArray[childindex];
@@ -218,13 +217,7 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
             std::cout << "j/2 = " << j/2 << std::endl;
             std::cout << heapreconstruction[j/2] << std::endl;
         }
-        // if (heapreconstruction[j/2] > heapreconstruction[j + 1]) {
-        //     std::cout << "heap property failure\n\n";
-        //     std::cout << "j = " << j << std::endl;
-        //     std::cout << heapreconstruction[j] << std::endl;
-        //     std::cout << "2*j + 1 = " << 2 * j + 1<< std::endl;
-        //     std::cout << heapreconstruction[2 * j + 1] << std::endl;
-        // }
+
         assert(heapreconstruction[j/2] <= heapreconstruction[j]);
     }
 
@@ -251,53 +244,53 @@ void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, Reg
     assert(parent_reconstruction <= rightchild_reconstruction);
 }
 
+/*
+Protocol 6 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+Basic restore heap property has the following functionality:
 
-// Protocol 6 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
-// Basic restore heap property has the following functionality:
-//
-// Before restoring heap property:                      z
-//                                                     /  \ 
-//                                                    y    x
-//
-// After restoring heap property:        if(y < x AND z < y)       if(y < x AND z > y)        if(y > x AND z < x)           if(y > x AND z > x)
-//
-//                                                 z                         x                        y                              x    
-//                                                /  \                      / \                      / \                            / \ 
-//                                               y    x                    y   z                    x    z                         y   z                                             
-// The protocol works as follows:
-//
-// Step 1: Compare the left and right children.
-// Step 2: Compare the smaller child with the parent.
-// If the smaller child is smaller than the parent, swap the smaller child with the root.
+Before restoring heap property:                      z
+                                                    /  \ 
+                                                   y    x
 
-// The protocol requires three DORAM (Distributed Oblivious RAM) reads performed in parallel:
-// - Read the parent, left child, and right child.
+After restoring heap property:        if(y < x AND z < y)       if(y < x AND z > y)        if(y > x AND z < x)           if(y > x AND z > x)
 
-// Two comparisons are performed:
-// a) Comparison between the left and right child.
-// b) Comparison between the smaller child and the parent.
+                                                z                         y                        z                              x    
+                                               /  \                      / \                      / \                            / \ 
+                                              y    x                    z   x                    y    x                         y   z                                             
+The protocol works as follows:
 
-// Two MPC-selects are performed in parallel:
-// - Computing the smaller child and the smaller index using MPC-select operations.
+Step 1: Compare the left and right children.
+Step 2: Compare the smaller child with the parent.
+If the smaller child is smaller than the parent, swap the smaller child with the root.
 
-// Next, the offsets by which the parent and children need to be updated are computed.
-// Offset computation involves:
-// - One flag-flag multiplication.
-// - Two flag-word multiplications performed in parallel.
+The protocol requires three DORAM (Distributed Oblivious RAM) reads performed in parallel:
+- Read the parent, left child, and right child.
 
-// Three DORAM update operations are performed in parallel:
-// - Update the parent, left child, and right child.
+Two comparisons are performed:
+a) Comparison between the left and right child.
+b) Comparison between the smaller child and the parent.
 
-// The function returns the XOR-share of the smaller child's index.
+Two MPC-selects are performed in parallel:
+- Computing the smaller child and the smaller index using MPC-select operations.
 
-// The total cost of the protocol includes:
-// - 3 DORAM reads (performed in parallel).
-// - 2 comparisons.
-// - 2 MPC-selects (performed in parallel).
-// - 1 flag-flag multiplication.
-// - 2 flag-word multiplications (performed in parallel).
-// - 3 DORAM updates (performed in parallel).
+Next, the offsets by which the parent and children need to be updated are computed.
+Offset computation involves:
+- One flag-flag multiplication.
+- Two flag-word multiplications performed in parallel.
 
+Three DORAM update operations are performed in parallel:
+- Update the parent, left child, and right child.
+
+The function returns the XOR-share of the smaller child's index.
+
+The total cost of the protocol includes:
+- 3 DORAM reads (performed in parallel).
+- 2 comparisons.
+- 2 MPC-selects (performed in parallel).
+- 1 flag-flag multiplication.
+- 2 flag-word multiplications (performed in parallel).
+- 3 DORAM updates (performed in parallel).
+*/
 RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield, RegXS index) {
     RegAS smallest;
     auto HeapArray = oram.flat(tio, yield);
@@ -501,48 +494,48 @@ void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
 }
 
 
-
-// Restore the head property at the root.
-// the only reason this function exists is because at the root level
-// the indices to read (the root and its two children) are explicit and not shared
+/*
+Restore the head property at the root.
+the only reason this function exists is because at the root level
+the indices to read (the root and its two children) are explicit and not shared
        
-//                 root
-//                 /  \ 
-//        leftchild    rightchild
+                root
+                /  \ 
+       leftchild    rightchild
 
-// After restoring heap property:        
-// if(leftchild < rightchild AND root < leftchild)       if(leftchild < rightchild AND root > leftchild)     if(leftchild > rightchild AND root < rightchild)     if(leftchild > rightchild AND root > rightchild)
-
-
-//                  root                                                      rightchild                                                 leftchild                                                   rightchild    
-//                /     \                                                        /   \                                                     /    \                                                     /      \ 
-//          leftchild    rightchild                                      leftchild   root                                         rightchild    root                                            leftchild    root
+After restoring heap property:        
+if(leftchild < rightchild AND root < leftchild)       if(leftchild < rightchild AND root > leftchild)     if(leftchild > rightchild AND root < rightchild)     if(leftchild > rightchild AND root > rightchild)
 
 
-// The restore_heap_property_at_explicit_index protocol works as follows:
+                 root                                                        leftchild                                         root                                            rightchild    
+               /     \                                                        /   \                                           /    \                                           /      \ 
+         leftchild    rightchild                                           root   rightchild                          leftchild    rightchild                            leftchild    root
 
-// Step 1: Compare the left and right children.
-// Step 2: Compare the smaller child with the root.
-// If the smaller child is smaller than the root, swap the smaller child with the root.
-// Unlike the restore_heap_property protocol, restore_heap_property_at_explicit_index begins with three regular (non-DORAM) read operations:
-// - Read the parent, left child, and right child.
-// Two comparisons are performed:
-// a) Comparison between the left and right child.
-// b) Comparison between the smaller child and the parent.
-// The above comparisons have to be sequential because we need to find the smallerindex and smallerchild 
-// Which is dependent on the first comparison 
-// Next, the offsets by which the parent and children need to be updated are computed.
-// Offset computation involves:
-// - One flag-flag multiplication.
-// - Two flag-word multiplications.
-// Three DORAM update operations are required (performed in parallel) to update the parent, left child, and right child.
-// In total, this protocol requires:
-// - 2 comparisons.
-// - 1 flag-flag multiplication.
-// - 2 flag-word multiplications.
-// - 3 DORAM updates.
-// The function returns a pair of a) XOR-share of the index of the smaller child and b) the comparison between left and right children
 
+The restore_heap_property_at_explicit_index protocol works as follows:
+
+Step 1: Compare the left and right children.
+Step 2: Compare the smaller child with the root.
+If the smaller child is smaller than the root, swap the smaller child with the root.
+Unlike the restore_heap_property protocol, restore_heap_property_at_explicit_index begins with three regular (non-DORAM) read operations:
+- Read the parent, left child, and right child.
+Two comparisons are performed:
+a) Comparison between the left and right child.
+b) Comparison between the smaller child and the parent.
+The above comparisons have to be sequential because we need to find the smallerindex and smallerchild 
+Which is dependent on the first comparison 
+Next, the offsets by which the parent and children need to be updated are computed.
+Offset computation involves:
+- One flag-flag multiplication.
+- Two flag-word multiplications.
+Three DORAM update operations are required (performed in parallel) to update the parent, left child, and right child.
+In total, this protocol requires:
+- 2 comparisons.
+- 1 flag-flag multiplication.
+- 2 flag-word multiplications.
+- 3 DORAM updates.
+The function returns a pair of a) XOR-share of the index of the smaller child and b) the comparison between left and right children
+*/
 std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield, size_t index = 1) {
     auto HeapArray = oram.flat(tio, yield);
     RegAS parent = HeapArray[index];
