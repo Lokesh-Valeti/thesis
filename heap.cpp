@@ -7,12 +7,25 @@
 #include "heap.hpp"   
  
 /*
- The heap datastructure is stored in an array with the starting index as 1 (and not 0)
- For nodes stored in index i of the array, the parent is stored at i/2 and 
- The left and right children are stored at 2i and 2i + 1
- All the unused array indicies have MAX_INT stored in them
- TODO: Draw a diagram to show the layout   
 
+The heap datastructure is stored in an array with the starting index as 1 (and not 0)
+For nodes stored in index i of the array, the parent is stored at i/2 and 
+The left and right children are stored at 2i and 2i + 1
+All the unused array indicies have MAX_INT stored in them
+    
+                                 x1
+                               /   \
+                              x2    x3
+                             /  \   / \
+                            x4  x5 x6  x7
+
+  A Heap like above is stored in array like below.
+
+  NULL| x1 | x2 | x3 | x4 | x5 | x6 | x7 |
+
+*/
+
+/*
  _Protocol 4_ from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
   Consider the following insertion path with:  x0 < x1 < x2 < NewElement < x3 < x4
 
@@ -644,8 +657,7 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
 
 void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
     
-    std::cout << "argc = " << argc << std::endl;
-    
+
     MPCTIO tio(mpcio, 0, opts.num_threads);
 
     int nargs = argc;
