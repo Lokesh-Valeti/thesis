@@ -649,38 +649,44 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
 
 
 
-void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
+void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
     
-    int argc = 14;
+    std::cout << "argc = " << argc << std::endl;
+    
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+
+    int nargs = argc;
+    
+    if(tio.player() == 2) nargs -= 6;
+    if(tio.player() == 1) nargs -= 5;
+    if(tio.player() == 0) nargs -= 4;
+    
     int maxdepth = 0;
     int heapdepth = 0;
     size_t n_inserts = 0;
     size_t n_extracts = 0;
     int is_optimized = 0;
     int run_sanity = 0;
-    //int itr = 0;
 
     // Process command line arguments
-    for (int i = 0; i < argc; i += 2) {
+    for (int i = 0; i < nargs; i += 2) {
         std::string option = args[i];
-        if (option == "-m" && i + 1 < argc) {
+        if (option == "-m" && i + 1 < nargs) {
             maxdepth = std::atoi(args[i + 1]);
-        } else if (option == "-d" && i + 1 < argc) {
+        } else if (option == "-d" && i + 1 < nargs) {
             heapdepth = std::atoi(args[i + 1]);
-        } else if (option == "-i" && i + 1 < argc) {
+        } else if (option == "-i" && i + 1 < nargs) {
             n_inserts = std::atoi(args[i + 1]);
-        } else if (option == "-e" && i + 1 < argc) {
+        } else if (option == "-e" && i + 1 < nargs) {
             n_extracts = std::atoi(args[i + 1]);
-        } else if (option == "-opt" && i + 1 < argc) {
+        } else if (option == "-opt" && i + 1 < nargs) {
             is_optimized = std::atoi(args[i + 1]);
-        } else if (option == "-s" && i + 1 < argc) {
+        } else if (option == "-s" && i + 1 < nargs) {
             run_sanity = std::atoi(args[i + 1]);
-        } else if (option == "-itr" && i + 1 < argc) {
-            //itr = std::atoi(args[i + 1]);
         }
     }
  
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    
     
     run_coroutines(tio, [ & tio, maxdepth, heapdepth, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
         size_t size = size_t(1) << maxdepth;

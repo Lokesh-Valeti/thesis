@@ -32,5 +32,5 @@ class MinHeap {
 };
 
 void Heap(MPCIO &mpcio,
-   const PRACOptions &opts, char **args);
+   const PRACOptions &opts, char **args, int argc);
 #endif

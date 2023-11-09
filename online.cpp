@@ -1516,7 +1516,7 @@ static void path(MPCIO &mpcio,
     });
 }
 
-void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
+void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args, int argc)
 {
     MPCTIO tio(mpcio, 0);
     if (!*args) {
@@ -1621,7 +1621,7 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } 
      else if (!strcmp(*args, "heap")) {
         ++args;
-        Heap(mpcio, opts, args);
+        Heap(mpcio, opts, args, argc);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }
