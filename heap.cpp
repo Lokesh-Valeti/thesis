@@ -696,7 +696,6 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         size_t size = size_t(1) << maxdepth;
         MinHeap tree(tio.player(), size);
         tree.init(tio, yield);
-        //tree.num_items = (size_t(1) << heapdepth) - 1;
         tree.set_num_items((size_t(1) << heapdepth) - 1);
         tree.init(tio, yield, 1);
         std::cout << "\n===== Init Stats =====\n";
