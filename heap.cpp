@@ -95,7 +95,6 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
 
     for (size_t j = 0; j < height; ++j) {
         if(tio.player() !=2) {
-            //flag[j] = u[j];
             if(j > 0) u[j] = flag[j] ^ u[j-1];
         }
     }
@@ -172,7 +171,6 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
     
     auto HeapArray = oram.flat(tio, yield);
     num_items++;
-    
     size_t childindex = num_items;
     size_t parentindex = childindex / 2;
     
@@ -697,7 +695,8 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         size_t size = size_t(1) << maxdepth;
         MinHeap tree(tio.player(), size);
         tree.init(tio, yield);
-        tree.num_items = (size_t(1) << heapdepth) - 1;
+        //tree.num_items = (size_t(1) << heapdepth) - 1;
+        tree.set_num_items((size_t(1) << heapdepth) - 1);
         tree.init(tio, yield, 1);
         std::cout << "\n===== Init Stats =====\n";
         tio.sync_lamport();

@@ -11,14 +11,15 @@ class MinHeap {
     private: 
     Duoram < RegAS > oram;
     size_t MAX_SIZE;
+    size_t num_items;
 
     public: 
-    size_t num_items = 0;
+    
     MinHeap(int player_num, size_t size) : oram(player_num, size){
 
     };
 
-    
+    void set_num_items (size_t n) {num_items = n;}
     RegAS extract_min(MPCIO &mpcio, MPCTIO tio, yield_t & yield, int is_optimized);
     void init(MPCTIO tio, yield_t & yield);
     void init(MPCTIO tio, yield_t & yield, size_t which_init);
