@@ -199,6 +199,7 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
 }
 
 
+#ifdef HEAP_DEBUG
 // Note: This function is intended for debugging purposes only.
 // The purpose of this function is to verify that the heap property is satisfied.
 // The function checks if the heap property holds for the given heap structure. It ensures that for each node in the heap, the value of the parent node is less than or equal to the values of its children.
@@ -235,6 +236,8 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
     delete [] heapreconstruction;
 
 }
+
+#endif
 
 // Note: This function is intended for debugging purposes only.
 // The purpose of this function is to assert the fact that the reconstruction values of both the left child and right child are greater than or equal to the reconstruction value of the parent.
@@ -722,12 +725,12 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
         
+        #ifdef HEAP_DEBUG
         if(run_sanity == 1 && n_inserts != 0) tree.verify_heap_property(tio, yield);
-         
+        #endif 
+        
         mpcio.reset_stats();
         tio.reset_lamport();
-        
-
         
         #ifdef HEAP_VERBOSE
         tree.print_heap(tio, yield);
@@ -760,7 +763,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         tree.print_heap(tio, yield);
         #endif
 
+        #ifdef HEAP_DEBUG
         if(run_sanity == 1 && n_extracts != 0) tree.verify_heap_property(tio, yield);
+        #endif
     }
     );
 }
