@@ -661,11 +661,12 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
 
-    int nargs = argc;
+    int nargs = 0;
     
-    if(tio.player() == 2) nargs -= 6;
-    if(tio.player() == 1) nargs -= 5;
-    if(tio.player() == 0) nargs -= 4;
+    for (int i = 0; i < argc; i++) {
+        if(args[i]==nullptr) break;
+        ++nargs;
+    }
     
     int maxdepth = 0;
     int heapdepth = 0;
@@ -674,7 +675,6 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
     int is_optimized = 0;
     int run_sanity = 0;
 
-    // Process command line arguments
     for (int i = 0; i < nargs; i += 2) {
         std::string option = args[i];
         if (option == "-m" && i + 1 < nargs) {
@@ -692,8 +692,6 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         }
     }
  
-    
-    
     run_coroutines(tio, [ & tio, maxdepth, heapdepth, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
         size_t size = size_t(1) << maxdepth;
         MinHeap tree(tio.player(), size);

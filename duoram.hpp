@@ -548,7 +548,6 @@ public:
    // P0 and P1 output vectors r0 and r1 such that r0 \oplus r1 = [000100] 
    std::vector<RegBS> unit_vector(MPCTIO &tio, yield_t &yield, size_t nitems, RegXS foundidx)
    {
-    
       std::vector<RegBS> standard_basis(nitems); 
       
       if (player < 2) {
