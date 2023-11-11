@@ -1210,7 +1210,7 @@ static void pad_test(MPCIO &mpcio,
 
 
 static void bsearch_test(MPCIO &mpcio,
-    const PRACOptions &opts, char **args, bool basic)
+    const PRACOptions &opts, char **args, bool basic, bool is_presorted)
 {
     value_t target;
     arc4random_buf(&target, sizeof(target));
@@ -1232,7 +1232,7 @@ static void bsearch_test(MPCIO &mpcio,
     }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, &mpcio, depth, len, target, basic] (yield_t &yield) {
+    run_coroutines(tio, [&tio, &mpcio, depth, len, target, basic, is_presorted] (yield_t &yield) {
         RegAS tshare;
         std::cout << "\n===== SETUP =====\n";
 
@@ -1266,16 +1266,23 @@ static void bsearch_test(MPCIO &mpcio,
         std::vector<coro_t> coroutines;
         for (address_t i=0; i<len; ++i) {
             coroutines.emplace_back(
-                [&A, i, &tio](yield_t &yield) {
+                [&A, i, &tio, is_presorted](yield_t &yield) {
                     auto Acoro = A.context(yield);
                     RegAS v;
-                    //v.randomize(62);
-                    v.ashare = tio.player() * i;
-		    Acoro[i] = v;
+                    if(!is_presorted) 
+                     {
+                      v.randomize(62);
+                     }
+                     else
+                     {
+                      v.ashare = tio.player() * i;
+                      Acoro[i] = v;  
+                     }
+ 
                 });
         }
         run_coroutines(yield, coroutines);
-        //A.bitonic_sort(0, len);
+        if(!is_presorted) A.bitonic_sort(0, len);
         A.explicitonly(false);
 
         tio.sync_lamport();
@@ -1594,10 +1601,10 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args, int argc)
         pad_test(mpcio, opts, args);
     } else if (!strcmp(*args, "bbsearch")) {
         ++args;
-        bsearch_test(mpcio, opts, args, true);
+        bsearch_test(mpcio, opts, args, true, true);
     } else if (!strcmp(*args, "bsearch")) {
         ++args;
-        bsearch_test(mpcio, opts, args, false);
+        bsearch_test(mpcio, opts, args, false, true);
     } else if (!strcmp(*args, "duoram")) {
         ++args;
         if (opts.use_xor_db) {
