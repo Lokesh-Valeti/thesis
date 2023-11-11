@@ -548,6 +548,7 @@ public:
    // P0 and P1 output vectors r0 and r1 such that r0 \oplus r1 = [000100] 
    std::vector<RegBS> unit_vector(MPCTIO &tio, yield_t &yield, size_t nitems, RegXS foundidx)
    {
+    
       std::vector<RegBS> standard_basis(nitems); 
       
       if (player < 2) {
@@ -564,7 +565,7 @@ public:
           auto se = StreamEval(dt->dpf[1], 0, indshift,  tio.aes_ops(), true);
 
           for (size_t j = 0; j < nitems; ++j) {
-               RDPF<1>::LeafNode  leaf = se.next();
+               typename RDPF<WIDTH>::LeafNode  leaf = se.next();
                standard_basis[j] = dt->dpf[1].unit_bs(leaf); 
           } 
 
