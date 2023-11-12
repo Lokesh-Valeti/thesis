@@ -25,13 +25,11 @@ class MinHeap {
     void init(MPCTIO tio, yield_t & yield, size_t which_init);
     int insert(MPCTIO tio, yield_t & yield, RegAS val);
     void insert_optimized(MPCTIO tio, yield_t & yield, RegAS val);
-    
-    #ifdef HEAP_DEBUG
+      
     void verify_heap_property(MPCTIO tio, yield_t & yield);
-    #endif
-    
+  
     RegXS restore_heap_property(MPCIO &mpcio, MPCTIO tio, yield_t & yield, RegXS index);
-    std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t depth, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
+    std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
     std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield,  size_t index);
     void print_heap(MPCTIO tio, yield_t & yield);
 };

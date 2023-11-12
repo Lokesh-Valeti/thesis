@@ -199,12 +199,12 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
 }
 
 
-#ifdef HEAP_DEBUG
-// Note: This function is intended for debugging purposes only.
+ 
+// Note: This function is intended for testing purposes only.
 // The purpose of this function is to verify that the heap property is satisfied.
 // The function checks if the heap property holds for the given heap structure. It ensures that for each node in the heap, the value of the parent node is less than or equal to the values of its children.
 // By calling this function during debugging, you can validate the integrity of the heap structure and ensure that the heap property is maintained correctly.
-// It is important to note that this function is not meant for production use and should be used solely for debugging and testing purposes.
+// It is important to note that this function is not meant for production use and should be used solely for  testing purposes.
 
 void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
 
@@ -237,8 +237,9 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
 
 }
 
-#endif
+ 
 
+#ifdef HEAP_DEBUG
 // Note: This function is intended for debugging purposes only.
 // The purpose of this function is to assert the fact that the reconstruction values of both the left child and right child are greater than or equal to the reconstruction value of the parent.
 // The function performs an assertion check to validate this condition. If the condition is not satisfied, an assertion error will be triggered.
@@ -257,6 +258,7 @@ void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, Reg
     assert(parent_reconstruction <= leftchild_reconstruction);
     assert(parent_reconstruction <= rightchild_reconstruction);
 }
+#endif
 
 /*
 Protocol 6 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
@@ -311,7 +313,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     RegXS leftchildindex = index;
     leftchildindex = index << 1;
     RegXS rightchildindex;
-    rightchildindex.xshare = leftchildindex.xshare ^ (tio.player());
+    rightchildindex.xshare = leftchildindex.xshare ^ (!tio.player());
     
     RegAS parent, leftchild, rightchild;
     
@@ -387,9 +389,11 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 // The key difference between the optimized and basic versions is that the optimized version utilizes a wide DPF (Distributed Point Function) for reads and writes
 // In addition to restoring the heap property, the function also returns the result of the comparison (leftchild > rightchild)
 // The (leftchild > rightchild) comparison is utilized in the extract_min operation to increment the oblivindx by a certain value
+// The function restores the heap property at node index
+// The parameter layer is the height at which the node at index lies
 // The optimized version achieves improved efficiency by leveraging wide DPF operations for read and write operations
 
-std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, size_t depth, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx) {
+std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx) {
     
     auto HeapArray = oram.flat(tio, yield);
 
@@ -639,7 +643,7 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
      oidx.incr(outroot.second);
 
      for (size_t i = 0; i < height-1; ++i) {
-         auto out = restore_heap_property_optimized(tio, yield, smaller, i + 1, height, oidx);
+         auto out = restore_heap_property_optimized(tio, yield, smaller, i + 1,  oidx);
          smaller = out.first;
          oidx.incr(out.second);
      }
@@ -722,9 +726,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
         
-        #ifdef HEAP_DEBUG
+       
         if(run_sanity == 1 && n_inserts != 0) tree.verify_heap_property(tio, yield);
-        #endif 
+     
         
         mpcio.reset_stats();
         tio.reset_lamport();
@@ -742,9 +746,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
         #endif
         
-         #ifdef HEAP_DEBUG
+ 
          tree.verify_heap_property(tio, yield);
-         #endif 
+ 
          
          #ifdef HEAP_VERBOSE
          tree.print_heap(tio, yield);
@@ -760,9 +764,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         tree.print_heap(tio, yield);
         #endif
 
-        #ifdef HEAP_DEBUG
+       
         if(run_sanity == 1 && n_extracts != 0) tree.verify_heap_property(tio, yield);
-        #endif
+        
     }
     );
 }
