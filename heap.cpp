@@ -6,9 +6,7 @@
 #include "shapes.hpp"
 #include "heap.hpp"   
  
-/*
-
-    
+/*    
 The Optimized Insert Protocol
 Takes in the additive share of the value to be inserted
 And adds the the value into the heap while keeping the heap property intact
@@ -71,7 +69,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     typename Duoram<RegAS>::Path old_P(HeapArray, tio, yield, num_items);
     const RegXS foundidx = old_P.binary_search(val);
     size_t childindex = num_items;
-    uint64_t height = old_P.size();//std::ceil(std::log2(num_items  + 1)) + 1;
+    uint64_t height = old_P.size(); // Here height is the number of nodes the path from root to the leaf
     RegAS zero;
     HeapArray[childindex] = zero;
     typename Duoram<RegAS>::Path P(HeapArray, tio, yield, num_items);
@@ -86,7 +84,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     std::vector<RegBS> flag;
     std::vector<RegBS> u(height);
     typename Duoram<RegAS>::template OblivIndex<RegXS,1> oidx(tio, yield, foundidx, logheight);
-    flag = oidx.unit_vector(tio, yield, height, foundidx); // changed the third param to height from 1 << logheight
+    flag = oidx.unit_vector(tio, yield, height, foundidx);
 
     #ifdef HEAP_VERBOSE
     uint64_t foundidx_reconstruction = mpc_reconstruct(tio, yield, foundidx);
@@ -111,21 +109,21 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     }
     #endif
 
-    RegAS * path = new RegAS[height];
-    RegAS * w   = new RegAS[height];
-    RegAS * v = new RegAS[height];
-    
+    std::vector<RegAS> path(height);
+    std::vector<RegAS> w(height);
+    std::vector<RegAS> v(height);
+
     for (size_t j = 0; j < height; ++j) path[j] = P[j];
 
     std::vector<coro_t> coroutines;
     for (size_t j = 1; j < height; ++j) {
         coroutines.emplace_back( 
-                [&tio, w, u, path, j](yield_t &yield) {
+                [&tio, &w, &u, &path, j](yield_t &yield) {
             mpc_flagmult(tio, yield, w[j], u[j-1], path[j-1]-path[j]);
         }
         );
         coroutines.emplace_back( 
-                [&tio, v, flag, val, path, j](yield_t &yield) {
+                [&tio, &v, flag, val, &path, j](yield_t &yield) {
             mpc_flagmult(tio, yield, v[j-1], flag[j-1], val - path[j-1]);
         }
         );
@@ -151,13 +149,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
         std::cout << j << " --->: " << path_rec << std::endl;
     }
     std::cout << "\n\n============================\n\n";
-    #endif
-
-    delete[] path;
-    delete[] w;
-    delete[] v;
-
-    
+    #endif    
 }
 
 // The Basic Insert Protocol
@@ -174,7 +166,6 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
 // This process ensures that the newly inserted element is correctly positioned in the heap.
 // The total cost of the insert protocol is log(num_items) oblivious comparisons and log(num_items) oblivious swaps.
 // This protocol follows the approach described as Protocol 3 in the paper "PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures."
-
 int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
     
     auto HeapArray = oram.flat(tio, yield);
@@ -195,7 +186,6 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
         CDPF cdpf = tio.cdpf(yield);
         RegAS diff = sharechild - shareparent;
         auto[lt, eq, gt] = cdpf.compare(tio, yield, diff, tio.aes_ops());
-        //auto lteq = lt ^ eq;
         mpc_oswap(tio, yield, sharechild, shareparent, lt, VALUE_BITS);
         HeapArray[childindex]  = sharechild;
         HeapArray[parentindex] = shareparent;
@@ -213,7 +203,6 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
 // The function checks if the heap property holds for the given heap structure. It ensures that for each node in the heap, the value of the parent node is less than or equal to the values of its children.
 // By calling this function during debugging, you can validate the integrity of the heap structure and ensure that the heap property is maintained correctly.
 // It is important to note that this function is not meant for production use and should be used solely for  testing purposes.
-
 void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
 
     #ifdef HEAP_VERBOSE
@@ -253,7 +242,6 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
 // The function performs an assertion check to validate this condition. If the condition is not satisfied, an assertion error will be triggered.
 // This function is useful for verifying the correctness of reconstruction values during debugging and ensuring the integrity of the heap structure.
 // It is important to note that this function is not meant for production use and should be used solely for debugging purposes.
-
 void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, RegAS leftchild, RegAS rightchild) {
     uint64_t parent_reconstruction = mpc_reconstruct(tio, yield, parent);
     uint64_t leftchild_reconstruction = mpc_reconstruct(tio, yield, leftchild);
@@ -404,7 +392,6 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 // The function restores the heap property at node index
 // The parameter layer is the height at which the node at index lies
 // The optimized version achieves improved efficiency by leveraging wide DPF operations for read and write operations
-
 std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx) {
     
     auto HeapArray = oram.flat(tio, yield);
@@ -506,7 +493,6 @@ void MinHeap::init(MPCTIO tio, yield_t & yield, size_t which_init) {
 // The function performs the necessary operations to reconstruct the heap, ensuring that the heap property is satisfied. It then prints the contents of the reconstructed heap.
 // This function is useful for debugging and inspecting the state of the heap at a particular point in the program execution.
 // It is important to note that this function is not meant for production use and should be used solely for debugging purposes.
-
 void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
     uint64_t * Pjreconstruction = new uint64_t[num_items + 1];
@@ -637,7 +623,6 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
 // The choice of whether to use restore_heap_property or restore_heap_property_optimized
 // depends on whether it is a basic or optimized extraction of the minimum element.
 // These functions ensure that the heap property is maintained throughout the tree.
-
 RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_optimized) {
 
     size_t height = std::log2(num_items);
