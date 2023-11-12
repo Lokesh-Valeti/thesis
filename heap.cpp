@@ -35,9 +35,9 @@ All the unused array indicies have MAX_INT stored in them
   Consider the following insertion path with:  x0 < x1 < x2 < NewElement < x3 < x4
 
         x0                      x0                                 x0           
-         \                        \                                 \ 
+        / \                    /   \                             /  \ 
           x1                       x1                                x1
-           \                        \                                 \
+            \                        \                                 \
             x2                       x2                                x2
              \                        \                                 \         
               x3                      ( )                               NewElement
