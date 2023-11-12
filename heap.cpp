@@ -241,7 +241,7 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
 // The function performs an assertion check to validate this condition. If the condition is not satisfied, an assertion error will be triggered.
 // This function is useful for verifying the correctness of reconstruction values during debugging and ensuring the integrity of the heap structure.
 // It is important to note that this function is not meant for production use and should be used solely for debugging purposes.
-void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, RegAS leftchild, RegAS rightchild) {
+static void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, RegAS leftchild, RegAS rightchild) {
     uint64_t parent_reconstruction = mpc_reconstruct(tio, yield, parent);
     uint64_t leftchild_reconstruction = mpc_reconstruct(tio, yield, leftchild);
     uint64_t rightchild_reconstruction = mpc_reconstruct(tio, yield, rightchild);
