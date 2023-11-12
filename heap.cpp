@@ -138,9 +138,9 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
 
     #ifdef HEAP_VERBOSE
     std::cout << "\n\n=================Before===========\n\n";
+    auto path_rec_before = P.reconstruct();
     for (size_t j = 0; j < height; ++j) {
-        auto path_rec = mpc_reconstruct(tio, yield, P[j]);
-        std::cout << j << " --->: " << path_rec << std::endl;
+        std::cout << j << " --->: " << path_rec_before[j].share() << std::endl;
     }
     std::cout << "\n\n============================\n\n";
     #endif
@@ -149,9 +149,9 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
 
     #ifdef HEAP_VERBOSE
     std::cout << "\n\n=================After===========\n\n";
+    auto path_rec_after = P.reconstruct();
     for (size_t j = 0; j < height; ++j) {
-        auto path_rec = mpc_reconstruct(tio, yield, P[j]);
-        std::cout << j << " --->: " << path_rec << std::endl;
+        std::cout << j << " --->: " << path_rec_after[j].share() << std::endl;
     }
     std::cout << "\n\n============================\n\n";
     #endif    
@@ -213,27 +213,26 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
     #endif
     
     auto HeapArray = oram.flat(tio, yield);
-    uint64_t * heapreconstruction = new uint64_t[num_items + 1];
-    for (size_t j = 1; j < num_items + 1; ++j) {
-        heapreconstruction[j] = mpc_reconstruct(tio, yield,  HeapArray[j]);
-        #ifdef HEAP_VERBOSE
-        if(tio.player() < 2) std::cout << j << " -----> heapreconstruction[" << j << "] = " << heapreconstruction[j] << std::endl;
-        #endif
-    }
-    
+
+    auto heapreconstruction = HeapArray.reconstruct();
+   
+    #ifdef HEAP_VERBOSE
+     for (size_t j = 1; j < num_items + 1; ++j) {
+            if(tio.player() < 2) std::cout << j << " -----> heapreconstruction[" << j << "] = " << heapreconstruction[j].share() << std::endl;
+        }
+    #endif
+   
     for (size_t j = 2; j <= num_items; ++j) {
-        if (heapreconstruction[j/2] > heapreconstruction[j]) {
+        if (heapreconstruction[j/2].share() > heapreconstruction[j].share()) {
             std::cout << "heap property failure\n\n";
             std::cout << "j = " << j << std::endl;
             std::cout << heapreconstruction[j] << std::endl;
             std::cout << "j/2 = " << j/2 << std::endl;
-            std::cout << heapreconstruction[j/2] << std::endl;
+            std::cout << heapreconstruction[j/2].share() << std::endl;
         }
 
-        assert(heapreconstruction[j/2] <= heapreconstruction[j]);
+        assert(heapreconstruction[j/2].share() <= heapreconstruction[j].share());
     }
-
-    delete [] heapreconstruction;
 
 }
 
@@ -499,17 +498,14 @@ void MinHeap::init(MPCTIO tio, yield_t & yield, size_t n) {
 // It is important to note that this function is not meant for production use and should be used solely for debugging purposes.
 void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
-    uint64_t * Pjreconstruction = new uint64_t[num_items + 1];
-    for (size_t j = 0; j <= num_items; ++j)  Pjreconstruction[j] = mpc_reconstruct(tio, yield, HeapArray[j]);
+    auto Pjreconstruction = HeapArray.reconstruct(); 
     for (size_t j = 0; j <= num_items; ++j) {
         if(2 * j < num_items) { 
-            std::cout << j << "-->> HeapArray[" << j << "] = " <<   Pjreconstruction[j] << ", children are: " << Pjreconstruction[2 * j] << " and " << Pjreconstruction[2 * j + 1] <<  std::endl;
+            std::cout << j << "-->> HeapArray[" << j << "] = " <<   Pjreconstruction[j].share() << ", children are: " << Pjreconstruction[2 * j].share() << " and " << Pjreconstruction[2 * j + 1].share() <<  std::endl;
         } else {
-            std::cout << j << "-->> HeapArray[" << j << "] = " << std::dec << Pjreconstruction[j] << " is a LEAF " <<  std::endl;
+            std::cout << j << "-->> HeapArray[" << j << "] = " << std::dec << Pjreconstruction[j].share() << " is a LEAF " <<  std::endl;
         }
     }
-
-    delete[] Pjreconstruction;
 }
 
 
