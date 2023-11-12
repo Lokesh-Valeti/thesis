@@ -61,7 +61,9 @@ and adds the the value into the heap while keeping the heap property intact
  The bits of 'flag' and 'u' are then used in parallel Flag-Word multiplications, totaling 2 times the logarithm of the heap size, to shift the elements greater than 'insertval' down one position 
  And write 'insertval' into the resulting empty location in the path
  This process requires a single message of communication
- Overall, the insert protocol achieves efficient insertion of a new element into the heap, with a complexity of log(log(heap size)) oblivious comparisons and 2xlog(heap size) oblivious swaps
+ The protocol requires one binary search on a database of size log(heap size) (height of the tree)
+ Overall, the insert protocol achieves efficient insertion of a new element into the heap, with a complexity of log(log(heap size)) oblivious comparisons
+ and 2 x log(heap size) flag multiplications 
 */
 void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);
