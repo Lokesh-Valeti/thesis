@@ -8,6 +8,11 @@
  
 /*
 
+    
+The Optimized Insert Protocol
+Takes in the additive share of the value to be inserted
+And adds the the value into the heap while keeping the heap property intact
+
 The heap datastructure is stored in an array with the starting index as 1 (and not 0)
 For nodes stored in index i of the array, the parent is stored at i/2 and 
 The left and right children are stored at 2i and 2i + 1
@@ -155,6 +160,9 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     
 }
 
+// The Basic Insert Protocol
+// Takes in the additive share of the value to be inserted
+// And adds the the value into the heap while keeping the heap property intact
 // The insert protocol works as follows:
 // Step 1: Add a new element to the last entry of the array.
 // This new element becomes a leaf in the heap.
@@ -480,7 +488,6 @@ void MinHeap::init(MPCTIO tio, yield_t & yield) {
 // This function simply inits a heap with values 1,2,...,n
 // We use this function only to setup our heap 
 // to do timing experiments on insert and extractmins
-
 void MinHeap::init(MPCTIO tio, yield_t & yield, size_t which_init) {
     auto HeapArray = oram.flat(tio, yield);
 
@@ -613,9 +620,12 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
 
 
 // This Protocol 5 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+// The extractmin protocol returns the minimum element (the root), removes it
+// and restores the heap property
 // The function extract_min cannot be called on an empty heap
 // Like in the paper, there is only one version of extract_min
-// the optimized version calls the optimized restore_heap_property
+// and takes in a boolean parameter to decide if the basic or the optimized version needs to be run
+// the optimized version calls the optimized restore_heap_property with everything else remaing the same
 // The extractmin algorithm removes the root and replaces it with last leaf node
 // After extracting the minimum element from the heap, the heap property is temporarily violated.
 // To restore the heap property, we begin at the root layer.
