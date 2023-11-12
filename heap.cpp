@@ -217,7 +217,7 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
         #endif
     }
     
-    for (size_t j = 2; j < num_items; ++j) {
+    for (size_t j = 2; j <= num_items; ++j) {
         if (heapreconstruction[j/2] > heapreconstruction[j]) {
             std::cout << "heap property failure\n\n";
             std::cout << "j = " << j << std::endl;
