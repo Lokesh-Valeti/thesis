@@ -16,11 +16,11 @@ All the unused array indicies have MAX_INT stored in them
                                /   \
                               x2    x3
                              /  \   / \
-                            x4  x5 x6  x7
+                            x4  x5 x6  ()
 
   A Heap like above is stored in array like below.
 
-  NULL| x1 | x2 | x3 | x4 | x5 | x6 | x7 |
+  NULL| x1 | x2 | x3 | x4 | x5 | x6 | MAXINT |
 
 */
 
@@ -61,7 +61,7 @@ and adds the the value into the heap while keeping the heap property intact
  The bits of 'flag' and 'u' are then used in parallel Flag-Word multiplications, totaling 2 times the logarithm of the heap size, to shift the elements greater than 'insertval' down one position 
  And write 'insertval' into the resulting empty location in the path
  This process requires a single message of communication
- Overall, the insert protocol achieves efficient insertion of a new element into the heap, with a complexity of log(heap size) oblivious comparisons and log(heap size) oblivious swaps
+ Overall, the insert protocol achieves efficient insertion of a new element into the heap, with a complexity of log(log(heap size)) oblivious comparisons and 2xlog(heap size) oblivious swaps
 */
 void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);

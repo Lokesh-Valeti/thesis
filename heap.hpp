@@ -14,12 +14,23 @@ private:
     size_t num_items;
 
     // Basic restore heap property at a secret shared index
+    // Takes in as an input the XOR shares of the index at which
+    // the heap property has to be restored
+    // Returns the XOR shares of the smaller index
     RegXS restore_heap_property(MPCIO &mpcio, MPCTIO tio, yield_t & yield, RegXS index);
     
     // Optimized restore heap property at a secret shared index
+    // Takes in as an input the XOR shares of the index at which
+    // the heap property has to be restored
+    // Returns the XOR shares of the smaller index and 
+    // comparison between the left and right child
     std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
     
     // Restore heap property at an index in clear
+    // Takes in as an input the index (in clear) at which
+    // the heap property has to be restored
+    // Returns the XOR shares of the smaller index and 
+    // comparison between the left and right child
     std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield,  size_t index);
 
 public: 
@@ -28,6 +39,7 @@ public:
     // The extractmin protocol returns the minimum element (the root), removes it
     // and restores the heap property
     // and takes in a boolean parameter to decide if the basic or the optimized version needs to be run
+    // return value is the share of the minimum value (the root)
     RegAS extract_min(MPCIO &mpcio, MPCTIO tio, yield_t & yield, int is_optimized);
     
     // Intializes the heap array with 0x7fffffffffffff
