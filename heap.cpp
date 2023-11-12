@@ -69,7 +69,8 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     typename Duoram<RegAS>::Path old_P(HeapArray, tio, yield, num_items);
     const RegXS foundidx = old_P.binary_search(val);
     size_t childindex = num_items;
-    uint64_t height = old_P.size(); // Here height is the number of nodes the path from root to the leaf
+    // height is the number of nodes on the path from root to the leaf
+    uint64_t height = old_P.size();
     RegAS zero;
     HeapArray[childindex] = zero;
     typename Duoram<RegAS>::Path P(HeapArray, tio, yield, num_items);
