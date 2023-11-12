@@ -1210,12 +1210,20 @@ static void pad_test(MPCIO &mpcio,
 
 
 static void bsearch_test(MPCIO &mpcio,
-    const PRACOptions &opts, char **args, bool basic, bool is_presorted)
+    const PRACOptions &opts, char **args, bool basic)
 {
     value_t target;
     arc4random_buf(&target, sizeof(target));
     target >>= 1;
     nbits_t depth=6;
+    bool is_presorted = true;
+
+    // Use a random array (which we explicitly sort) instead of a
+    // presorted array
+    if (*args && !strcmp(args[0], "-r")) {
+        is_presorted = false;
+        ++args;
+    }
 
     if (*args) {
         depth = atoi(*args);
@@ -1225,6 +1233,9 @@ static void bsearch_test(MPCIO &mpcio,
     if (*args) {
         len = atoi(*args);
         ++args;
+    }
+    if (is_presorted) {
+        target %= (len << 16);
     }
     if (*args) {
         target = strtoull(*args, NULL, 16);
@@ -1254,36 +1265,31 @@ static void bsearch_test(MPCIO &mpcio,
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
 
-        std::cout << "\n===== SORT RANDOM DATABASE =====\n";
+        std::cout << "\n===== " << (is_presorted ? "CREATE" : "SORT RANDOM")
+            << " DATABASE =====\n";
         mpcio.reset_stats();
         tio.reset_lamport();
-        // Create a random database and sort it
-        //size_t &aes_ops = tio.aes_ops();
+        // If is_presorted is true, create a database of presorted
+        // values.  If is_presorted is false, create a database of
+        // random values and explicitly sort it.
         Duoram<RegAS> oram(tio.player(), len);
         auto A = oram.flat(tio, yield);
         A.explicitonly(true);
-        // Initialize the memory to random values in parallel
-        std::vector<coro_t> coroutines;
+        // Initialize the memory to sorted or random values, depending
+        // on the is_presorted flag
         for (address_t i=0; i<len; ++i) {
-            coroutines.emplace_back(
-                [&A, i, &tio, is_presorted](yield_t &yield) {
-                    auto Acoro = A.context(yield);
-                    RegAS v;
-                    if(!is_presorted) 
-                     {
-                      v.randomize(62);
-                     }
-                     else
-                     {
-                      v.ashare = tio.player() * i;
-                      Acoro[i] = v;  
-                     }
- 
-                });
+            RegAS v;
+            if (!is_presorted) {
+                v.randomize(62);
+            } else {
+                v.ashare = (tio.player() * i) << 16;
+            }
+            A[i] = v;
         }
-        run_coroutines(yield, coroutines);
-        if(!is_presorted) A.bitonic_sort(0, len);
         A.explicitonly(false);
+        if (!is_presorted) {
+            A.bitonic_sort(0, len);
+        }
 
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
@@ -1601,10 +1607,10 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args, int argc)
         pad_test(mpcio, opts, args);
     } else if (!strcmp(*args, "bbsearch")) {
         ++args;
-        bsearch_test(mpcio, opts, args, true, true);
+        bsearch_test(mpcio, opts, args, true);
     } else if (!strcmp(*args, "bsearch")) {
         ++args;
-        bsearch_test(mpcio, opts, args, false, true);
+        bsearch_test(mpcio, opts, args, false);
     } else if (!strcmp(*args, "duoram")) {
         ++args;
         if (opts.use_xor_db) {
