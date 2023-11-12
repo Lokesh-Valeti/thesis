@@ -167,7 +167,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
 // This process ensures that the newly inserted element is correctly positioned in the heap.
 // The total cost of the insert protocol is log(num_items) oblivious comparisons and log(num_items) oblivious swaps.
 // This protocol follows the approach described as Protocol 3 in the paper "PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures."
-int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
+void MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
     
     auto HeapArray = oram.flat(tio, yield);
     num_items++;
@@ -193,8 +193,6 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
         childindex = parentindex;
         parentindex = parentindex / 2;
     }
-
-    return 1;
 }
 
 

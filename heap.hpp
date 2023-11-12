@@ -32,7 +32,7 @@ public:
     // The Basic Insert Protocol
     // Takes in the additive share of the value to be inserted
     // And adds the the value into the heap while keeping the heap property intact
-    int insert(MPCTIO tio, yield_t & yield, RegAS val);
+    void insert(MPCTIO tio, yield_t & yield, RegAS val);
     
     // The Optimized Insert Protocol
     // Takes in the additive share of the value to be inserted
