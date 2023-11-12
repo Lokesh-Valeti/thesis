@@ -6,11 +6,7 @@
 #include "shapes.hpp"
 #include "heap.hpp"   
  
-/*    
-The Optimized Insert Protocol
-Takes in the additive share of the value to be inserted
-And adds the the value into the heap while keeping the heap property intact
-
+/*
 The heap datastructure is stored in an array with the starting index as 1 (and not 0)
 For nodes stored in index i of the array, the parent is stored at i/2 and 
 The left and right children are stored at 2i and 2i + 1
@@ -29,20 +25,24 @@ All the unused array indicies have MAX_INT stored in them
 */
 
 /*
+The Optimized Insert Protocol
+Takes in the additive share of the value to be inserted
+and adds the the value into the heap while keeping the heap property intact
+
  _Protocol 4_ from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
   Consider the following insertion path with:  x0 < x1 < x2 < NewElement < x3 < x4
 
-        x0                      x0                                 x0           
-        / \                    /   \                             /  \ 
-          x1                       x1                                x1
-            \                        \                                 \
-            x2                       x2                                x2
-             \                        \                                 \         
-              x3                      ( )                               NewElement
-               \                        \                                 \
-                x4                       x3                                x3
-                 \                        \                                 \
-                 ( )                       x4                                x4
+        x0                      x0                               x0           
+        / \                    /  \                             /  \
+          x1                      x1                                x1
+         /                        /                                 /
+        x2                       x2                                x2
+         \                        \                                 \
+          x3                      ( )                               NewElement
+           \                        \                                 \
+            x4                       x3                                x3
+           /                        /                                 /
+         ( )                       x4                                x4
             
       (Path with new element)       (binary search to determine             (After insertion)
                                      the point where New Element 
