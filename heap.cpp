@@ -262,6 +262,9 @@ static void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS pare
 
 /*
 Protocol 6 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+Takes in as an input the XOR shares of the index at which the heap property has to be restored
+Returns the XOR shares of the smaller index
+
 Basic restore heap property has the following functionality:
 
 Before restoring heap property:                      z
@@ -389,6 +392,10 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 }
 
 // This Protocol 7 is derived from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
+// Takes in as an input the XOR shares of the index at which
+// the heap property has to be restored
+// Returns the XOR shares of the smaller index and 
+// comparison between the left and right child
 // This protocol represents an optimized version of restoring the heap property
 // The key difference between the optimized and basic versions is that the optimized version utilizes a wide DPF (Distributed Point Function) for reads and writes
 // In addition to restoring the heap property, the function also returns the result of the comparison (leftchild > rightchild)
@@ -515,6 +522,9 @@ void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
 Restore the head property at the root.
 the only reason this function exists is because at the root level
 the indices to read (the root and its two children) are explicit and not shared
+Restore heap property at an index in clear
+Takes in as an input the index (in clear) at which
+the heap property has to be restored
        
                 root
                 /  \ 
