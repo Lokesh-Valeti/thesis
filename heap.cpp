@@ -635,8 +635,8 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
     auto HeapArray = oram.flat(tio, yield);
     minval = HeapArray[1];
     HeapArray[1] = RegAS(HeapArray[num_items]);
-            RegAS v;
-        v.ashare = 0x7fffffffffffff * !tio.player();
+    RegAS v;
+    v.ashare = 0x7fffffffffffff * !tio.player();
     HeapArray[num_items] = v;
     num_items--;
     auto outroot = restore_heap_property_at_explicit_index(tio, yield);
@@ -751,25 +751,25 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         #endif
         
  
-         tree.verify_heap_property(tio, yield);
+        tree.verify_heap_property(tio, yield);
  
          
-         #ifdef HEAP_VERBOSE
-         tree.print_heap(tio, yield);
-         #endif
-
-        }
-
-        std::cout << "\n===== Extract Min Stats =====\n";
-        tio.sync_lamport();
-        mpcio.dump_stats(std::cout);
-        
         #ifdef HEAP_VERBOSE
         tree.print_heap(tio, yield);
         #endif
 
+       }
+
+       std::cout << "\n===== Extract Min Stats =====\n";
+       tio.sync_lamport();
+       mpcio.dump_stats(std::cout);
+        
+       #ifdef HEAP_VERBOSE
+       tree.print_heap(tio, yield);
+       #endif
+
        
-        if(run_sanity == 1 && n_extracts != 0) tree.verify_heap_property(tio, yield);
+       if(run_sanity == 1 && n_extracts != 0) tree.verify_heap_property(tio, yield);
         
     }
     );
