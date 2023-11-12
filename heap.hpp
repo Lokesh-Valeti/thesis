@@ -13,6 +13,15 @@ private:
     size_t MAX_SIZE;
     size_t num_items;
 
+    // Basic restore heap property at a secret shared index
+    RegXS restore_heap_property(MPCIO &mpcio, MPCTIO tio, yield_t & yield, RegXS index);
+    
+    // Optimized restore heap property at a secret shared index
+    std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
+    
+    // Restore heap property at an index in clear
+    std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield,  size_t index);
+
 public: 
     MinHeap(int player_num, size_t size) : oram(player_num, size) {};
 
@@ -43,14 +52,6 @@ public:
     // The purpose of this function is to verify that the heap property is satisfied.
     void verify_heap_property(MPCTIO tio, yield_t & yield);
     
-    // Basic restore heap property at a secret shared index
-    RegXS restore_heap_property(MPCIO &mpcio, MPCTIO tio, yield_t & yield, RegXS index);
-    
-    // Optimized restore heap property at a secret shared index
-    std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
-    
-    // Restore heap property at an index in clear
-    std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield,  size_t index);
     
     // Prints the current heap
     void print_heap(MPCTIO tio, yield_t & yield);
