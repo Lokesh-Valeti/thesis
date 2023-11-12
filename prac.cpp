@@ -25,7 +25,7 @@ static void usage(const char *progname)
 
 static void comp_player_main(boost::asio::io_context &io_context,
     unsigned player, const PRACOptions &opts, const char *p0addr,
-    char **args, int argc)
+    char **args)
 {
     std::deque<tcp::socket> peersocks, serversocks;
     mpcio_setup_computational(player, io_context, p0addr,
@@ -37,7 +37,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
         if (opts.mode == MODE_PREPROCESSING) {
             preprocessing_comp(mpcio, opts, args);
         } else {
-            online_main(mpcio, opts, args, argc);
+            online_main(mpcio, opts, args);
         }
     });
 
@@ -51,7 +51,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
 
 static void server_player_main(boost::asio::io_context &io_context,
     const PRACOptions &opts, const char *p0addr,
-    const char *p1addr, char **args, int argc)
+    const char *p1addr, char **args)
 {
     std::deque<tcp::socket> p0socks, p1socks;
     mpcio_setup_server(io_context, p0addr, p1addr,
@@ -63,7 +63,7 @@ static void server_player_main(boost::asio::io_context &io_context,
         if (opts.mode == MODE_PREPROCESSING) {
             preprocessing_server(mpcserverio, opts, args);
         } else {
-            online_main(mpcserverio, opts, args, argc);
+            online_main(mpcserverio, opts, args);
         }
     });
 
@@ -164,9 +164,9 @@ int main(int argc, char **argv)
     boost::asio::io_context io_context;
 
     if (player < 2) {
-        comp_player_main(io_context, player, opts, p0addr, args, argc);
+        comp_player_main(io_context, player, opts, p0addr, args);
     } else {
-        server_player_main(io_context, opts, p0addr, p1addr, args, argc);
+        server_player_main(io_context, opts, p0addr, p1addr, args);
     }
 
     return 0;

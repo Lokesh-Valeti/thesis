@@ -660,15 +660,14 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
 
 
 
-void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
+void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
     
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
 
     int nargs = 0;
     
-    for (int i = 0; i < argc; i++) {
-        if(args[i]==nullptr) break;
+    while (args[nargs] != nullptr) {
         ++nargs;
     }
     

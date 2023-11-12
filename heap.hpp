@@ -56,6 +56,6 @@ public:
     void print_heap(MPCTIO tio, yield_t & yield);
 };
 
-void Heap(MPCIO &mpcio,
-   const PRACOptions &opts, char **args, int argc);
+void Heap(MPCIO &mpcio, const PRACOptions &opts, char **args);
+
 #endif
