@@ -98,13 +98,11 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     #endif
 
     for (size_t j = 0; j < height; ++j) {
-        if(tio.player() !=2) {
             if(j > 0) {
                 u[j] = flag[j] ^ u[j-1];
             } else {
                 u[j] = flag[j];
             }
-        }
     }
     
     #ifdef HEAP_VERBOSE
