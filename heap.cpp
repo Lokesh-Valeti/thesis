@@ -75,7 +75,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     typename Duoram<RegAS>::Path P(HeapArray, tio, yield, num_items);
     
     #ifdef HEAP_VERBOSE
-    uint64_t val_reconstruction = mpc_reconstruct(tio, yield, val, VALUE_BITS);
+    uint64_t val_reconstruction = mpc_reconstruct(tio, yield, val);
     std::cout << "val_reconstruction = " << val_reconstruction << std::endl;
     #endif
 
@@ -186,7 +186,7 @@ int MinHeap::insert(MPCTIO tio, yield_t & yield, RegAS val) {
         CDPF cdpf = tio.cdpf(yield);
         RegAS diff = sharechild - shareparent;
         auto[lt, eq, gt] = cdpf.compare(tio, yield, diff, tio.aes_ops());
-        mpc_oswap(tio, yield, sharechild, shareparent, lt, VALUE_BITS);
+        mpc_oswap(tio, yield, sharechild, shareparent, lt);
         HeapArray[childindex]  = sharechild;
         HeapArray[parentindex] = shareparent;
         childindex = parentindex;
@@ -343,9 +343,9 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     RegAS smallerchild;
     
     run_coroutines(tio, [&tio, &smallerindex, lteq, rightchildindex, leftchildindex](yield_t &yield) {
-    mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, VALUE_BITS);
+    mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex);
     },  [&tio, &smallerchild, lteq, rightchild, leftchild](yield_t &yield) {
-        mpc_select(tio, yield, smallerchild, lteq, rightchild, leftchild, VALUE_BITS);
+        mpc_select(tio, yield, smallerchild, lteq, rightchild, leftchild);
     }
     );
     
@@ -360,9 +360,9 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     RegAS update_index_by, update_leftindex_by;
     
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield) {
-    mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild, VALUE_BITS);
+    mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);
     },  [&tio, &update_index_by, lt_p, parent, smallerchild](yield_t &yield) {
-        mpc_flagmult(tio, yield, update_index_by, lt_p, smallerchild - parent, VALUE_BITS);
+        mpc_flagmult(tio, yield, update_index_by, lt_p, smallerchild - parent);
     }
     );
     
@@ -429,9 +429,9 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     RegAS smallerchild;
 
     run_coroutines(tio, [&tio, &smallerindex, lteq, rightchildindex, leftchildindex](yield_t &yield)
-                  { mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex, VALUE_BITS);},
+                  { mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex);},
                   [&tio, &smallerchild, lt, rightchild, leftchild](yield_t &yield)
-                  { mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild, VALUE_BITS);});
+                  { mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild);});
 
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
@@ -445,9 +445,9 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     RegAS update_index_by, update_leftindex_by;
 
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield)
-            { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild, VALUE_BITS);},
+            { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);},
             [&tio, &update_index_by, lt1eq1, parent, smallerchild](yield_t &yield)
-            {mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent, VALUE_BITS);} 
+            {mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent);} 
             );
     
     run_coroutines(tio, [&tio, &P, &oidx, update_index_by](yield_t &yield) {
@@ -576,9 +576,9 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     RegAS update_index_by, update_leftindex_by;
    
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield) {
-        mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild, VALUE_BITS);
+        mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);
     }, [&tio, &update_index_by, lt1eq1, parent, smallerchild](yield_t &yield) {
-        mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent, VALUE_BITS);
+        mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent);
     }
     );
    
@@ -714,7 +714,7 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
            
             #ifdef HEAP_VERBOSE
             inserted_val.ashare = inserted_val.ashare;
-            uint64_t inserted_val_rec = mpc_reconstruct(tio, yield, inserted_val, VALUE_BITS);
+            uint64_t inserted_val_rec = mpc_reconstruct(tio, yield, inserted_val);
             std::cout << "inserted_val_rec = " << inserted_val_rec << std::endl << std::endl;
             #endif
             
@@ -742,7 +742,7 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
         #ifdef HEAP_VERBOSE
         RegAS minval = tree.extract_min(mpcio, tio, yield, is_optimized);
-        uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval, VALUE_BITS);
+        uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
         std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
         #endif
         
