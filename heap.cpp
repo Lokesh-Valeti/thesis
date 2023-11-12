@@ -273,6 +273,10 @@ After restoring heap property:        if(y < x AND z < y)       if(y < x AND z >
                                                 z                         y                        z                              x    
                                                /  \                      / \                      / \                            / \ 
                                               y    x                    z   x                    y    x                         y   z                                             
+
+
+The function is relying on the "unused" entries in the heap being MAXINT
+
 The protocol works as follows:
 
 Step 1: Compare the left and right children.
