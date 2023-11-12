@@ -1625,8 +1625,7 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args, int argc)
     } else if (!strcmp(*args, "cell")) {
         ++args;
         cell(mpcio, opts, args);
-    } 
-     else if (!strcmp(*args, "heap")) {
+    } else if (!strcmp(*args, "heap")) {
         ++args;
         Heap(mpcio, opts, args, argc);
     } else {

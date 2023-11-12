@@ -221,7 +221,7 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
         #endif
     }
     
-    for (size_t j = 2; j <= num_items; ++j) {
+    for (size_t j = 2; j < num_items; ++j) {
         if (heapreconstruction[j/2] > heapreconstruction[j]) {
             std::cout << "heap property failure\n\n";
             std::cout << "j = " << j << std::endl;
@@ -497,8 +497,8 @@ void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
     uint64_t * Pjreconstruction = new uint64_t[num_items + 1];
     for (size_t j = 0; j <= num_items; ++j)  Pjreconstruction[j] = mpc_reconstruct(tio, yield, HeapArray[j]);
     for (size_t j = 0; j <= num_items; ++j) {
-        if(2 * j < num_items) {
-            std::cout << j << "-->> HeapArray[" << j << "] = " << std::dec << Pjreconstruction[j] << ", children are: " << Pjreconstruction[2 * j] << " and " << Pjreconstruction[2 * j + 1] <<  std::endl;
+        if(2 * j < num_items) { 
+            std::cout << j << "-->> HeapArray[" << j << "] = " <<   Pjreconstruction[j] << ", children are: " << Pjreconstruction[2 * j] << " and " << Pjreconstruction[2 * j + 1] <<  std::endl;
         } else {
             std::cout << j << "-->> HeapArray[" << j << "] = " << std::dec << Pjreconstruction[j] << " is a LEAF " <<  std::endl;
         }
