@@ -243,7 +243,7 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
 // The purpose of this function is to assert the fact that the reconstruction values of both the left child and right child are greater than or equal to the reconstruction value of the parent.
 // The function performs an assertion check to validate this condition. If the condition is not satisfied, an assertion error will be triggered.
 // This function is useful for verifying the correctness of reconstruction values during debugging and ensuring the integrity of the heap structure.
-// It is important to note that this function is not meant for production use and should be used solely for debugging and testing purposes.
+// It is important to note that this function is not meant for production use and should be used solely for debugging purposes.
 
 void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS parent, RegAS leftchild, RegAS rightchild) {
     uint64_t parent_reconstruction = mpc_reconstruct(tio, yield, parent);
@@ -490,7 +490,7 @@ void MinHeap::init(MPCTIO tio, yield_t & yield, size_t which_init) {
 // The purpose of this function is to reconstruct the heap and print its contents.
 // The function performs the necessary operations to reconstruct the heap, ensuring that the heap property is satisfied. It then prints the contents of the reconstructed heap.
 // This function is useful for debugging and inspecting the state of the heap at a particular point in the program execution.
-// It is important to note that this function is not meant for production use and should be used solely for debugging and testing purposes.
+// It is important to note that this function is not meant for production use and should be used solely for debugging purposes.
 
 void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
