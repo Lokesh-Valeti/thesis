@@ -8,18 +8,13 @@
 #include "mpcops.hpp"
 
 class MinHeap {
-    private: 
+private: 
     Duoram < RegAS > oram;
     size_t MAX_SIZE;
     size_t num_items;
 
-    public: 
-    
-    MinHeap(int player_num, size_t size) : oram(player_num, size){
-
-    };
-
-    void set_num_items (size_t n) {num_items = n;}
+public: 
+    MinHeap(int player_num, size_t size) : oram(player_num, size) {};
 
     // The extractmin protocol returns the minimum element (the root), removes it
     // and restores the heap property
@@ -30,9 +25,9 @@ class MinHeap {
     void init(MPCTIO tio, yield_t & yield);
     
     // This function simply inits a heap with values 1,2,...,n
-    // We use this function only to setup our heap 
+    // We use this function only to set up our heap 
     // to do timing experiments on insert and extractmins
-    void init(MPCTIO tio, yield_t & yield, size_t which_init);
+    void init(MPCTIO tio, yield_t & yield, size_t n);
     
     // The Basic Insert Protocol
     // Takes in the additive share of the value to be inserted

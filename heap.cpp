@@ -473,13 +473,14 @@ void MinHeap::init(MPCTIO tio, yield_t & yield) {
 
 
 // This function simply inits a heap with values 1,2,...,n
-// We use this function only to setup our heap 
+// We use this function only to set up our heap 
 // to do timing experiments on insert and extractmins
-void MinHeap::init(MPCTIO tio, yield_t & yield, size_t which_init) {
+void MinHeap::init(MPCTIO tio, yield_t & yield, size_t n) {
     auto HeapArray = oram.flat(tio, yield);
 
+    num_items = n;
     HeapArray.explicitonly(true);
-    for (size_t j = 1; j <= num_items; ++j) {
+    for (size_t j = 1; j <= n; ++j) {
         RegAS v;
         v.ashare = j * tio.player();
         HeapArray[j] = v;
@@ -699,8 +700,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args, int argc) {
         size_t size = size_t(1) << maxdepth;
         MinHeap tree(tio.player(), size);
         tree.init(tio, yield);
-        tree.set_num_items((size_t(1) << heapdepth) - 1);
-        tree.init(tio, yield, 1);
+        // This form of init with a third parameter of n sets the heap
+        // to contain 1, 2, 3, ..., n.
+        tree.init(tio, yield, (size_t(1) << heapdepth) - 1);
         std::cout << "\n===== Init Stats =====\n";
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
