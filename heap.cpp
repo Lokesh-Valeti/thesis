@@ -66,14 +66,14 @@ and adds the the value into the heap while keeping the heap property intact
 void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);
     num_items++;
-    typename Duoram<RegAS>::Path old_P(HeapArray, tio, yield, num_items);
-    const RegXS foundidx = old_P.binary_search(val);
+    typename Duoram<RegAS>::Path P(HeapArray, tio, yield, num_items);
+    const RegXS foundidx = P.binary_search(val);
     size_t childindex = num_items;
     // height is the number of nodes on the path from root to the leaf
-    uint64_t height = old_P.size();
+    uint64_t height = P.size();
     RegAS zero;
     HeapArray[childindex] = zero;
-    typename Duoram<RegAS>::Path P(HeapArray, tio, yield, num_items);
+    
     
     #ifdef HEAP_VERBOSE
     uint64_t val_reconstruction = mpc_reconstruct(tio, yield, val);
