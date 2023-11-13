@@ -648,7 +648,7 @@ public:
         oblividx = &obidx;
     }
 
-    // Create a MemRefExpl for accessing a partcular field of T
+    // Create a MemRefS for accessing a partcular field of T
     template <typename SFT>
     MemRefS<U,SFT,SFT T::*,Sh,WIDTH> field(SFT T::*subfieldsel) {
         auto res = MemRefS<U,SFT,SFT T::*,Sh,WIDTH>(this->shape,
