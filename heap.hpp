@@ -16,20 +16,20 @@ private:
     // Basic restore heap property at a secret shared index
     // Takes in as an input the XOR shares of the index at which
     // the heap property has to be restored
-    // Returns the XOR shares of the smaller index
+    // Returns the XOR shares of the index of the smaller child
     RegXS restore_heap_property(MPCIO &mpcio, MPCTIO tio, yield_t & yield, RegXS index);
     
     // Optimized restore heap property at a secret shared index
     // Takes in as an input the XOR shares of the index at which
     // the heap property has to be restored
-    // Returns the XOR shares of the smaller index and 
+    // Returns the XOR shares of the index of the smaller child and 
     // comparison between the left and right child
     std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO tio, yield_t & yield, RegXS index, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
     
     // Restore heap property at an index in clear
     // Takes in as an input the index (in clear) at which
     // the heap property has to be restored
-    // Returns the XOR shares of the smaller index and 
+    // Returns the XOR shares of the index of the smaller child and 
     // comparison between the left and right child
     std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield,  size_t index);
 

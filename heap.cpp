@@ -264,7 +264,7 @@ static void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS pare
 /*
 Protocol 6 from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
 Takes in as an input the XOR shares of the index at which the heap property has to be restored
-Returns the XOR shares of the smaller index
+Returns the XOR shares of the index of the smaller child
 
 Basic restore heap property has the following functionality:
 
@@ -295,7 +295,7 @@ a) Comparison between the left and right child.
 b) Comparison between the smaller child and the parent.
 
 Two MPC-selects are performed in parallel:
-- Computing the smaller child and the smaller index using MPC-select operations.
+- Computing the smaller child and its index using MPC-select operations.
 
 Next, the offsets by which the parent and children need to be updated are computed.
 Offset computation involves:
@@ -395,11 +395,13 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 // This Protocol 7 is derived from PRAC: Round-Efficient 3-Party MPC for Dynamic Data Structures
 // Takes in as an input the XOR shares of the index at which
 // the heap property has to be restored
-// Returns the XOR shares of the smaller index and 
+// Returns the XOR shares of the index of the smaller child and 
 // comparison between the left and right child
 // This protocol represents an optimized version of restoring the heap property
 // The key difference between the optimized and basic versions is that the optimized version utilizes a wide DPF (Distributed Point Function) for reads and writes
-// In addition to restoring the heap property, the function also returns the result of the comparison (leftchild > rightchild)
+// In addition to restoring the heap property, the function also returns
+// shares of the index of the smaller child, and the result of the
+// comparison (leftchild > rightchild)
 // The (leftchild > rightchild) comparison is utilized in the extract_min operation to increment the oblivindx by a certain value
 // The function restores the heap property at node index
 // The parameter layer is the height at which the node at index lies
