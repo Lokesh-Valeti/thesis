@@ -522,7 +522,7 @@ void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
 
 
 /*
-Restore the head property at the root.
+Restore the head property at an explicit index (typically the root).
 the only reason this function exists is because at the root level
 the indices to read (the root and its two children) are explicit and not shared
 Restore heap property at an index in clear
@@ -552,8 +552,8 @@ Unlike the restore_heap_property protocol, restore_heap_property_at_explicit_ind
 Two comparisons are performed:
 a) Comparison between the left and right child.
 b) Comparison between the smaller child and the parent.
-The above comparisons have to be sequential because we need to find the smallerindex and smallerchild 
-Which is dependent on the first comparison 
+The above comparisons have to be sequential because we need to find the smallerindex and smallerchild,
+which is dependent on the first comparison 
 Next, the offsets by which the parent and children need to be updated are computed.
 Offset computation involves:
 - One flag-flag multiplication.
