@@ -63,7 +63,8 @@ and adds the the value into the heap while keeping the heap property intact
  This process requires a single message of communication
  The protocol requires one binary search on a database of size log(heap size) (height of the tree)
  Overall, the insert protocol achieves efficient insertion of a new element into the heap, with a complexity of log(log(heap size)) oblivious comparisons
- and 2 x log(heap size) flag multiplications 
+ and 2 x log(heap size) flag multiplications. The flag multiplications
+ are all done in a single round.
 */
 void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     auto HeapArray = oram.flat(tio, yield);
