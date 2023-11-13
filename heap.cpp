@@ -117,15 +117,17 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     for (size_t j = 0; j < height; ++j) path[j] = P[j];
 
     std::vector<coro_t> coroutines;
-    for (size_t j = 1; j < height; ++j) {
-        coroutines.emplace_back( 
-                [&tio, &w, &u, &path, j](yield_t &yield) {
-            mpc_flagmult(tio, yield, w[j], u[j-1], path[j-1]-path[j]);
+    for (size_t j = 0; j < height; ++j) {
+        if (j > 0) {
+            coroutines.emplace_back( 
+                    [&tio, &w, &u, &path, j](yield_t &yield) {
+                mpc_flagmult(tio, yield, w[j], u[j-1], path[j-1]-path[j]);
+            }
+            );
         }
-        );
         coroutines.emplace_back( 
                 [&tio, &v, flag, val, &path, j](yield_t &yield) {
-            mpc_flagmult(tio, yield, v[j-1], flag[j-1], val - path[j-1]);
+            mpc_flagmult(tio, yield, v[j], flag[j], val - path[j]);
         }
         );
     }
@@ -134,7 +136,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
 
     #ifdef HEAP_VERBOSE
     std::cout << "\n\n=================Before===========\n\n";
-    for (size_t j = 0; j < height-1; ++j) {
+    for (size_t j = 0; j < height; ++j) {
         auto path_rec = mpc_reconstruct(tio, yield, P[j]);
         std::cout << j << " --->: " << path_rec << std::endl;
     }
@@ -145,7 +147,7 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
 
     #ifdef HEAP_VERBOSE
     std::cout << "\n\n=================After===========\n\n";
-    for (size_t j = 0; j < height-1; ++j) {
+    for (size_t j = 0; j < height; ++j) {
         auto path_rec = mpc_reconstruct(tio, yield, P[j]);
         std::cout << j << " --->: " << path_rec << std::endl;
     }
