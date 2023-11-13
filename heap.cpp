@@ -759,9 +759,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
         #endif
         
- 
-        tree.verify_heap_property(tio, yield);
- 
+        if (run_sanity == 1) {
+            tree.verify_heap_property(tio, yield);
+        }
          
         #ifdef HEAP_VERBOSE
         tree.print_heap(tio, yield);
