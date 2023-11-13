@@ -477,7 +477,7 @@ void MinHeap::init(MPCTIO tio, yield_t & yield) {
 }
 
 
-// This function simply inits a heap with values 1,2,...,n
+// This function simply inits a heap with values 100,200,...,100*n
 // We use this function only to set up our heap 
 // to do timing experiments on insert and extractmins
 void MinHeap::init(MPCTIO tio, yield_t & yield, size_t n) {
@@ -487,7 +487,7 @@ void MinHeap::init(MPCTIO tio, yield_t & yield, size_t n) {
     HeapArray.explicitonly(true);
     for (size_t j = 1; j <= n; ++j) {
         RegAS v;
-        v.ashare = j * tio.player();
+        v.ashare = (j * tio.player()) * 100;
         HeapArray[j] = v;
     }
     HeapArray.explicitonly(false);
@@ -715,7 +715,7 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         for (size_t j = 0; j < n_inserts; ++j) {
             
             RegAS inserted_val;
-            inserted_val.randomize(10);
+            inserted_val.randomize(8);
            
             #ifdef HEAP_VERBOSE
             inserted_val.ashare = inserted_val.ashare;

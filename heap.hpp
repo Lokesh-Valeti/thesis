@@ -24,7 +24,7 @@ public:
     // Intializes the heap array with 0x7fffffffffffff
     void init(MPCTIO tio, yield_t & yield);
     
-    // This function simply inits a heap with values 1,2,...,n
+    // This function simply inits a heap with values 100,200,...,100*n
     // We use this function only to set up our heap 
     // to do timing experiments on insert and extractmins
     void init(MPCTIO tio, yield_t & yield, size_t n);
