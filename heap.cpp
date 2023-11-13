@@ -148,7 +148,15 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     std::cout << "\n\n============================\n\n";
     #endif
     
-    for (size_t j = 0; j < height; ++j) P[j] += (w[j] + v[j]);
+    coroutines.clear();
+
+    for (size_t j = 0; j < height; ++j) {
+        coroutines.emplace_back( [&tio, &v, &w, &P, j](yield_t &yield) {
+            auto Pcoro = P.context(yield); 
+            Pcoro[j] += (w[j] + v[j]);
+        });
+    }
+    run_coroutines(tio, coroutines);
 
     #ifdef HEAP_VERBOSE
     std::cout << "\n\n=================After===========\n\n";
@@ -596,9 +604,20 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     }
     );
    
-    HeapArray[index] += update_index_by;
-    HeapArray[leftchildindex] += update_leftindex_by;
-    HeapArray[rightchildindex] += -(update_index_by + update_leftindex_by);
+    run_coroutines(tio,
+        [&tio, &HeapArray, &update_index_by, index](yield_t &yield) {
+            auto HeapArraycoro = HeapArray.context(yield);
+            HeapArraycoro[index] += update_index_by;
+        },
+        [&tio, &HeapArray, &update_leftindex_by, leftchildindex](yield_t &yield) {
+            auto HeapArraycoro = HeapArray.context(yield);
+            HeapArraycoro[leftchildindex] += update_leftindex_by;
+        },
+        [&tio, &HeapArray, &update_index_by, &update_leftindex_by, rightchildindex](yield_t &yield) {
+            auto HeapArraycoro = HeapArray.context(yield);
+            HeapArraycoro[rightchildindex] += -(update_index_by + update_leftindex_by);
+        }
+    );
 
     #ifdef HEAP_VERBOSE
     RegAS new_parent = HeapArray[index];
