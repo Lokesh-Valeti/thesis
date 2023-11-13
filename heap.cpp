@@ -101,11 +101,11 @@ void MinHeap::insert_optimized(MPCTIO tio, yield_t & yield, RegAS val) {
     #endif
 
     for (size_t j = 0; j < height; ++j) {
-            if(j > 0) {
-                u[j] = flag[j] ^ u[j-1];
-            } else {
-                u[j] = flag[j];
-            }
+        if(j > 0) {
+            u[j] = flag[j] ^ u[j-1];
+        } else {
+            u[j] = flag[j];
+        }
     }
     
     #ifdef HEAP_VERBOSE
@@ -750,23 +750,23 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         #endif
         
         for (size_t j = 0; j < n_extracts; ++j) {
-        #ifdef HEAP_VERBOSE
-        RegAS minval =
-        #endif
-        tree.extract_min(mpcio, tio, yield, is_optimized);
+            #ifdef HEAP_VERBOSE
+            RegAS minval =
+            #endif
+            tree.extract_min(mpcio, tio, yield, is_optimized);
 
-        #ifdef HEAP_VERBOSE
-        uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
-        std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
-        #endif
-        
-        if (run_sanity == 1) {
-            tree.verify_heap_property(tio, yield);
-        }
-         
-        #ifdef HEAP_VERBOSE
-        tree.print_heap(tio, yield);
-        #endif
+            #ifdef HEAP_VERBOSE
+            uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
+            std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
+            #endif
+            
+            if (run_sanity == 1) {
+                tree.verify_heap_property(tio, yield);
+            }
+             
+            #ifdef HEAP_VERBOSE
+            tree.print_heap(tio, yield);
+            #endif
 
        }
 
