@@ -653,20 +653,20 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO tio, yield_t & yield, int is_op
     RegXS smaller = outroot.first;
     
     if(is_optimized > 0) {
-     typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx(tio, yield, height);
-     oidx.incr(outroot.second);
+        typename Duoram < RegAS > ::template OblivIndex < RegXS, 3 > oidx(tio, yield, height);
+        oidx.incr(outroot.second);
 
-     for (size_t i = 0; i < height-1; ++i) {
-         auto out = restore_heap_property_optimized(tio, yield, smaller, i + 1,  oidx);
-         smaller = out.first;
-         oidx.incr(out.second);
-     }
+        for (size_t i = 0; i < height-1; ++i) {
+            auto out = restore_heap_property_optimized(tio, yield, smaller, i + 1,  oidx);
+            smaller = out.first;
+            oidx.incr(out.second);
+        }
     }
 
     if(is_optimized == 0) {
-      for (size_t i = 0; i < height - 1; ++i) {
-        smaller = restore_heap_property(mpcio, tio, yield, smaller);
-      }
+        for (size_t i = 0; i < height - 1; ++i) {
+            smaller = restore_heap_property(mpcio, tio, yield, smaller);
+        }
     }
     
     return minval;
