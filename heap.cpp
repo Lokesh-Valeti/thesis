@@ -509,8 +509,8 @@ void MinHeap::init(MPCTIO tio, yield_t & yield, size_t n) {
 void MinHeap::print_heap(MPCTIO tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
     auto Pjreconstruction = HeapArray.reconstruct(); 
-    for (size_t j = 0; j <= num_items; ++j) {
-        if(2 * j < num_items) { 
+    for (size_t j = 1; j <= num_items; ++j) {
+        if(2 * j <= num_items) { 
             std::cout << j << "-->> HeapArray[" << j << "] = " <<   Pjreconstruction[j].share() << ", children are: " << Pjreconstruction[2 * j].share() << " and " << Pjreconstruction[2 * j + 1].share() <<  std::endl;
         } else {
             std::cout << j << "-->> HeapArray[" << j << "] = " << std::dec << Pjreconstruction[j].share() << " is a LEAF " <<  std::endl;
