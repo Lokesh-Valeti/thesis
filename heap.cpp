@@ -414,7 +414,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     leftchildindex = index << 1;
 
     RegXS rightchildindex;
-    rightchildindex.xshare = leftchildindex.xshare ^ tio.player();
+    rightchildindex.xshare = leftchildindex.xshare ^ (!tio.player());
 
     typename Duoram < RegAS > ::Flat P(HeapArray, tio, yield, 1 << layer, 1 << layer);
     typename Duoram < RegAS > ::Flat C(HeapArray, tio, yield, 2 << layer, 2 << layer);
