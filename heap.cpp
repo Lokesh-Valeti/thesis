@@ -552,7 +552,7 @@ The restore_heap_property_at_explicit_index protocol works as follows:
 Step 1: Compare the left and right children.
 Step 2: Compare the smaller child with the root.
 If the smaller child is smaller than the root, swap the smaller child with the root.
-Unlike the restore_heap_property protocol, restore_heap_property_at_explicit_index begins with three regular (non-DORAM) read operations:
+Unlike the restore_heap_property protocol, restore_heap_property_at_explicit_index begins with three explicit-index (non-DORAM) read operations:
 - Read the parent, left child, and right child.
 Two comparisons are performed:
 a) Comparison between the left and right child.
@@ -563,12 +563,12 @@ Next, the offsets by which the parent and children need to be updated are comput
 Offset computation involves:
 - One flag-flag multiplication.
 - Two flag-word multiplications.
-Three regular (non-DORAM) update operations are required (performed in parallel) to update the parent, left child, and right child.
+Three explicit-index (non-DORAM) update operations are required (performed in parallel) to update the parent, left child, and right child.
 In total, this protocol requires:
 - 2 comparisons.
 - 1 flag-flag multiplication.
 - 2 flag-word multiplications.
-- 3 regular (non-DORAM) updates and reads.
+- 3 explicit-index (non-DORAM) reads and updates.
 The function returns a pair of a) XOR-share of the index of the smaller child and b) the comparison between left and right children
 */
 std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield, size_t index = 1) {
