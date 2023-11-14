@@ -18,9 +18,9 @@ date "+===== Start %s %F %T"
 savefile0=$$.p0.out
 savefile1=$$.p1.out
 savefile2=$$.p2.out
-docker exec -w /root/prac prac_p0 bash -c "$PRAC_NUMA_P0 stdbuf -o 0 ./prac $opts 0 $* > $savefile0" &
-docker exec -w /root/prac prac_p1 bash -c "$PRAC_NUMA_P1 stdbuf -o 0 ./prac $opts 1 $p0addr $* > $savefile1" &
-docker exec -w /root/prac prac_p2 bash -c "$PRAC_NUMA_P2 stdbuf -o 0 ./prac $opts 2 $p0addr $p1addr $* > $savefile2" &
+docker exec -w /root/prac prac_p0 bash -c "$PRAC_NUMA_P0 stdbuf -o 0 ./prac $opts 0 $* > $savefile0 2>&1" &
+docker exec -w /root/prac prac_p1 bash -c "$PRAC_NUMA_P1 stdbuf -o 0 ./prac $opts 1 $p0addr $* > $savefile1 2>&1" &
+docker exec -w /root/prac prac_p2 bash -c "$PRAC_NUMA_P2 stdbuf -o 0 ./prac $opts 2 $p0addr $p1addr $* > $savefile2 2>&1" &
 wait
 echo ===== P0 output
 docker exec -w /root/prac prac_p0 cat $savefile0
