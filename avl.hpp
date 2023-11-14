@@ -1,6 +1,7 @@
 #ifndef __AVL_HPP__
 #define __AVL_HPP__
 
+#include <optional>
 #include <math.h>
 #include <stdio.h>
 #include <string>
@@ -27,7 +28,6 @@
     DEBUG_BB: Debug flag for balance bit computations
 */
 
-#define AVL_OPT_ON
 // #define AVL_RANDOMIZE_INSERTS
 // #define AVL_DEBUG
 // #define AVL_DEBUG_BB
@@ -194,7 +194,7 @@ class AVL {
           MAX_DEPTH+=1;
           size=size>>1;
         }
-        OPTIMIZED = opt_flag; 
+        OPTIMIZED = opt_flag;
     };
 
     void init(){
