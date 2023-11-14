@@ -892,6 +892,42 @@ static void duoram(MPCIO &mpcio,
     });
 }
 
+// This measures just sequential (dependent) reads
+// T is RegAS or RegXS for additive or XOR shared database respectively
+template <typename T>
+static void read_test(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth = 6;
+    int items = 4;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        items = atoi(*args);
+        ++args;
+    }
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, items] (yield_t &yield) {
+        size_t size = size_t(1)<<depth;
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+
+        std::cout << "\n===== SEQUENTIAL READS =====\n";
+        T totval;
+        for (int i=0;i<items;++i) {
+            RegXS idx;
+            idx.randomize(depth);
+            T val = A[idx];
+            totval += val;
+        }
+        printf("Total value read: %016lx\n", totval.share());
+    });
+}
+
 static void cdpf_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -1592,6 +1628,13 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
             duoram_test<RegXS>(mpcio, opts, args);
         } else {
             duoram_test<RegAS>(mpcio, opts, args);
+        }
+    } else if (!strcmp(*args, "read")) {
+        ++args;
+        if (opts.use_xor_db) {
+            read_test<RegXS>(mpcio, opts, args);
+        } else {
+            read_test<RegAS>(mpcio, opts, args);
         }
     } else if (!strcmp(*args, "cdpftest")) {
         ++args;
