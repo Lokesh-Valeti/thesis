@@ -764,6 +764,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         tree.print_heap(tio, yield);
         #endif
         
+        bool have_lastextract = false;
+        uint64_t lastextract = 0;
+
         for (size_t j = 0; j < n_extracts; ++j) {
  
  
@@ -773,6 +776,11 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
              RegAS minval = tree.extract_min(mpcio, tio, yield, is_optimized);
              uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
              std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
+             if (have_lastextract) {
+                assert(minval_reconstruction >= lastextract);
+             }
+             lastextract = minval_reconstruction;
+             have_lastextract = true;
             } else {
               tree.extract_min(mpcio, tio, yield, is_optimized);
             }
