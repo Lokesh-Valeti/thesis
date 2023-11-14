@@ -109,9 +109,11 @@ void MPCSingleIO::send(bool implicit_send)
 size_t MPCSingleIO::recv(void *data, size_t len, lamport_t &lamport)
 {
 #ifdef VERBOSE_COMMS
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
     size_t orig_len = len;
-    printf("Recv %s.%d len=%lu lamp=%u ", dest.c_str(), thread_num,
-        len, lamport);
+    printf("%lu.%06lu: Recv %s.%d len=%lu lamp=%u ", tv.tv_sec,
+        tv.tv_usec, dest.c_str(), thread_num, len, lamport);
 #endif
 
 #ifdef SEND_LAMPORT_CLOCKS
@@ -152,7 +154,8 @@ size_t MPCSingleIO::recv(void *data, size_t len, lamport_t &lamport)
     size_t res = boost::asio::read(sock, boost::asio::buffer(data, len));
 #endif
 #ifdef VERBOSE_COMMS
-    printf("nlamp=%u: ", lamport);
+    gettimeofday(&tv, NULL);
+    printf("nlamp=%u %lu.%06lu: ", lamport, tv.tv_sec, tv.tv_usec);
     for (size_t i=0;i<orig_len;++i) {
         printf("%02x", ((const unsigned char*)data)[i]);
     }
@@ -612,7 +615,10 @@ size_t MPCTIO::recv_p1(void *data, size_t len)
 void MPCTIO::send()
 {
 #ifdef VERBOSE_COMMS
-    printf("Thread %u sending round %lu\n", thread_num, ++round_num);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    printf("%lu.%06lu: Thread %u sending round %lu\n", tv.tv_sec,
+        tv.tv_usec, thread_num, ++round_num);
 #endif
     if (mpcio.player < 2) {
         MPCPeerIO &mpcpio = static_cast<MPCPeerIO&>(mpcio);
