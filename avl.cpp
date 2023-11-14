@@ -1060,7 +1060,7 @@ void AVL::fixImbalance(MPCTIO &tio, yield_t &yield, Duoram<Node>::Flat &A,
     if(OPTIMIZED) {
         oidx_cs.emplace(tio, yield, cs_ptr, width);
         cs_node = A[oidx_cs.value()];
-            old_cs_ptr = cs_node.pointers;
+        old_cs_ptr = cs_node.pointers;
     } else {
         cs_node = A[cs_ptr];
     }
@@ -1827,7 +1827,7 @@ void avl(MPCIO &mpcio,
                 if(tio.player()==0) {
                     assert(tree.check_avl(tio, yield));
                 } else {
-                  tree.check_avl(tio, yield);
+                    tree.check_avl(tio, yield);
                 }
             }
             //tree.print_oram(tio, yield);
@@ -1854,7 +1854,7 @@ void avl(MPCIO &mpcio,
                 if(tio.player()==0) {
                     assert(tree.check_avl(tio, yield));
                 } else {
-                  tree.check_avl(tio, yield);
+                    tree.check_avl(tio, yield);
                 }
             }
         }
