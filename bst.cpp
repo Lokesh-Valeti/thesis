@@ -216,7 +216,7 @@ void BST::check_bst(MPCTIO &tio, yield_t &yield) {
     Returns a tuple <ptr, dir> where
     ptr: the pointer to the node where the insertion should happen
     dir: the bit indicating whether the new node should be inserted as the
-         the left/right child.
+         left/right child.
 
 */
 std::tuple<RegXS, RegBS> BST::insert(MPCTIO &tio, yield_t &yield, RegXS ptr,
@@ -440,7 +440,7 @@ RegBS BST::lookup(MPCTIO &tio, yield_t &yield, RegAS key, Node *ret_node) {
 
     Takes as input the pointer to the current node in tree traversal (ptr),
     the key to be deleted (del_key), the underlying Duoram as a
-    flat (A), Flags af (already found) and fs (find successor), thei
+    flat (A), Flags af (already found) and fs (find successor), and the
     Time-To_live TTL. Finally, a return structure ret_struct that tracks
     the location of the successor node and the node to delete, in order
     to perform the actual deletion after the recursive traversal. This

@@ -15,17 +15,12 @@
 /*
     Macro definitions:
 
-    AVL_OPT_ON: Turn AVL optimizations on
-        Optimizations:
-        - Use incremental DPFs for traversing the tree
-        - Use updates instead of writes when possible
+    AVL_RANDOMIZE_INSERTS: Randomize keys of items inserted in the unit
+    tests. When turned off, items with incremental keys are inserted
 
-    RANDOMIZE: Randomize keys of items inserted. When turned off, items
-    with incremental keys are inserted
+    AVL_DEBUG: General debug flag
 
-    DEBUG: General debug flag
-
-    DEBUG_BB: Debug flag for balance bit computations
+    AVL_DEBUG_BB: Debug flag for balance bit computations
 */
 
 // #define AVL_RANDOMIZE_INSERTS
