@@ -354,24 +354,23 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
 
     CDPF cdpf = tio.cdpf(yield);
     auto[lt_c, eq_c, gt_c] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
-    auto lteq = lt_c ^ eq_c;
+
     RegXS smallerindex;
     RegAS smallerchild;
     
-    run_coroutines(tio, [&tio, &smallerindex, lteq, rightchildindex, leftchildindex](yield_t &yield) {
-    mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex);
-    },  [&tio, &smallerchild, lteq, rightchild, leftchild](yield_t &yield) {
-        mpc_select(tio, yield, smallerchild, lteq, rightchild, leftchild);
+    run_coroutines(tio, [&tio, &smallerindex, lt_c, rightchildindex, leftchildindex](yield_t &yield) {
+    mpc_select(tio, yield, smallerindex, lt_c, rightchildindex, leftchildindex);
+    },  [&tio, &smallerchild, lt_c, rightchild, leftchild](yield_t &yield) {
+        mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild);
     }
     );
     
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt_p, eq_p, gt_p] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
-   // auto lt_p_eq_p = lt_p ^ eq_p;
-    
+     
     RegBS ltlt1;
     
-    mpc_and(tio, yield, ltlt1, lteq, lt_p);
+    mpc_and(tio, yield, ltlt1, lt_c, lt_p);
     
     RegAS update_index_by, update_leftindex_by;
     
