@@ -768,31 +768,27 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         uint64_t lastextract = 0;
 
         for (size_t j = 0; j < n_extracts; ++j) {
- 
- 
 
-            if(run_sanity == 1)
-            {
-             RegAS minval = tree.extract_min(mpcio, tio, yield, is_optimized);
-             uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
-             std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
-             if (have_lastextract) {
-                assert(minval_reconstruction >= lastextract);
-             }
-             lastextract = minval_reconstruction;
-             have_lastextract = true;
+            if(run_sanity == 1) {
+                RegAS minval = tree.extract_min(mpcio, tio, yield, is_optimized);
+                uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
+                std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
+                if (have_lastextract) {
+                    assert(minval_reconstruction >= lastextract);
+                }
+                lastextract = minval_reconstruction;
+                have_lastextract = true;
             } else {
-              tree.extract_min(mpcio, tio, yield, is_optimized);
+                tree.extract_min(mpcio, tio, yield, is_optimized);
             }
-            
+
             if (run_sanity == 1) {
                 tree.verify_heap_property(tio, yield);
             }
-             
+
             #ifdef HEAP_VERBOSE
             tree.print_heap(tio, yield);
             #endif
-
        }
 
        std::cout << "\n===== Extract Min Stats =====\n";
