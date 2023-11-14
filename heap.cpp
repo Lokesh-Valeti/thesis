@@ -367,7 +367,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt_p, eq_p, gt_p] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
-     
+    
     RegBS ltlt1;
     
     mpc_and(tio, yield, ltlt1, lt_c, lt_p);
@@ -457,8 +457,6 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
     
-    //auto lt1eq1 = lt1 ^ eq1;
-
     RegBS ltlt1;    
 
     mpc_and(tio, yield, ltlt1, lteq, lt1);
