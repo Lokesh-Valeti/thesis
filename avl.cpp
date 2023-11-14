@@ -1878,7 +1878,7 @@ void avl_tests(MPCIO &mpcio,
     run_coroutines(tio, [&tio, depth, items] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         bool player0 = tio.player()==0;
-        AVL tree(tio.player(), size, true);
+        AVL tree(tio.player(), size);
 
         // (T1) : Test 1 : L rotation (root modified)
         /*

@@ -182,7 +182,7 @@ class AVL {
         value_t node, value_t min_key, value_t max_key);
 
   public:
-    AVL(int num_players, size_t size, bool opt_flag) :
+    AVL(int num_players, size_t size, bool opt_flag = true) :
             oram(num_players, size), OPTIMIZED(opt_flag) {
         this->MAX_SIZE = size;
         MAX_DEPTH = 0;
