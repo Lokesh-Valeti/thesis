@@ -727,7 +727,7 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         MinHeap tree(tio.player(), size);
         tree.init(tio, yield);
         // This form of init with a third parameter of n sets the heap
-        // to contain 1, 2, 3, ..., n.
+        // to contain 100, 200, 300, ..., 100*n.
         tree.init(tio, yield, (size_t(1) << heapdepth) - 1);
         std::cout << "\n===== Init Stats =====\n";
         tio.sync_lamport();
