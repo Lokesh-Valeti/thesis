@@ -367,11 +367,11 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt_p, eq_p, gt_p] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
-    auto lt_p_eq_p = lt_p ^ eq_p;
+   // auto lt_p_eq_p = lt_p ^ eq_p;
     
     RegBS ltlt1;
     
-    mpc_and(tio, yield, ltlt1, lteq, lt_p_eq_p);
+    mpc_and(tio, yield, ltlt1, lteq, lt_p);
     
     RegAS update_index_by, update_leftindex_by;
     
@@ -458,18 +458,18 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
     
-    auto lt1eq1 = lt1 ^ eq1;
+    //auto lt1eq1 = lt1 ^ eq1;
 
     RegBS ltlt1;    
 
-    mpc_and(tio, yield, ltlt1, lteq, lt1eq1);
+    mpc_and(tio, yield, ltlt1, lteq, lt1);
 
     RegAS update_index_by, update_leftindex_by;
 
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield)
             { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);},
-            [&tio, &update_index_by, lt1eq1, parent, smallerchild](yield_t &yield)
-            {mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent);} 
+            [&tio, &update_index_by, lt1, parent, smallerchild](yield_t &yield)
+            {mpc_flagmult(tio, yield, update_index_by, lt1, smallerchild - parent);} 
             );
     
     run_coroutines(tio, [&tio, &P, &oidx, update_index_by](yield_t &yield) {
@@ -566,12 +566,12 @@ Next, the offsets by which the parent and children need to be updated are comput
 Offset computation involves:
 - One flag-flag multiplication.
 - Two flag-word multiplications.
-Three DORAM update operations are required (performed in parallel) to update the parent, left child, and right child.
+Three regular (non-DORAM) update operations are required (performed in parallel) to update the parent, left child, and right child.
 In total, this protocol requires:
 - 2 comparisons.
 - 1 flag-flag multiplication.
 - 2 flag-word multiplications.
-- 3 DORAM updates.
+- 3 regular (non-DORAM) updates and reads.
 The function returns a pair of a) XOR-share of the index of the smaller child and b) the comparison between left and right children
 */
 std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO tio, yield_t & yield, size_t index = 1) {
@@ -771,15 +771,17 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         #endif
         
         for (size_t j = 0; j < n_extracts; ++j) {
-            #ifdef HEAP_VERBOSE
-            RegAS minval =
-            #endif
-            tree.extract_min(mpcio, tio, yield, is_optimized);
+ 
+ 
 
-            #ifdef HEAP_VERBOSE
-            uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
-            std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
-            #endif
+            if(run_sanity == 1)
+            {
+             RegAS minval = tree.extract_min(mpcio, tio, yield, is_optimized);
+             uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
+             std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
+            } else {
+              tree.extract_min(mpcio, tio, yield, is_optimized);
+            }
             
             if (run_sanity == 1) {
                 tree.verify_heap_property(tio, yield);
