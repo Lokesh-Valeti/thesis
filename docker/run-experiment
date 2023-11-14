@@ -9,7 +9,7 @@ preproc=0
 opts=""
 while getopts paot:ex arg; do
     opts+=" -${arg} ${OPTARG}"
-    if [ "$arg" = "p" ]; then
+    if [ "$arg" = "p" -o "$arg" = "a" ]; then
         preproc=1
     fi
 done
