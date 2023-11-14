@@ -597,9 +597,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield) {
         mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);
     }, [&tio, &update_index_by, lt1eq1, parent, smallerchild](yield_t &yield) {
-        mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent);
-    }
-    );
+        mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent);});
    
     run_coroutines(tio,
         [&tio, &HeapArray, &update_index_by, index](yield_t &yield) {
@@ -613,8 +611,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
         [&tio, &HeapArray, &update_index_by, &update_leftindex_by, rightchildindex](yield_t &yield) {
             auto HeapArraycoro = HeapArray.context(yield);
             HeapArraycoro[rightchildindex] += -(update_index_by + update_leftindex_by);
-        }
-    );
+        });
 
     #ifdef HEAP_VERBOSE
     RegAS new_parent = HeapArray[index];
