@@ -579,7 +579,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     CDPF cdpf = tio.cdpf(yield);
     auto[lt, eq, gt] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
    
-    auto lteq = lt ^ eq;
+    auto lteq = lt;
     RegAS smallerchild;
     mpc_select(tio, yield, smallerchild, lteq, rightchild, leftchild);
    
@@ -588,7 +588,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     RegXS smallerindex = (RegXS(lteq) & leftchildindex) ^ (RegXS(gt) & rightchildindex);
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
-    auto lt1eq1 = lt1 ^ eq1;
+    auto lt1eq1 = lt1;
     RegBS ltlt1;
    
     mpc_and(tio, yield, ltlt1, lteq, lt1eq1);
