@@ -237,7 +237,7 @@ void MinHeap::verify_heap_property(MPCTIO tio, yield_t & yield) {
         if (heapreconstruction[j/2].share() > heapreconstruction[j].share()) {
             std::cout << "heap property failure\n\n";
             std::cout << "j = " << j << std::endl;
-            std::cout << heapreconstruction[j] << std::endl;
+            std::cout << heapreconstruction[j].share() << std::endl;
             std::cout << "j/2 = " << j/2 << std::endl;
             std::cout << heapreconstruction[j/2].share() << std::endl;
         }
