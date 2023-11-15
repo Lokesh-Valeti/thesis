@@ -9,7 +9,7 @@ LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthr
 
 BIN=prac
 SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp rdpf.cpp \
-    cdpf.cpp duoram.cpp cell.cpp bst.cpp avl.cpp
+    cdpf.cpp duoram.cpp cell.cpp bst.cpp avl.cpp heap.cpp
 OBJS=$(SRCS:.cpp=.o)
 ASMS=$(SRCS:.cpp=.s)
 
@@ -42,7 +42,7 @@ preproc.o: rdpf.tcc mpcops.hpp mpcops.tcc cdpf.hpp cdpf.tcc
 online.o: online.hpp mpcio.hpp types.hpp bitutils.hpp corotypes.hpp mpcio.tcc
 online.o: options.hpp mpcops.hpp coroutine.hpp mpcops.tcc rdpf.hpp dpf.hpp
 online.o: prg.hpp aes.hpp rdpf.tcc duoram.hpp duoram.tcc cdpf.hpp cdpf.tcc
-online.o: cell.hpp shapes.hpp shapes.tcc bst.hpp avl.hpp
+online.o: cell.hpp heap.hpp shapes.hpp shapes.tcc bst.hpp avl.hpp
 mpcops.o: mpcops.hpp types.hpp bitutils.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 mpcops.o: coroutine.hpp mpcops.tcc
 rdpf.o: rdpf.hpp mpcio.hpp types.hpp bitutils.hpp corotypes.hpp mpcio.tcc
@@ -50,14 +50,18 @@ rdpf.o: coroutine.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc mpcops.hpp mpcops.tcc
 cdpf.o: bitutils.hpp cdpf.hpp mpcio.hpp types.hpp corotypes.hpp mpcio.tcc
 cdpf.o: coroutine.hpp dpf.hpp prg.hpp aes.hpp cdpf.tcc
 duoram.o: duoram.hpp types.hpp bitutils.hpp mpcio.hpp corotypes.hpp mpcio.tcc
-duoram.o: coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
-duoram.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc shapes.hpp shapes.tcc
+duoram.o: coroutine.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc mpcops.hpp
+duoram.o: mpcops.tcc duoram.tcc cdpf.hpp cdpf.tcc shapes.hpp shapes.tcc
 cell.o: types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp mpcio.tcc
-cell.o: coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp dpf.hpp
-cell.o: prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc cell.hpp options.hpp
+cell.o: coroutine.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc mpcops.hpp
+cell.o: mpcops.tcc duoram.tcc cdpf.hpp cdpf.tcc cell.hpp options.hpp
 bst.o: bst.hpp types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp
-bst.o: mpcio.tcc coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp
-bst.o: dpf.hpp prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc options.hpp
+bst.o: mpcio.tcc coroutine.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc
+bst.o: mpcops.hpp mpcops.tcc duoram.tcc cdpf.hpp cdpf.tcc options.hpp
 avl.o: avl.hpp types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp
-avl.o: mpcio.tcc coroutine.hpp duoram.tcc mpcops.hpp mpcops.tcc cdpf.hpp
-avl.o: dpf.hpp prg.hpp aes.hpp cdpf.tcc rdpf.hpp rdpf.tcc options.hpp bst.hpp
+avl.o: mpcio.tcc coroutine.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc
+avl.o: mpcops.hpp mpcops.tcc duoram.tcc cdpf.hpp cdpf.tcc options.hpp bst.hpp
+heap.o: types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp mpcio.tcc
+heap.o: coroutine.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc mpcops.hpp
+heap.o: mpcops.tcc duoram.tcc cdpf.hpp cdpf.tcc cell.hpp options.hpp
+heap.o: shapes.hpp shapes.tcc heap.hpp

@@ -7,6 +7,7 @@
 #include "types.hpp"
 #include "mpcio.hpp"
 #include "coroutine.hpp"
+#include "rdpf.hpp"
 
 // Implementation of the 3-party protocols described in:
 // Adithya Vadapalli, Ryan Henry, Ian Goldberg, "Duoram: A
@@ -535,10 +536,44 @@ public:
         next_windex(0), incremental(true), idx(RegXS())
     {
         if (player < 2) {
-            dt = tio.rdpftriple(yield, depth, true);
+            dt = tio.rdpftriple<WIDTH>(yield, depth, true);
         } else {
-            dp = tio.rdpfpair(yield, depth, true);
+            dp = tio.rdpfpair<WIDTH>(yield, depth, true);
         }
+    }
+
+
+   // The function unit_vector takes in an XOR-share of an index foundindx and a size
+   // The function outputs _boolean shares_ of a standard-basis vector of size (with the non-zero index at foundindx)
+   // For example suppose nitems = 6; and suppose P0 and P1 take parameters foundindx0 and foundindx1 such that, foundindx0 \oplus foundindx1 = 3
+   // P0 and P1 output vectors r0 and r1 such that r0 \oplus r1 = [000100]
+   std::vector<RegBS> unit_vector(MPCTIO &tio, yield_t &yield, size_t nitems, RegXS foundidx)
+   {
+      std::vector<RegBS> standard_basis(nitems);
+
+      if (player < 2) {
+          U indoffset;
+          dt->get_target(indoffset);
+          indoffset -= foundidx;
+          U peerindoffset;
+          tio.queue_peer(&indoffset, BITBYTES(curdepth));
+          yield();
+          tio.recv_peer(&peerindoffset, BITBYTES(curdepth));
+          auto indshift = combine(indoffset, peerindoffset, curdepth);
+
+          // Pick one of the DPF triples, we can also pick dpf[0] or dpf[2]
+          auto se = StreamEval(dt->dpf[1], 0, indshift,  tio.aes_ops(), true);
+
+          for (size_t j = 0; j < nitems; ++j) {
+               typename RDPF<WIDTH>::LeafNode  leaf = se.next();
+               standard_basis[j] = dt->dpf[1].unit_bs(leaf);
+          }
+
+       } else {
+          yield();
+       }
+
+       return standard_basis;
     }
 
     // Incrementally append a (shared) bit to the oblivious index
@@ -556,6 +591,8 @@ public:
 
     // Get a copy of the index
     U index() { return idx; }
+
+    nbits_t depth() {return curdepth;}
 
     // Get the next wide-RDPF index
     nbits_t windex() { assert(next_windex < WIDTH); return next_windex++; }
@@ -611,7 +648,7 @@ public:
         oblividx = &obidx;
     }
 
-    // Create a MemRefExpl for accessing a partcular field of T
+    // Create a MemRefS for accessing a partcular field of T
     template <typename SFT>
     MemRefS<U,SFT,SFT T::*,Sh,WIDTH> field(SFT T::*subfieldsel) {
         auto res = MemRefS<U,SFT,SFT T::*,Sh,WIDTH>(this->shape,

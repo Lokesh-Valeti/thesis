@@ -6,6 +6,7 @@
 #include "duoram.hpp"
 #include "cdpf.hpp"
 #include "cell.hpp"
+#include "heap.hpp"
 #include "shapes.hpp"
 #include "bst.hpp"
 #include "avl.hpp"
@@ -892,6 +893,42 @@ static void duoram(MPCIO &mpcio,
     });
 }
 
+// This measures just sequential (dependent) reads
+// T is RegAS or RegXS for additive or XOR shared database respectively
+template <typename T>
+static void read_test(MPCIO &mpcio,
+    const PRACOptions &opts, char **args)
+{
+    nbits_t depth = 6;
+    int items = 4;
+
+    if (*args) {
+        depth = atoi(*args);
+        ++args;
+    }
+    if (*args) {
+        items = atoi(*args);
+        ++args;
+    }
+
+    MPCTIO tio(mpcio, 0, opts.num_threads);
+    run_coroutines(tio, [&mpcio, &tio, depth, items] (yield_t &yield) {
+        size_t size = size_t(1)<<depth;
+        Duoram<T> oram(tio.player(), size);
+        auto A = oram.flat(tio, yield);
+
+        std::cout << "\n===== SEQUENTIAL READS =====\n";
+        T totval;
+        for (int i=0;i<items;++i) {
+            RegXS idx;
+            idx.randomize(depth);
+            T val = A[idx];
+            totval += val;
+        }
+        printf("Total value read: %016lx\n", totval.share());
+    });
+}
+
 static void cdpf_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
 {
@@ -1216,6 +1253,14 @@ static void bsearch_test(MPCIO &mpcio,
     arc4random_buf(&target, sizeof(target));
     target >>= 1;
     nbits_t depth=6;
+    bool is_presorted = true;
+
+    // Use a random array (which we explicitly sort) instead of a
+    // presorted array
+    if (*args && !strcmp(args[0], "-r")) {
+        is_presorted = false;
+        ++args;
+    }
 
     if (*args) {
         depth = atoi(*args);
@@ -1226,13 +1271,16 @@ static void bsearch_test(MPCIO &mpcio,
         len = atoi(*args);
         ++args;
     }
+    if (is_presorted) {
+        target %= (len << 16);
+    }
     if (*args) {
         target = strtoull(*args, NULL, 16);
         ++args;
     }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, &mpcio, depth, len, target, basic] (yield_t &yield) {
+    run_coroutines(tio, [&tio, &mpcio, depth, len, target, basic, is_presorted] (yield_t &yield) {
         RegAS tshare;
         std::cout << "\n===== SETUP =====\n";
 
@@ -1254,28 +1302,31 @@ static void bsearch_test(MPCIO &mpcio,
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
 
-        std::cout << "\n===== SORT RANDOM DATABASE =====\n";
+        std::cout << "\n===== " << (is_presorted ? "CREATE" : "SORT RANDOM")
+            << " DATABASE =====\n";
         mpcio.reset_stats();
         tio.reset_lamport();
-        // Create a random database and sort it
-        // size_t &aes_ops = tio.aes_ops();
+        // If is_presorted is true, create a database of presorted
+        // values.  If is_presorted is false, create a database of
+        // random values and explicitly sort it.
         Duoram<RegAS> oram(tio.player(), len);
         auto A = oram.flat(tio, yield);
         A.explicitonly(true);
-        // Initialize the memory to random values in parallel
-        std::vector<coro_t> coroutines;
+        // Initialize the memory to sorted or random values, depending
+        // on the is_presorted flag
         for (address_t i=0; i<len; ++i) {
-            coroutines.emplace_back(
-                [&A, i](yield_t &yield) {
-                    auto Acoro = A.context(yield);
-                    RegAS v;
-                    v.randomize(62);
-                    Acoro[i] += v;
-                });
+            RegAS v;
+            if (!is_presorted) {
+                v.randomize(62);
+            } else {
+                v.ashare = (tio.player() * i) << 16;
+            }
+            A[i] = v;
         }
-        run_coroutines(yield, coroutines);
-        A.bitonic_sort(0, len);
         A.explicitonly(false);
+        if (!is_presorted) {
+            A.bitonic_sort(0, len);
+        }
 
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
@@ -1579,6 +1630,13 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
         } else {
             duoram_test<RegAS>(mpcio, opts, args);
         }
+    } else if (!strcmp(*args, "read")) {
+        ++args;
+        if (opts.use_xor_db) {
+            read_test<RegXS>(mpcio, opts, args);
+        } else {
+            read_test<RegAS>(mpcio, opts, args);
+        }
     } else if (!strcmp(*args, "cdpftest")) {
         ++args;
         cdpf_test(mpcio, opts, args);
@@ -1626,6 +1684,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "avl_tests")) {
         ++args;
         avl_tests(mpcio, opts, args);
+    } else if (!strcmp(*args, "heap")) {
+        ++args;
+        Heap(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }

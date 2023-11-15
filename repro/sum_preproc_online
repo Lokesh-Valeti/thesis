@@ -1,0 +1,52 @@
+#!/bin/bash
+
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <file1> <file2>"
+    exit 1
+fi
+
+file1="$1"
+file2="$2"
+
+if [ ! -f "$file1" ] || [ ! -f "$file2" ]; then
+    echo "Error: Both input files must exist."
+    exit 1
+fi
+
+data1=()
+data2=()
+
+while read line; do
+    if [[ "$line" == "BS Search"* ]]; then
+        parts=($line)
+        y="${parts[4]}"
+        y_err="${parts[6]#±}"
+        data1+=("$y,$y_err")
+    fi
+done < "$file1"
+
+while read line; do
+    if [[ "$line" == "BS Search"* ]]; then
+        parts=($line)
+        y="${parts[4]}"
+        y_err="${parts[6]#±}"
+        data2+=("$y,$y_err")
+    fi
+done < "$file2"
+
+if [ ${#data1[@]} -ne ${#data2[@]} ]; then
+    echo "Error: The two files do not have the same number of data points."
+    exit 1
+fi
+
+echo "Data point y_sum y_err_sum"
+for i in "${!data1[@]}"; do
+    IFS=',' read -ra data1_parts <<< "${data1[i]}"
+    IFS=',' read -ra data2_parts <<< "${data2[i]}"
+    
+    y_sum=$(echo "${data1_parts[0]} + ${data2_parts[0]}" | bc -l)
+    y_err_sum=$(echo "scale=4; sqrt(${data1_parts[1]}^2 + ${data2_parts[1]}^2)" | bc -l)
+    
+    echo "$((i+1)) $y_sum $y_err_sum"
+done
+

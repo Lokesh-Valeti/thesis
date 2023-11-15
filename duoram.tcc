@@ -89,22 +89,26 @@ void Duoram<T>::Shape::explicitonly(bool enable)
 
 // For debugging or checking your answers (using this in general is
 // of course insecure)
-// This one reconstructs the whole database
+// This one reconstructs the whole Shape
 template <typename T>
 std::vector<T> Duoram<T>::Shape::reconstruct() const
 {
     int player = tio.player();
     std::vector<T> res;
-    res.resize(duoram.size());
+    res.resize(shape_size);
     // Player 1 sends their share of the database to player 0
     if (player == 1) {
-        tio.queue_peer(duoram.database.data(), duoram.size()*sizeof(T));
+        for (size_t i=0; i < shape_size; ++i) {
+            T elt = std::get<0>(get_comp(i));
+            tio.queue_peer(&elt, sizeof(T));
+        }
         yield();
     } else if (player == 0) {
         yield();
-        tio.recv_peer(res.data(), duoram.size()*sizeof(T));
-        for(size_t i=0;i<duoram.size();++i) {
-            res[i] += duoram.database[i];
+        for(size_t i=0; i < shape_size; ++i) {
+            tio.recv_peer(&res[i], sizeof(T));
+            T myelt = std::get<0>(get_comp(i));
+            res[i] += myelt;
         }
     } else if (player == 2) {
         // The server (player 2) only syncs with the yield
