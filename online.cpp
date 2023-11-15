@@ -1266,13 +1266,14 @@ static void bsearch_test(MPCIO &mpcio,
         depth = atoi(*args);
         ++args;
     }
-    address_t len = (1<<depth);
+    address_t len = (1<<depth) - 1;
+    int iters = 1;
     if (*args) {
-        len = atoi(*args);
+        iters = atoi(*args);
         ++args;
     }
     if (is_presorted) {
-        target %= (len << 16);
+        target %= (value_t(len) << 16);
     }
     if (*args) {
         target = strtoull(*args, NULL, 16);
@@ -1280,7 +1281,7 @@ static void bsearch_test(MPCIO &mpcio,
     }
 
     MPCTIO tio(mpcio, 0, opts.num_threads);
-    run_coroutines(tio, [&tio, &mpcio, depth, len, target, basic, is_presorted] (yield_t &yield) {
+    run_coroutines(tio, [&tio, &mpcio, depth, len, iters, target, basic, is_presorted] (yield_t &yield) {
         RegAS tshare;
         std::cout << "\n===== SETUP =====\n";
 
@@ -1319,7 +1320,7 @@ static void bsearch_test(MPCIO &mpcio,
             if (!is_presorted) {
                 v.randomize(62);
             } else {
-                v.ashare = (tio.player() * i) << 16;
+                v.ashare = (tio.player() * value_t(i)) << 16;
             }
             A[i] = v;
         }
@@ -1335,13 +1336,15 @@ static void bsearch_test(MPCIO &mpcio,
         mpcio.reset_stats();
         tio.reset_lamport();
         // Binary search for the target
-        value_t checkindex;
-        if (basic) {
-            RegAS tindex = A.basic_binary_search(tshare);
-            checkindex = mpc_reconstruct(tio, yield, tindex);
-        } else {
-            RegXS tindex = A.binary_search(tshare);
-            checkindex = mpc_reconstruct(tio, yield, tindex);
+        value_t checkindex = 0;
+        for (int i=0; i<iters; ++i) {
+            if (basic) {
+                RegAS tindex = A.basic_binary_search(tshare);
+                checkindex = mpc_reconstruct(tio, yield, tindex);
+            } else {
+                RegXS tindex = A.binary_search(tshare);
+                checkindex = mpc_reconstruct(tio, yield, tindex);
+            }
         }
 
         tio.sync_lamport();
