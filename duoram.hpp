@@ -546,11 +546,11 @@ public:
    // The function unit_vector takes in an XOR-share of an index foundindx and a size
    // The function outputs _boolean shares_ of a standard-basis vector of size (with the non-zero index at foundindx)
    // For example suppose nitems = 6; and suppose P0 and P1 take parameters foundindx0 and foundindx1 such that, foundindx0 \oplus foundindx1 = 3
-   // P0 and P1 output vectors r0 and r1 such that r0 \oplus r1 = [000100] 
+   // P0 and P1 output vectors r0 and r1 such that r0 \oplus r1 = [000100]
    std::vector<RegBS> unit_vector(MPCTIO &tio, yield_t &yield, size_t nitems, RegXS foundidx)
    {
-      std::vector<RegBS> standard_basis(nitems); 
-      
+      std::vector<RegBS> standard_basis(nitems);
+
       if (player < 2) {
           U indoffset;
           dt->get_target(indoffset);
@@ -566,13 +566,13 @@ public:
 
           for (size_t j = 0; j < nitems; ++j) {
                typename RDPF<WIDTH>::LeafNode  leaf = se.next();
-               standard_basis[j] = dt->dpf[1].unit_bs(leaf); 
-          } 
+               standard_basis[j] = dt->dpf[1].unit_bs(leaf);
+          }
 
-       } else {  
+       } else {
           yield();
        }
-       
+
        return standard_basis;
     }
 
