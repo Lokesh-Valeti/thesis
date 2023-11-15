@@ -259,11 +259,9 @@ static void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS pare
     uint64_t parent_reconstruction = mpc_reconstruct(tio, yield, parent);
     uint64_t leftchild_reconstruction = mpc_reconstruct(tio, yield, leftchild);
     uint64_t rightchild_reconstruction = mpc_reconstruct(tio, yield, rightchild);
-    //#ifdef HEAP_VERBOSE
     std::cout << "parent_reconstruction = " << parent_reconstruction << std::endl;
     std::cout << "leftchild_reconstruction = " << leftchild_reconstruction << std::endl;
     std::cout << "rightchild_reconstruction = " << rightchild_reconstruction << std::endl << std::endl << std::endl;
-    //#endif
     assert(parent_reconstruction <= leftchild_reconstruction);
     assert(parent_reconstruction <= rightchild_reconstruction);
 }
