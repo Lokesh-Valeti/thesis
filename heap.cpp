@@ -582,25 +582,24 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     CDPF cdpf = tio.cdpf(yield);
     auto[lt, eq, gt] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
 
-    auto lteq = lt;
+    auto gteq = gt ^ eq;
     RegAS smallerchild;
-    mpc_select(tio, yield, smallerchild, lteq, rightchild, leftchild);
+    mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild);
 
     uint64_t leftchildindex = (2 * index);
     uint64_t rightchildindex = (2 * index) + 1;
-    RegXS smallerindex = (RegXS(lteq) & leftchildindex) ^ (RegXS(gt) & rightchildindex);
+    RegXS smallerindex = (RegXS(lt) & leftchildindex) ^ (RegXS(gteq) & rightchildindex);
     CDPF cdpf0 = tio.cdpf(yield);
     auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
-    auto lt1eq1 = lt1;
     RegBS ltlt1;
 
-    mpc_and(tio, yield, ltlt1, lteq, lt1eq1);
+    mpc_and(tio, yield, ltlt1, lt, lt1);
     RegAS update_index_by, update_leftindex_by;
 
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield) {
         mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);
-    }, [&tio, &update_index_by, lt1eq1, parent, smallerchild](yield_t &yield) {
-        mpc_flagmult(tio, yield, update_index_by, lt1eq1, smallerchild - parent);});
+    }, [&tio, &update_index_by, lt1, parent, smallerchild](yield_t &yield) {
+        mpc_flagmult(tio, yield, update_index_by, lt1, smallerchild - parent);});
 
     run_coroutines(tio,
         [&tio, &HeapArray, &update_index_by, index](yield_t &yield) {
@@ -631,7 +630,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     #ifdef HEAP_DEBUG
     verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
     #endif
-    auto gteq = gt ^ eq;
+
     return {smallerindex, gteq};
 }
 
