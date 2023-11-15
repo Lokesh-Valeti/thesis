@@ -357,7 +357,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     RegAS smallerchild;
 
     run_coroutines(tio, [&tio, &smallerindex, lt_c, rightchildindex, leftchildindex](yield_t &yield) {
-    mpc_select(tio, yield, smallerindex, lt_c, rightchildindex, leftchildindex);
+        mpc_select(tio, yield, smallerindex, lt_c, rightchildindex, leftchildindex);
     },  [&tio, &smallerchild, lt_c, rightchild, leftchild](yield_t &yield) {
         mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild);
     }
@@ -373,7 +373,7 @@ RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO tio, yield_t & yield,
     RegAS update_index_by, update_leftindex_by;
 
     run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield) {
-    mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);
+        mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);
     },  [&tio, &update_index_by, lt_p, parent, smallerchild](yield_t &yield) {
         mpc_flagmult(tio, yield, update_index_by, lt_p, smallerchild - parent);
     }
