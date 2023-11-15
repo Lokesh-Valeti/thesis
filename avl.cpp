@@ -896,10 +896,27 @@ void AVL::insert(MPCTIO &tio, yield_t &yield, const Node &node) {
 
         // Write back update pointers and balances into gp, p, c, and n
         if(OPTIMIZED) {
-            A[oidx_n.value()].NODE_POINTERS+=(n_pointers - old_n_pointers);
-            A[oidx_c.value()].NODE_POINTERS+=(child_pointers - old_child_pointers);
-            A[oidx_p.value()].NODE_POINTERS+=(parent_pointers - old_parent_pointers);
-            A[oidx_gp.value()].NODE_POINTERS+=(gp_pointers - old_gp_pointers);
+            run_coroutines(tio,
+                [&tio, &A, &oidx_n, n_pointers, old_n_pointers]
+                (yield_t &yield) {
+                    auto Acont = A.context(yield);
+                    Acont[oidx_n.value()].NODE_POINTERS+=(n_pointers - old_n_pointers);
+                },
+                [&tio, &A, &oidx_c, child_pointers, old_child_pointers]
+                (yield_t &yield) {
+                    auto Acont = A.context(yield);
+                    Acont[oidx_c.value()].NODE_POINTERS+=(child_pointers - old_child_pointers);
+                },
+                [&tio, &A, &oidx_p, parent_pointers, old_parent_pointers]
+                (yield_t &yield) {
+                    auto Acont = A.context(yield);
+                    Acont[oidx_p.value()].NODE_POINTERS+=(parent_pointers - old_parent_pointers);
+                },
+                [&tio, &A, &oidx_gp, gp_pointers, old_gp_pointers]
+                (yield_t &yield) {
+                    auto Acont = A.context(yield);
+                    Acont[oidx_gp.value()].NODE_POINTERS+=(gp_pointers - old_gp_pointers);
+                });
         } else {
             A[ret.c_node].NODE_POINTERS = child_pointers;
             A[ret.p_node].NODE_POINTERS = parent_pointers;
