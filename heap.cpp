@@ -259,11 +259,11 @@ static void verify_parent_children_heaps(MPCTIO tio, yield_t & yield, RegAS pare
     uint64_t parent_reconstruction = mpc_reconstruct(tio, yield, parent);
     uint64_t leftchild_reconstruction = mpc_reconstruct(tio, yield, leftchild);
     uint64_t rightchild_reconstruction = mpc_reconstruct(tio, yield, rightchild);
-    #ifdef HEAP_VERBOSE
+    //#ifdef HEAP_VERBOSE
     std::cout << "parent_reconstruction = " << parent_reconstruction << std::endl;
     std::cout << "leftchild_reconstruction = " << leftchild_reconstruction << std::endl;
     std::cout << "rightchild_reconstruction = " << rightchild_reconstruction << std::endl << std::endl << std::endl;
-    #endif
+    //#endif
     assert(parent_reconstruction <= leftchild_reconstruction);
     assert(parent_reconstruction <= rightchild_reconstruction);
 }
@@ -443,31 +443,34 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
 
     CDPF cdpf = tio.cdpf(yield);
 
-    auto[lt, eq, gt] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
-    auto lteq = lt ^ eq;
-
+    auto[lt_c, eq_c, gt_c] = cdpf.compare(tio, yield, leftchild - rightchild, tio.aes_ops());
+  
     RegXS smallerindex;
     RegAS smallerchild;
 
-    run_coroutines(tio, [&tio, &smallerindex, lteq, rightchildindex, leftchildindex](yield_t &yield)
-                  { mpc_select(tio, yield, smallerindex, lteq, rightchildindex, leftchildindex);},
-                  [&tio, &smallerchild, lt, rightchild, leftchild](yield_t &yield)
-                  { mpc_select(tio, yield, smallerchild, lt, rightchild, leftchild);});
+    run_coroutines(tio, [&tio, &smallerindex, lt_c, rightchildindex, leftchildindex](yield_t &yield) {
+    mpc_select(tio, yield, smallerindex, lt_c, rightchildindex, leftchildindex);
+    },  [&tio, &smallerchild, lt_c, rightchild, leftchild](yield_t &yield) {
+        mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild);
+    }
+    );
 
     CDPF cdpf0 = tio.cdpf(yield);
-    auto[lt1, eq1, gt1] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
+    auto[lt_p, eq_p, gt_p] = cdpf0.compare(tio, yield, smallerchild - parent, tio.aes_ops());
     
     RegBS ltlt1;    
 
-    mpc_and(tio, yield, ltlt1, lteq, lt1);
+    mpc_and(tio, yield, ltlt1, lt_c, lt_p);
 
     RegAS update_index_by, update_leftindex_by;
 
-    run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield)
-            { mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);},
-            [&tio, &update_index_by, lt1, parent, smallerchild](yield_t &yield)
-            {mpc_flagmult(tio, yield, update_index_by, lt1, smallerchild - parent);} 
-            );
+
+    run_coroutines(tio, [&tio, &update_leftindex_by, ltlt1, parent, leftchild](yield_t &yield) {
+    mpc_flagmult(tio, yield, update_leftindex_by, ltlt1, parent - leftchild);
+    },  [&tio, &update_index_by, lt_p, parent, smallerchild](yield_t &yield) {
+        mpc_flagmult(tio, yield, update_index_by, lt_p, smallerchild - parent);
+    }
+    );
     
     run_coroutines(tio, [&tio, &P, &oidx, update_index_by](yield_t &yield) {
                     auto Pcoro = P.context(yield); 
@@ -480,7 +483,9 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
                     Rcoro[oidx] += -(update_leftindex_by + update_index_by);
                     });
 
-    return {smallerindex, gt};
+    auto gteq = gt_c ^ eq_c;
+
+    return {smallerindex, gteq};
 }
 
 
@@ -628,8 +633,8 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
     #ifdef HEAP_DEBUG
     verify_parent_children_heaps(tio, yield, HeapArray[index], HeapArray[leftchildindex] , HeapArray[rightchildindex]);
     #endif
-    
-    return {smallerindex, gt};
+    auto gteq = gt ^ eq;
+    return {smallerindex, gteq};
 }
 
 
