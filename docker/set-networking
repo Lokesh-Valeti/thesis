@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# cd into the directory containing this script (from the bash faq 028)
+if [[ $BASH_SOURCE = */* ]]; then
+  cd -- "${BASH_SOURCE%/*}/" || exit
+fi
+
 latency=30ms
 bw=100mbit
 
