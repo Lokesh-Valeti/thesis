@@ -447,7 +447,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO tio, yie
     RegAS smallerchild;
 
     run_coroutines(tio, [&tio, &smallerindex, lt_c, rightchildindex, leftchildindex](yield_t &yield) {
-    mpc_select(tio, yield, smallerindex, lt_c, rightchildindex, leftchildindex);
+        mpc_select(tio, yield, smallerindex, lt_c, rightchildindex, leftchildindex);
     },  [&tio, &smallerchild, lt_c, rightchild, leftchild](yield_t &yield) {
         mpc_select(tio, yield, smallerchild, lt_c, rightchild, leftchild);
     }
