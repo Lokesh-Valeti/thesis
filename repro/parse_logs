@@ -1,0 +1,477 @@
+#!/usr/bin/perl
+
+# Parse the log output files of run-experiment
+# Send concatenated log files to stdin, or list them on the command
+# line.
+
+use strict;
+
+my $showmemusage = 0;
+my $netsetup = '';
+my %preproc_resources = ();
+my @preproc_seconds = (0, 0, 0);
+my @preproc_kib = (0, 0, 0);
+my @preproc_latencies = (0, 0, 0);
+my @preproc_mem_mib = (0, 0, 0);
+my %preproc_s_data = ();
+my %preproc_kib_data = ();
+my %preproc_latencies_data = ();
+my %preproc_P0mem_mib_data = ();
+my %preproc_P1mem_mib_data = ();
+my %preproc_P2mem_mib_data = ();
+my %online_s_data = ();
+my %online_kib_data = ();
+my %online_latencies_data = ();
+my %online_P0mem_mib_data = ();
+my %online_P1mem_mib_data = ();
+my %online_P2mem_mib_data = ();
+
+if ($ARGV[0] eq "-m") {
+    shift;
+    $showmemusage = 1;
+}
+
+while(<>) {
+    chomp;
+    if (/Network setup: (.*)/) {
+        $netsetup = "$1 ";
+        next;
+    }
+    if (/===== Running prac (.*)/) {
+        my $cmdline = $1;
+        if ($cmdline =~ /-[pa]/) {
+            &parse_preproc($cmdline);
+            next;
+        } elsif ($cmdline =~ /^-- read/) {
+            &parse_read($cmdline);
+        } elsif ($cmdline =~ /^-- b?bsearch/) {
+            &parse_bsearch($cmdline);
+        } elsif ($cmdline =~ /^-- heap/) {
+            &parse_heap($cmdline);
+        } else {
+            warn "Unknown cmdline: $cmdline\n";
+            while(<>) {
+                last if /===== End/;
+            }
+        }
+        %preproc_resources = ();
+        @preproc_seconds = (0, 0, 0);
+        @preproc_kib = (0, 0, 0);
+        @preproc_latencies = (0, 0, 0);
+        @preproc_mem_mib = (0, 0, 0);
+        next;
+    }
+}
+
+# Convert the data (in the form [n, sum, sum_squares]) to statistics (in
+# the form [mean, variance])
+my %preproc_s_stats = ();
+my %preproc_kib_stats = ();
+my %preproc_latencies_stats = ();
+my %preproc_P0mem_mib_stats = ();
+my %preproc_P1mem_mib_stats = ();
+my %preproc_P2mem_mib_stats = ();
+my %online_s_stats = ();
+my %online_kib_stats = ();
+my %online_latencies_stats = ();
+my %online_P0mem_mib_stats = ();
+my %online_P1mem_mib_stats = ();
+my %online_P2mem_mib_stats = ();
+&statsify(\%preproc_s_stats, \%preproc_s_data);
+&statsify(\%preproc_kib_stats, \%preproc_kib_data);
+&statsify(\%preproc_latencies_stats, \%preproc_latencies_data);
+&statsify(\%preproc_P0mem_mib_stats, \%preproc_P0mem_mib_data);
+&statsify(\%preproc_P1mem_mib_stats, \%preproc_P1mem_mib_data);
+&statsify(\%preproc_P2mem_mib_stats, \%preproc_P2mem_mib_data);
+&statsify(\%online_s_stats, \%online_s_data);
+&statsify(\%online_kib_stats, \%online_kib_data);
+&statsify(\%online_latencies_stats, \%online_latencies_data);
+&statsify(\%online_P0mem_mib_stats, \%online_P0mem_mib_data);
+&statsify(\%online_P1mem_mib_stats, \%online_P1mem_mib_data);
+&statsify(\%online_P2mem_mib_stats, \%online_P2mem_mib_data);
+
+# The total values are the sums of the preproc and online values
+my %total_s_stats = ();
+my %total_kib_stats = ();
+&sum_preproc_online(\%total_s_stats, \%preproc_s_stats, \%online_s_stats);
+&sum_preproc_online(\%total_kib_stats, \%preproc_kib_stats, \%online_kib_stats);
+
+# Output the data
+&output_stats(\%preproc_s_stats, "Preprc", "s");
+&output_stats(\%preproc_kib_stats, "Preprc", "KiB");
+&output_stats(\%preproc_latencies_stats, "Preprc", "latencies");
+if ($showmemusage) {
+    &output_stats(\%preproc_P0mem_mib_stats, "Preprc", "P0MemMiB");
+    &output_stats(\%preproc_P1mem_mib_stats, "Preprc", "P1MemMiB");
+    &output_stats(\%preproc_P2mem_mib_stats, "Preprc", "P2MemMiB");
+}
+&output_stats(\%online_s_stats, "Onln", "s");
+&output_stats(\%online_kib_stats, "Onln", "KiB");
+&output_stats(\%online_latencies_stats, "Onln", "latencies");
+if ($showmemusage) {
+    &output_stats(\%online_P0mem_mib_stats, "Onln", "P0MemMiB");
+    &output_stats(\%online_P1mem_mib_stats, "Onln", "P1MemMiB");
+    &output_stats(\%online_P2mem_mib_stats, "Onln", "P2MemMiB");
+}
+&output_stats(\%total_s_stats, "Totl", "s");
+&output_stats(\%total_kib_stats, "Totl", "KiB");
+
+# Subroutines
+
+sub parse_preproc {
+    my $cmdline = $_[0];
+    my $who = 0;
+    # Reset the preproc usages unless we're appending to a previous
+    # preproc
+    unless ($cmdline =~ /-a/) {
+        %preproc_resources = ();
+        @preproc_seconds = (0, 0, 0);
+        @preproc_kib = (0, 0, 0);
+        @preproc_latencies = (0, 0, 0);
+        @preproc_mem_mib = (0, 0, 0);
+    }
+    &parse_resources(\%preproc_resources, $cmdline);
+    while(<>) {
+        if (/===== P([012]) output/) {
+            $who = $1;
+            next;
+        }
+        last if /===== End/;
+        # The log was malformed
+        die "Malformed log" if /===== Running/;
+        if (/^(\d+) message bytes sent/) {
+            $preproc_kib[$who] += $1 / 1024;
+        } elsif (/^(\d+) Lamport clock/) {
+            $preproc_latencies[$who] += $1;
+        } elsif (/^(\d+) milliseconds wall clock/) {
+            $preproc_seconds[$who] += $1 / 1000;
+        } elsif (/^Mem: (\d+) KiB/) {
+            $preproc_mem_mib[$who] += $1 / 1024;
+        }
+    }
+}
+
+# Parse a resource usage string, and accumulate the values into the
+# given dict
+sub parse_resources {
+    my ($dict, $resstr) = @_;
+    while ($resstr =~ /(\S+):(\d+)/g) {
+        $dict->{$1} = 0 unless defined $dict->{$1};
+        $dict->{$1} += $2;
+    }
+}
+
+# Serialize a resource usage dict back into a canonical string
+sub serialize_resources {
+    my $dict = $_[0];
+    my $res = '';
+    my $k;
+    foreach $k (sort keys %$dict) {
+        if ($res ne '') {
+            $res .= ' ';
+        }
+        $res .= $k . ":" . $dict->{$k};
+    }
+    $res;
+}
+
+sub parse_read {
+    my $cmdline = $_[0];
+    my $who = 0;
+    my @online_seconds = (0, 0, 0);
+    my @online_kib = (0, 0, 0);
+    my @online_latencies = (0, 0, 0);
+    my @online_mem_mib = (0, 0, 0);
+
+    unless ($cmdline =~ /read (\d+) (\d+)/) {
+        die "Cannot parse read cmdline: $cmdline";
+    }
+    my ($size, $num) = ($1, $2);
+    while(<>) {
+        if (/===== P([012]) output/) {
+            $who = $1;
+            next;
+        }
+        last if /===== End/;
+        # The log was malformed
+        die "Malformed log" if /===== Running/;
+        if (/^(\d+) message bytes sent/) {
+            $online_kib[$who] = $1 / 1024;
+        } elsif (/^(\d+) Lamport clock/) {
+            $online_latencies[$who] = $1;
+        } elsif (/^(\d+) milliseconds wall clock/) {
+            $online_seconds[$who] = $1 / 1000;
+        } elsif (/^Mem: (\d+) KiB/) {
+            $online_mem_mib[$who] = $1 / 1024;
+        } elsif ($who == 0 && /^Precomputed values used: (.*)/) {
+            my %used_resources = ();
+            &parse_resources(\%used_resources, $1);
+            my $preproc_resources_str = &serialize_resources(\%preproc_resources);
+            my $used_resources_str = &serialize_resources(\%used_resources);
+            if ($preproc_resources_str ne $used_resources_str) {
+                warn "Resource usage does not match preprocessing:\n" .
+                    "Preproc: $preproc_resources_str\n" .
+                    "Used: $used_resources_str\n ";
+            }
+        }
+    }
+    my $label = "PRAC read $netsetup$size $num";
+    &accum_data(\%preproc_s_data, $label, &maxarray(@preproc_seconds));
+    &accum_data(\%preproc_kib_data, $label, &avgarray(@preproc_kib));
+    &accum_data(\%preproc_latencies_data, $label, &maxarray(@preproc_latencies));
+    &accum_data(\%preproc_P0mem_mib_data, $label, $preproc_mem_mib[0]);
+    &accum_data(\%preproc_P1mem_mib_data, $label, $preproc_mem_mib[1]);
+    &accum_data(\%preproc_P2mem_mib_data, $label, $preproc_mem_mib[2]);
+    &accum_data(\%online_s_data, $label, &maxarray(@online_seconds));
+    &accum_data(\%online_kib_data, $label, &avgarray(@online_kib));
+    &accum_data(\%online_latencies_data, $label, &maxarray(@online_latencies));
+    &accum_data(\%online_P0mem_mib_data, $label, $online_mem_mib[0]);
+    &accum_data(\%online_P1mem_mib_data, $label, $online_mem_mib[1]);
+    &accum_data(\%online_P2mem_mib_data, $label, $online_mem_mib[2]);
+}
+
+sub parse_bsearch {
+    my $cmdline = $_[0];
+    my $optimized = "Opt";
+    if ($cmdline =~ /bbsearch/) {
+        $optimized = "Basic";
+    }
+    my $who = 0;
+    my $section = '';
+    my @online_seconds = (0, 0, 0);
+    my @online_kib = (0, 0, 0);
+    my @online_latencies = (0, 0, 0);
+    my @online_mem_mib = (0, 0, 0);
+
+    unless ($cmdline =~ /b?bsearch (\d+) (\d+)/) {
+        die "Cannot parse bsearch cmdline: $cmdline";
+    }
+    my ($size, $num) = ($1, $2);
+    while(<>) {
+        if (/===== P([012]) output/) {
+            $who = $1;
+            next;
+        }
+        if (/===== ([A-Z ]+) =====/) {
+            $section = $1;
+            next;
+        }
+        last if /===== End/;
+        # The log was malformed
+        die "Malformed log" if /===== Running/;
+        if ($section eq "BINARY SEARCH") {
+            if (/^(\d+) message bytes sent/) {
+                $online_kib[$who] = $1 / 1024;
+            } elsif (/^(\d+) Lamport clock/) {
+                $online_latencies[$who] = $1;
+            } elsif (/^(\d+) milliseconds wall clock/) {
+                $online_seconds[$who] = $1 / 1000;
+            } elsif (/^Mem: (\d+) KiB/) {
+                $online_mem_mib[$who] = $1 / 1024;
+            }
+        }
+        if ($who == 0 && /^Precomputed values used: (.*)/) {
+            my %used_resources = ();
+            &parse_resources(\%used_resources, $1);
+            my $preproc_resources_str = &serialize_resources(\%preproc_resources);
+            my $used_resources_str = &serialize_resources(\%used_resources);
+            if ($preproc_resources_str ne $used_resources_str) {
+                warn "Resource usage does not match preprocessing:\n" .
+                    "Preproc: $preproc_resources_str\n" .
+                    "Used: $used_resources_str\n ";
+            }
+        }
+    }
+    my $label = "${optimized}PRAC bsearch $netsetup$size $num";
+    &accum_data(\%preproc_s_data, $label, &maxarray(@preproc_seconds));
+    &accum_data(\%preproc_kib_data, $label, &avgarray(@preproc_kib));
+    &accum_data(\%preproc_latencies_data, $label, &maxarray(@preproc_latencies));
+    &accum_data(\%preproc_P0mem_mib_data, $label, $preproc_mem_mib[0]);
+    &accum_data(\%preproc_P1mem_mib_data, $label, $preproc_mem_mib[1]);
+    &accum_data(\%preproc_P2mem_mib_data, $label, $preproc_mem_mib[2]);
+    &accum_data(\%online_s_data, $label, &maxarray(@online_seconds));
+    &accum_data(\%online_kib_data, $label, &avgarray(@online_kib));
+    &accum_data(\%online_latencies_data, $label, &maxarray(@online_latencies));
+    &accum_data(\%online_P0mem_mib_data, $label, $online_mem_mib[0]);
+    &accum_data(\%online_P1mem_mib_data, $label, $online_mem_mib[1]);
+    &accum_data(\%online_P2mem_mib_data, $label, $online_mem_mib[2]);
+}
+
+sub parse_heap {
+    my $cmdline = $_[0];
+    my $who = 0;
+    my $section = '';
+    my @online_seconds = (0, 0, 0);
+    my @online_kib = (0, 0, 0);
+    my @online_latencies = (0, 0, 0);
+    my @online_mem_mib = (0, 0, 0);
+
+    my $optimized = "Opt";
+    my $oper = "";
+    unless ($cmdline =~ /heap -m (\d+) -d \d+ -i (\d+) -e (\d+) -opt (\d+) -s 0/) {
+        die "Cannot parse heap cmdline: $cmdline";
+    }
+    my ($size, $nins, $next, $optflag) = ($1, $2, $3, $4);
+    if ($nins > 0 && $next > 0) {
+        die "heap does both insertions and extractions: $cmdline\n";
+    }
+    $oper = "Ins" if $nins > 0;
+    $oper = "Ext" if $next > 0;
+    if ($optflag == 0) {
+        $optimized = "Basic";
+    }
+    my $num = ($nins + $next);
+    while(<>) {
+        if (/===== P([012]) output/) {
+            $who = $1;
+            next;
+        }
+        if (/===== ([A-Za-z ]+) Stats =====/) {
+            $section = $1;
+            next;
+        }
+        last if /===== End/;
+        # The log was malformed
+        die "Malformed log" if /===== Running/;
+        my $rightsection = 0;
+        if ($section eq "Insert" && $oper eq "Ins") {
+            $rightsection = 1;
+        }
+        if ($section eq "Extract Min" && $oper eq "Ext") {
+            $rightsection = 1;
+        }
+        if ($rightsection) {
+            if (/^(\d+) message bytes sent/) {
+                $online_kib[$who] = $1 / 1024;
+            } elsif (/^(\d+) Lamport clock/) {
+                $online_latencies[$who] = $1;
+            } elsif (/^(\d+) milliseconds wall clock/) {
+                $online_seconds[$who] = $1 / 1000;
+            } elsif (/^Mem: (\d+) KiB/) {
+                $online_mem_mib[$who] = $1 / 1024;
+            }
+        }
+        if ($who == 0 && /^Precomputed values used: (.*)/) {
+            my %used_resources = ();
+            &parse_resources(\%used_resources, $1);
+            my $preproc_resources_str = &serialize_resources(\%preproc_resources);
+            my $used_resources_str = &serialize_resources(\%used_resources);
+            if ($preproc_resources_str ne $used_resources_str) {
+                warn "Resource usage does not match preprocessing:\n" .
+                    "Preproc: $preproc_resources_str\n" .
+                    "Used: $used_resources_str\n ";
+            }
+        }
+    }
+    my $label = "${optimized}PRAC heap$oper $netsetup$size $num";
+    &accum_data(\%preproc_s_data, $label, &maxarray(@preproc_seconds));
+    &accum_data(\%preproc_kib_data, $label, &avgarray(@preproc_kib));
+    &accum_data(\%preproc_latencies_data, $label, &maxarray(@preproc_latencies));
+    &accum_data(\%preproc_P0mem_mib_data, $label, $preproc_mem_mib[0]);
+    &accum_data(\%preproc_P1mem_mib_data, $label, $preproc_mem_mib[1]);
+    &accum_data(\%preproc_P2mem_mib_data, $label, $preproc_mem_mib[2]);
+    &accum_data(\%online_s_data, $label, &maxarray(@online_seconds));
+    &accum_data(\%online_kib_data, $label, &avgarray(@online_kib));
+    &accum_data(\%online_latencies_data, $label, &maxarray(@online_latencies));
+    &accum_data(\%online_P0mem_mib_data, $label, $online_mem_mib[0]);
+    &accum_data(\%online_P1mem_mib_data, $label, $online_mem_mib[1]);
+    &accum_data(\%online_P2mem_mib_data, $label, $online_mem_mib[2]);
+}
+
+sub maxarray {
+    my $max = $_[0];
+    foreach (@_) {
+        $max = $_ if $_ > $max;
+    }
+    $max;
+}
+
+sub avgarray {
+    my $sum = 0;
+    my $n = 0;
+    foreach (@_) {
+        $sum += $_;
+        $n += 1;
+    }
+    $sum / $n;
+}
+
+# Pass:
+# - a reference to a dictionary
+# - the key into that dictionary
+# - the new data point
+# Data is stored in the dictionary as a triple (n, sum, sum_squares)
+sub accum_data {
+    my ($dict, $key, $data) = @_;
+    $dict->{$key} = [0, 0, 0] unless defined $dict->{$key};
+    $dict->{$key}->[0] += 1;
+    $dict->{$key}->[1] += $data;
+    $dict->{$key}->[2] += ($data * $data);
+}
+
+# Convert data (in the form [n, sum, sum_squares]) to statistics (in
+# the form [mean, variance])
+sub statsify {
+    my ($sdict, $ddict) = @_;
+    my $key;
+    foreach $key (keys %$ddict) {
+        my $data = $ddict->{$key};
+        my $n = $data->[0];
+        my $sum = $data->[1];
+        my $sumsq = $data->[2];
+        if ($n == 0) {
+            $sdict->{$key} = [undef, undef];
+        } elsif ($n == 1) {
+            $sdict->{$key} = [$sum, undef];
+        } else {
+            $sdict->{$key} = [$sum/$n, ($sumsq - ($sum*$sum/$n))/($n-1)];
+        }
+    }
+}
+
+# Turn a stat array [mean, variance] into a string to display
+sub statstr {
+    my $data = $_[0];
+    if (defined $data->[1]) {
+        my $mean = $data->[0];
+        my $stddev = $data->[1] > 0 ? sqrt($data->[1]) : 0;
+        return "$mean ± $stddev";
+    } elsif (defined $data->[0]) {
+        return $data->[0];
+    } else {
+        return "none"
+    }
+}
+
+# Sum two stat arrays
+sub statsum {
+    my ($data0, $data1) = @_;
+    if (defined $data0->[1] && defined $data1->[1]) {
+        return [$data0->[0] + $data1->[0], $data0->[1] + $data1->[1]];
+    } else {
+        return [$data0->[0] + $data1->[0], undef];
+    }
+}
+
+# Add the preproc and online stats to get the total stats
+sub sum_preproc_online {
+    my ($tdict, $pdict, $odict) = @_;
+    my $key;
+    foreach $key (keys %$pdict) {
+        if (defined $odict->{$key}) {
+            $tdict->{$key} = &statsum($pdict->{$key}, $odict->{$key});
+        }
+    }
+}
+
+# Output the stats in the given dictionary. Append $phase to the
+# protocol name, and add $units to the end.
+sub output_stats {
+    my ($dict, $phase, $units) = @_;
+    my $label;
+    foreach $label (sort keys %$dict) {
+        my $printlabel = $label;
+        $printlabel =~ s/PRAC/PRAC$phase/;
+        print $printlabel, " ", &statstr($dict->{$label}), " $units\n";
+    }
+}

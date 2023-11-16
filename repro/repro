@@ -1,0 +1,237 @@
+#!/bin/bash
+
+# Reproduce the PRAC experiments from our paper:
+
+# Sajin Sasy, Adithya Vadapalli, Ian Goldberg. PRAC: Round-Efficient
+# 3-Party MPC for Dynamic Data Structures
+
+# cd into the directory containing this script (from the bash faq 028)
+if [[ $BASH_SOURCE = */* ]]; then
+  cd -- "${BASH_SOURCE%/*}/" || exit
+fi
+
+# Allow running only subsets of the experiment suite.  Valid values are
+# "test", "all", "none".  ("none" is useful if you just want to re-parse
+# the output of existing logs.)  You can also say "single" followed by
+# all the arguments to "run" (below) to run a single experiment; for
+# example:
+# ./repro single read 20 1
+if [ "$1" = "" ]; then
+    whichexps="test"
+else
+    whichexps="$1"
+fi
+
+# The number of operations per run; the graphs in the paper use 3
+if [ "$whichexps" = "single" -o "$2" = "" ]; then
+    # If there's an explicit experiment on the command line, don't read
+    # the next argument as the number of operations.  $numops will be
+    # ignored, anyway, since it will be specified as part of the
+    # command.
+    numiters=3
+else
+    numiters="$2"
+fi
+
+logname='log'
+
+# Run one experiment
+# The arguments are just the arguments to run-experiment
+run() {
+    now=`date`
+    echo "$now: Running $* ..."
+    logfile="prac_${logname}.out${LOGSUFFIX}"
+    mkdir -p data
+    ../docker/run-experiment $* >> data/$logfile
+}
+
+# Parse the output logs.  We run this in the docker in case you don't
+# have perl installed on the host.
+# Arguments: a list of logfiles
+parse() {
+    if [ "$RAMEN_PARSE_HOST" = "1" ]; then
+        ./parse_logs $*
+    else
+        cat $* | docker exec -w /root/prac/repro -i prac_p0 ./parse_logs
+    fi
+}
+
+# A very small kick-the-tires test to ensure everything compiled and
+# built properly
+if [ "$whichexps" = "test" ]; then
+    echo "Running test experiment..."
+    logname='test'
+    run -o read 16 1
+    echo
+    echo "# Test output"
+    echo
+    parse data/prac_test.out${LOGSUFFIX}
+    echo
+    echo "# End test output"
+    echo
+    exit
+fi
+
+# Be able to run a single experiment specified on the command line
+if [ "$whichexps" = "single" ]; then
+    echo "Running single experiment..."
+    shift
+    run $*
+    exit
+fi
+
+now=`date`
+echo "$now: Starting experiments"
+
+if [ "$whichexps" = "fig6" -o "$whichexps" = "all" ]; then
+    echo "Running Figure 6 experiments..."
+    for iter in $(seq 1 $numiters); do
+        # Figure 6(a)
+        logname='fig6a'
+        for num in 16 32 64 128 256 512 1024 2048; do
+            run -p r20:$num
+            run read 20 $num
+        done
+        # Figure 6(b,c)
+        logname='fig6bc'
+        for size in 16 18 20 22 24 26 28 30; do
+            run -p r${size}:10
+            run read $size 10
+        done
+    done
+fi
+
+if [ "$whichexps" = "fig7" -o "$whichexps" = "all" ]; then
+    echo "Running Figure 7 experiments..."
+    for iter in $(seq 1 $numiters); do
+        # Figure 7(a)
+        logname='fig7a'
+        for num in 4 8 16 32 64; do
+            run -p i19:$num c:$((num*20))
+            run bsearch 20 $num
+        done
+        for num in 4 8 16 32 64; do
+            run -p m:$((num*20)) r20:$((num*20)) c:$((num*20))
+            run bbsearch 20 $num
+        done
+        # Figure 7(b,c)
+        logname='fig7bc'
+        for size in 16 18 20 22 24 26 28; do
+            run -p i$((size-1)):1 c:${size}
+            run bsearch $size 1
+        done
+        for size in 16 18 20 22 24 26 28; do
+            run -p m:${size} r${size}:${size} c:${size}
+            run bbsearch $size 1
+        done
+    done
+fi
+
+if [ "$whichexps" = "fig8" -o "$whichexps" = "all" ]; then
+    echo "Running Figure 8 experiments..."
+    for iter in $(seq 1 $numiters); do
+        # Figure 8(a)
+        logname='fig8a'
+        for num in 4 8 16 32; do
+            run -p m:$((num*57)) a:$((num*19)) s:$((num*18)) i19.3:${num} c:$((num*38))
+            run heap -m 20 -d 20 -i 0 -e ${num} -opt 1 -s 0
+        done
+        for num in 4 8 16 32; do
+            run -p m:$((num*57)) a:$((num*19)) s:$((num*18)) r20:$((num*108)) c:$((num*38))
+            run heap -m 20 -d 20 -i 0 -e ${num} -opt 0 -s 0
+        done
+        # Figure 8(b,c)
+        logname='fig8bc'
+        for size in 16 18 20 22 24 26 28 30; do
+            run -p m:$((size*3-3)) a:$((size-1)) s:$((size-2)) i$((size-1)).3:1 c:$((size*2-2))
+            run heap -m ${size} -d ${size} -i 0 -e 1 -opt 1 -s 0
+        done
+        for size in 16 18 20 22 24 26 28 30; do
+            run -p m:$((size*3-3)) a:$((size-1)) s:$((size-2)) r${size}:$((size*6-12)) c:$((size*2-2))
+            run heap -m ${size} -d ${size} -i 0 -e 1 -opt 0 -s 0
+        done
+    done
+fi
+
+now=`date`
+echo "$now: Experiments complete"
+
+# If you specified a custom log suffix, you're going to be parsing the
+# outputs differently.
+if [ "$LOGSUFFIX" = "" ]; then
+
+parse data/*.out > data/prac.dat
+
+echo
+echo "# Figure 6(a)"
+egrep 'PRACOnln read 20 (16|32|64|128|256|512|1024|2048) .* s$' data/prac.dat | sort -k4 -n
+echo
+egrep 'PRACTotl read 20 (16|32|64|128|256|512|1024|2048) .* s$' data/prac.dat | sort -k4 -n
+echo
+echo "# Figure 6(b)"
+egrep 'PRACOnln read ([0-9]+) 10 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'PRACTotl read ([0-9]+) 10 .* s$' data/prac.dat | sort -k3 -n
+echo
+echo "# Figure 6(c)"
+egrep 'PRACOnln read ([0-9]+) 10 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'PRACTotl read ([0-9]+) 10 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+echo "# Figure 7(a)"
+egrep 'BasicPRACOnln bsearch 20 (4|8|16|32|64) .* s$' data/prac.dat | sort -k4 -n
+echo
+egrep 'BasicPRACTotl bsearch 20 (4|8|16|32|64) .* s$' data/prac.dat | sort -k4 -n
+echo
+egrep 'OptPRACOnln bsearch 20 (4|8|16|32|64) .* s$' data/prac.dat | sort -k4 -n
+echo
+egrep 'OptPRACTotl bsearch 20 (4|8|16|32|64) .* s$' data/prac.dat | sort -k4 -n
+echo
+echo "# Figure 7(b)"
+egrep 'BasicPRACOnln bsearch ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACTotl bsearch ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln bsearch ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACTotl bsearch ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+echo "# Figure 7(c)"
+egrep 'BasicPRACOnln bsearch ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACTotl bsearch ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln bsearch ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACTotl bsearch ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+echo "# Figure 8(a)"
+egrep 'BasicPRACOnln heapExt 20 (4|8|16|32) .* s$' data/prac.dat | sort -k4 -n
+echo
+egrep 'BasicPRACTotl heapExt 20 (4|8|16|32) .* s$' data/prac.dat | sort -k4 -n
+echo
+egrep 'OptPRACOnln heapExt 20 (4|8|16|32) .* s$' data/prac.dat | sort -k4 -n
+echo
+egrep 'OptPRACTotl heapExt 20 (4|8|16|32) .* s$' data/prac.dat | sort -k4 -n
+echo
+echo "# Figure 8(b)"
+egrep 'BasicPRACOnln heapExt ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACTotl heapExt ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln heapExt ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACTotl heapExt ([0-9]+) 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+echo "# Figure 8(c)"
+egrep 'BasicPRACOnln heapExt ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACTotl heapExt ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln heapExt ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACTotl heapExt ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+echo "# End figures"
+
+fi
