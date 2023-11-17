@@ -47,8 +47,11 @@ size_t MPCSingleIO::queue(const void *data, size_t len, lamport_t lamport)
     }
 
 #ifdef VERBOSE_COMMS
-    printf("Queue %s.%d len=%lu lamp=%u: ", dest.c_str(), thread_num,
-        len, message_lamport.value());
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    printf("%lu.%06lu: Queue %s.%d len=%lu lamp=%u: ", tv.tv_sec,
+        tv.tv_usec, dest.c_str(), thread_num, len,
+        message_lamport.value());
     for (size_t i=0;i<len;++i) {
         printf("%02x", ((const unsigned char*)data)[i]);
     }
