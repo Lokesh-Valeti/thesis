@@ -198,6 +198,11 @@ struct MPCIO {
     static void dump_memusage(std::ostream &os);
 
     void dump_stats(std::ostream &os);
+
+    // Make MPCIO objects non-copyable; otherwise the Lamport clock
+    // gets duplicated and not kept in sync.
+    MPCIO(const MPCIO&) = delete;
+    MPCIO& operator=(const MPCIO&) = delete;
 };
 
 // A class to represent all of a computation peer's IO, either to other
@@ -363,6 +368,11 @@ class MPCTIO {
     size_t remaining_nodesselecttriples;
 
 public:
+    // Make MPCTIO objects non-copyable; otherwise the Lamport clock
+    // gets duplicated and not kept in sync.
+    MPCTIO(const MPCTIO&) = delete;
+    MPCTIO& operator=(const MPCTIO&) = delete;
+
     MPCTIO(MPCIO &mpcio, int thread_num, int num_threads = 1);
 
     // Sync our per-thread lamport clock with the master one in the

@@ -54,7 +54,7 @@ static void randomize_node(Node &a) {
     left), and keeps the gt flag as is (flag to go right) during traversal.
 
 */
-std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1,
+std::tuple<RegBS, RegBS> compare_keys(MPCTIO &tio, yield_t &yield, RegAS k1,
         RegAS k2) {
     CDPF cdpf = tio.cdpf(yield);
     auto [lt, eq, gt] = cdpf.compare(tio, yield, k2 - k1, tio.aes_ops());

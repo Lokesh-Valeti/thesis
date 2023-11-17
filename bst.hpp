@@ -126,7 +126,7 @@ struct Node {
     left), and keeps the gt flag as is (flag to go right) during traversal.
     Returns the shared bit flags lteq (go left) and gt (go right).
 */
-std::tuple<RegBS, RegBS> compare_keys(MPCTIO tio, yield_t &yield, RegAS k1, RegAS k2);
+std::tuple<RegBS, RegBS> compare_keys(MPCTIO &tio, yield_t &yield, RegAS k1, RegAS k2);
 
 // I/O operations (for sending over the network)
 
