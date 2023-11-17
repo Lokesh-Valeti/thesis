@@ -153,6 +153,40 @@ if [ "$whichexps" = "fig8" -o "$whichexps" = "all" ]; then
     done
 fi
 
+if [ "$whichexps" = "tab3" -o "$whichexps" = "all" ]; then
+    echo "Running Table 3 experiments..."
+    for iter in $(seq 1 $numiters); do
+        # Table 3
+        logname='tab3'
+        for size in 16 20 24; do
+            run -p m:$((size*2-1)) r5:1 i4:1 c:5
+            run heap -m ${size} -d $((size-1)) -i 1 -e 0 -opt 1 -s 0
+            run -p m:$((size-1)) c:$((size-1))
+            run heap -m ${size} -d $((size-1)) -i 1 -e 0 -opt 0 -s 0
+        done
+    done
+fi
+
+if [ "$whichexps" = "tab4" -o "$whichexps" = "all" ]; then
+    echo "Running Table 4 experiments..."
+    for iter in $(seq 1 $numiters); do
+        # Table 4
+        logname='tab4'
+        run -p a:8 s:171 r17:28 c:50
+        run avl -m 16 -i 1 -e 0 -opt 1 -s 0
+        run -p a:10 s:201 r21:33 c:60
+        run avl -m 20 -i 1 -e 0 -opt 1 -s 0
+        run -p a:12 s:237 r25:39 c:72
+        run avl -m 24 -i 1 -e 0 -opt 1 -s 0
+        run -p m:1 a:30 s:867 r16:72 r16.2:2 c:72
+        run avl -m 16 -i 0 -e 1 -opt 1 -s 0
+        run -p m:1 a:36 s:1047 r20:87 r20.2:2 c:87
+        run avl -m 20 -i 0 -e 1 -opt 1 -s 0
+        run -p m:1 a:43 s:1263 r24:105 r24.2:2 c:105
+        run avl -m 24 -i 0 -e 1 -opt 1 -s 0
+    done
+fi
+
 now=`date`
 echo "$now: Experiments complete"
 
@@ -231,6 +265,56 @@ echo
 egrep 'OptPRACOnln heapExt ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
 echo
 egrep 'OptPRACTotl heapExt ([0-9]+) 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+echo "# Table 3"
+egrep 'BasicPRACPreprc heapIns [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACOnln heapIns [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACPreprc heapIns [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACOnln heapIns [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACPreprc heapIns [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'BasicPRACOnln heapIns [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc heapIns [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln heapIns [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc heapIns [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln heapIns [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc heapIns [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln heapIns [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+echo "# Table 4"
+egrep 'OptPRACPreprc avlIns [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln avlIns [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc avlIns [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln avlIns [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc avlIns [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln avlIns [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc avlDel [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln avlDel [0-9]+ 1 .* s$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc avlDel [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln avlDel [0-9]+ 1 .* latencies$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACPreprc avlDel [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+egrep 'OptPRACOnln avlDel [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
 echo
 echo "# End figures"
 

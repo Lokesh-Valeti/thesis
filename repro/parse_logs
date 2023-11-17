@@ -48,6 +48,8 @@ while(<>) {
             &parse_bsearch($cmdline);
         } elsif ($cmdline =~ /^-- heap/) {
             &parse_heap($cmdline);
+        } elsif ($cmdline =~ /^-- avl/) {
+            &parse_avl($cmdline);
         } else {
             warn "Unknown cmdline: $cmdline\n";
             while(<>) {
@@ -364,6 +366,88 @@ sub parse_heap {
         }
     }
     my $label = "${optimized}PRAC heap$oper $netsetup$size $num";
+    &accum_data(\%preproc_s_data, $label, &maxarray(@preproc_seconds));
+    &accum_data(\%preproc_kib_data, $label, &avgarray(@preproc_kib));
+    &accum_data(\%preproc_latencies_data, $label, &maxarray(@preproc_latencies));
+    &accum_data(\%preproc_P0mem_mib_data, $label, $preproc_mem_mib[0]);
+    &accum_data(\%preproc_P1mem_mib_data, $label, $preproc_mem_mib[1]);
+    &accum_data(\%preproc_P2mem_mib_data, $label, $preproc_mem_mib[2]);
+    &accum_data(\%online_s_data, $label, &maxarray(@online_seconds));
+    &accum_data(\%online_kib_data, $label, &avgarray(@online_kib));
+    &accum_data(\%online_latencies_data, $label, &maxarray(@online_latencies));
+    &accum_data(\%online_P0mem_mib_data, $label, $online_mem_mib[0]);
+    &accum_data(\%online_P1mem_mib_data, $label, $online_mem_mib[1]);
+    &accum_data(\%online_P2mem_mib_data, $label, $online_mem_mib[2]);
+}
+
+sub parse_avl {
+    my $cmdline = $_[0];
+    my $who = 0;
+    my $section = '';
+    my @online_seconds = (0, 0, 0);
+    my @online_kib = (0, 0, 0);
+    my @online_latencies = (0, 0, 0);
+    my @online_mem_mib = (0, 0, 0);
+
+    my $optimized = "Opt";
+    my $oper = "";
+    unless ($cmdline =~ /avl -m (\d+) -i (\d+) -e (\d+) -opt (\d+) -s 0/) {
+        die "Cannot parse heap cmdline: $cmdline";
+    }
+    my ($size, $nins, $ndel, $optflag) = ($1, $2, $3, $4);
+    if ($nins > 0 && $ndel > 0) {
+        die "avl does both insertions and deletions: $cmdline\n";
+    }
+    $oper = "Ins" if $nins > 0;
+    $oper = "Del" if $ndel > 0;
+    if ($optflag == 0) {
+        $optimized = "Basic";
+    }
+    my $num = ($nins + $ndel);
+
+    while(<>) {
+        if (/===== P([012]) output/) {
+            $who = $1;
+            next;
+        }
+        if (/===== ([A-Z ]+) =====/) {
+            $section = $1;
+            next;
+        }
+        last if /===== End/;
+        # The log was malformed
+        die "Malformed log" if /===== Running/;
+        my $rightsection = 0;
+        if ($section eq "INSERTS" && $oper eq "Ins") {
+            $rightsection = 1;
+        }
+        if ($section eq "DELETES" && $oper eq "Del") {
+            $rightsection = 1;
+        }
+        if ($rightsection) {
+            if (/^(\d+) message bytes sent/) {
+                $online_kib[$who] = $1 / 1024;
+            } elsif (/^(\d+) Lamport clock/) {
+                $online_latencies[$who] = $1;
+            } elsif (/^(\d+) milliseconds wall clock/) {
+                $online_seconds[$who] = $1 / 1000;
+            } elsif (/^Mem: (\d+) KiB/) {
+                $online_mem_mib[$who] = $1 / 1024;
+            }
+        }
+        if ($who == 0 && /^Precomputed values used: (.*)/) {
+            my %used_resources = ();
+            &parse_resources(\%used_resources, $1);
+            my $preproc_resources_str = &serialize_resources(\%preproc_resources);
+            my $used_resources_str = &serialize_resources(\%used_resources);
+            if ($preproc_resources_str ne $used_resources_str) {
+                warn "Resource usage does not match preprocessing:\n" .
+                    "Preproc: $preproc_resources_str\n" .
+                    "Used: $used_resources_str\n ";
+            }
+        }
+    }
+    my $label = "${optimized}PRAC avl$oper $netsetup$size $num";
     &accum_data(\%preproc_s_data, $label, &maxarray(@preproc_seconds));
     &accum_data(\%preproc_kib_data, $label, &avgarray(@preproc_kib));
     &accum_data(\%preproc_latencies_data, $label, &maxarray(@preproc_latencies));
