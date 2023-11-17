@@ -501,13 +501,13 @@ void MinHeap::init(MPCTIO &tio, yield_t & yield, size_t n) {
     auto HeapArray = oram.flat(tio, yield);
 
     num_items = n;
-    HeapArray.explicitonly(true);
-    for (size_t j = 1; j <= n; ++j) {
-        RegAS v;
-        v.ashare = (j * tio.player()) * 100;
-        HeapArray[j] = v;
-    }
-    HeapArray.explicitonly(false);
+    HeapArray.init([n](size_t i) {
+        if (i >= 1 && i <= n) {
+            return i*100;
+        } else {
+            return size_t(0x7fffffffffffff);
+        }
+    });
 }
 
 
@@ -727,7 +727,6 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
     run_coroutines(tio, [ & tio, maxdepth, heapdepth, n_inserts, n_extracts, is_optimized, run_sanity, &mpcio](yield_t & yield) {
         size_t size = size_t(1) << maxdepth;
         MinHeap tree(tio.player(), size);
-        tree.init(tio, yield);
         // This form of init with a third parameter of n sets the heap
         // to contain 100, 200, 300, ..., 100*n.
         tree.init(tio, yield, (size_t(1) << heapdepth) - 1);
