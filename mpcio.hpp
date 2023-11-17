@@ -381,6 +381,11 @@ public:
     // run.
     void reset_lamport();
 
+    // Read the thread_lamport counter, for performance debugging
+    lamport_t get_thread_lamport() {
+        return thread_lamport;
+    }
+
     // The normal case, where the MPCIO is created inside the thread,
     // and so destructed when the thread ends, is handled automatically
     // here.
