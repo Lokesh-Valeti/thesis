@@ -1571,7 +1571,6 @@ static void path(MPCIO &mpcio,
 
 void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
-    MPCTIO tio(mpcio, 0);
     if (!*args) {
         std::cerr << "Mode is required as the first argument when not preprocessing.\n";
         return;
