@@ -139,7 +139,9 @@ sub parse_preproc {
             next;
         }
         last if /===== End/;
-        # The log was malformed
+        # Try to recover from a malformed log
+        last if /^Max GB:/;
+        # It was too malformed
         die "Malformed log" if /===== Running/;
         if (/^(\d+) message bytes sent/) {
             $preproc_kib[$who] += $1 / 1024;

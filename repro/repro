@@ -33,6 +33,17 @@ else
     numiters="$2"
 fi
 
+# The maximum amount of memory to use (in GB).  Set the environment
+# variable PRAC_MAXGB to increase it beyond 16 (don't set it lower
+# than 16).
+if [ "$PRAC_MAXGB" = "" ]; then
+    maxgb=16
+elif [ "$PRAC_MAXGB" -gt 16 ]; then
+    maxgb=$PRAC_MAXGB
+else
+    maxgb=16
+fi
+
 logname='log'
 
 # Run one experiment
@@ -42,6 +53,7 @@ run() {
     echo "$now: Running $* ..."
     logfile="prac_${logname}.out${LOGSUFFIX}"
     mkdir -p data
+    echo "Max GB: $maxgb" >> data/$logfile
     ../docker/run-experiment $* >> data/$logfile
 }
 
