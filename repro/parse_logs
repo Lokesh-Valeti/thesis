@@ -140,7 +140,7 @@ sub parse_preproc {
         }
         last if /===== End/;
         # Try to recover from a malformed log
-        last if /^Max GB:/;
+        last if /^Max MB:/;
         # It was too malformed
         die "Malformed log" if /===== Running/;
         if (/^(\d+) message bytes sent/) {

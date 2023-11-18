@@ -35,13 +35,39 @@ fi
 
 # The maximum amount of memory to use (in GB).  Set the environment
 # variable PRAC_MAXGB to increase it beyond 16 (don't set it lower
-# than 16).
-if [ "$PRAC_MAXGB" = "" ]; then
-    maxgb=16
+# than 16).  if you're using NUMA, where different parties don't all
+# share the same memory pool, then instead set:
+# - PRAC_P0_MAXGB to the max GB of memory to use in each NUMA node, if
+#   you have at least three NUMA nodes, and each player gets their own
+#   numa node
+# - PRAC_P02_MAXGB to the max GB of memory to use in each NUMA node, if
+#   you have two numa nodes, and P0 and P2 are in one, and P1 is in the
+#   other
+
+# P0 and P1 always use the same amount of memory.
+
+# For preprocessing, in the event the total memory usage exceeds 16GB,
+# P2's memory usage is no more than 1% of P0's.
+
+# There's about 5 MB overhead when preprocessing.
+
+if [ "$PRAC_P0_MAXGB" != "" ]; then
+    # Each party uses its own NUMA memory pool
+    max_preproc_p0_mb=$((PRAC_P0_MAXGB*1000-5))
+    max_mb=$((PRAC_P0_MAXGB*3000))
+elif [ "$PRAC_P02_MAXGB" != "" ]; then
+    # P0 and P2 share a NUMA memory pool, P1 gets its own
+    max_preproc_p0_mb=$((PRAC_P02_MAXGB*990-5))
+    max_mb=$((PRAC_P02_MAXGB*1990))
 elif [ "$PRAC_MAXGB" -gt 16 ]; then
-    maxgb=$PRAC_MAXGB
+    # All parties share one memory pool
+    max_preproc_p0_mb=$((PRAC_MAXGB*497-5))
+    max_mb=$((PRAC_MAXGB*1000))
 else
-    maxgb=16
+    # Default to PRAC_MAXGB=16
+    export PRAC_MAXGB=16
+    max_preproc_p0_mb=$((PRAC_MAXGB*497-5))
+    max_mb=$((PRAC_MAXGB*1000))
 fi
 
 logname='log'
@@ -53,15 +79,70 @@ run() {
     echo "$now: Running $* ..."
     logfile="prac_${logname}.out${LOGSUFFIX}"
     mkdir -p data
-    echo "Max GB: $maxgb" >> data/$logfile
+    echo "Max MB: $max_mb" >> data/$logfile
     ../docker/run-experiment $* >> data/$logfile
 }
+
+# Run preprocessing, being careful to not exceed available memory. We
+# typically preprocess a bunch of small resources that will easily fit
+# in memory, as well as a number of instances of one large resource.  We
+# create the small resources and as many of the instances of the large
+# resource first we can (with -p), and then more batches of instances of
+# the large resource (with -a, which means to append the newly created
+# resources to the storage file, rather than overwriting old ones).
+
+# Arguments:
+# $1: a string (containing embedded whitespace) of the required small
+#     resources
+# $2: the mb required by P0 to create the small resources
+# $3: the name of the large resource
+# $4: the number of instances of the large resource we want
+# $5: the mb required by P0 to create one instance of the large resource
+preproc() {
+    small_mb=$2
+    large_left=$4
+    large_mb_each=$5
+    # the maximum number of instances of the large resource we can
+    # create along with the small ones
+    num_large=$(( (max_preproc_p0_mb-small_mb)/large_mb_each ))
+    if [ $num_large -gt $large_left ]; then
+        num_large=$large_left
+    fi
+    run -p $1 ${3}:${num_large}
+    large_left=$((large_left-num_large))
+    # the maximum number of instances of the large resource we can
+    # create in a batch on their own
+    max_large_batch=$((max_preproc_p0_mb/large_mb_each))
+    if [ $max_large_batch = 0 ]; then
+        echo "Not enough memory"
+        return
+    fi
+    while [ $large_left -gt 0 ]; do
+        num_large=$large_left
+        if [ $num_large -gt $max_large_batch ]; then
+            num_large=$max_large_batch
+        fi
+        run -a ${3}:${num_large}
+        large_left=$((large_left-num_large))
+    done
+}
+
+# The number of MB needed for P0 to create different kinds of resources
+# of different sizes
+declare -A rMB
+rMB=([16]=6 [17]=11 [18]=20 [19]=38 [20]=76 [21]=150 [22]=297 [23]=593 [24]=1182 [25]=2361 [26]=4720 [27]=9440 [28]=18876 [29]=37755 [30]=75500)
+declare -A r2MB
+r2MB=([16]=9 [18]=32 [20]=125 [22]=494 [24]=1970 [26]=7870 [28]=31470 [30]=125850)
+declare -A iMB
+iMB=([15]=4 [17]=12 [19]=41 [21]=152 [23]=595 [25]=2364 [27]=9441 [29]=37753)
+declare -A i3MB
+i3MB=([15]=6 [17]=20 [19]=72 [21]=286 [23]=968 [25]=3955 [27]=15800 [29]=62950)
 
 # Parse the output logs.  We run this in the docker in case you don't
 # have perl installed on the host.
 # Arguments: a list of logfiles
 parse() {
-    if [ "$RAMEN_PARSE_HOST" = "1" ]; then
+    if [ "$PRAC_PARSE_HOST" = "1" ]; then
         ./parse_logs $*
     else
         cat $* | docker exec -w /root/prac/repro -i prac_p0 ./parse_logs
@@ -101,13 +182,13 @@ if [ "$whichexps" = "fig6" -o "$whichexps" = "all" ]; then
         # Figure 6(a)
         logname='fig6a'
         for num in 16 32 64 128 256 512 1024 2048; do
-            run -p r20:$num
+            preproc "" 0 r20 $num 76
             run read 20 $num
         done
         # Figure 6(b,c)
         logname='fig6bc'
         for size in 16 18 20 22 24 26 28 30; do
-            run -p r${size}:10
+            preproc "" 0 r${size} 10 ${rMB[$size]}
             run read $size 10
         done
     done
@@ -119,21 +200,21 @@ if [ "$whichexps" = "fig7" -o "$whichexps" = "all" ]; then
         # Figure 7(a)
         logname='fig7a'
         for num in 4 8 16 32 64; do
-            run -p i19:$num c:$((num*20))
+            preproc "c:$((num*20))" 10 i19 $num 41
             run bsearch 20 $num
         done
         for num in 4 8 16 32 64; do
-            run -p m:$((num*20)) r20:$((num*20)) c:$((num*20))
+            preproc "m:$((num*20)) c:$((num*20))" 20 r20 $((num*20)) 76
             run bbsearch 20 $num
         done
         # Figure 7(b,c)
         logname='fig7bc'
         for size in 16 18 20 22 24 26 28; do
-            run -p i$((size-1)):1 c:${size}
+            preproc "c:${size}" 1 i$((size-1)) 1 ${iMB[$((size-1))]}
             run bsearch $size 1
         done
         for size in 16 18 20 22 24 26 28; do
-            run -p m:${size} r${size}:${size} c:${size}
+            preproc "m:${size} c:${size}" 1 r${size} ${size} ${rMB[$size]}
             run bbsearch $size 1
         done
     done
@@ -145,21 +226,21 @@ if [ "$whichexps" = "fig8" -o "$whichexps" = "all" ]; then
         # Figure 8(a)
         logname='fig8a'
         for num in 4 8 16 32; do
-            run -p m:$((num*57)) a:$((num*19)) s:$((num*18)) i19.3:${num} c:$((num*38))
+            preproc "m:$((num*57)) a:$((num*19)) s:$((num*18)) c:$((num*38))" 35 i19.3 ${num} 68
             run heap -m 20 -d 20 -i 0 -e ${num} -opt 1 -s 0
         done
         for num in 4 8 16 32; do
-            run -p m:$((num*57)) a:$((num*19)) s:$((num*18)) r20:$((num*108)) c:$((num*38))
+            preproc "m:$((num*57)) a:$((num*19)) s:$((num*18)) c:$((num*38))" 35 r20 ${num} 76
             run heap -m 20 -d 20 -i 0 -e ${num} -opt 0 -s 0
         done
         # Figure 8(b,c)
         logname='fig8bc'
         for size in 16 18 20 22 24 26 28 30; do
-            run -p m:$((size*3-3)) a:$((size-1)) s:$((size-2)) i$((size-1)).3:1 c:$((size*2-2))
+            preproc "m:$((size*3-3)) a:$((size-1)) s:$((size-2)) c:$((size*2-2))" 3 i$((size-1)).3 1 ${i3MB[$((size-1))]}
             run heap -m ${size} -d ${size} -i 0 -e 1 -opt 1 -s 0
         done
         for size in 16 18 20 22 24 26 28 30; do
-            run -p m:$((size*3-3)) a:$((size-1)) s:$((size-2)) r${size}:$((size*6-12)) c:$((size*2-2))
+            preproc "m:$((size*3-3)) a:$((size-1)) s:$((size-2)) c:$((size*2-2))" 3 r${size} $((size*6-12)) ${rMB[$size]}
             run heap -m ${size} -d ${size} -i 0 -e 1 -opt 0 -s 0
         done
     done
@@ -184,17 +265,17 @@ if [ "$whichexps" = "tab4" -o "$whichexps" = "all" ]; then
     for iter in $(seq 1 $numiters); do
         # Table 4
         logname='tab4'
-        run -p a:8 s:171 r17:28 c:50
+        preproc "a:8 s:171 c:50" 3 r17 28 ${rMB[17]}
         run avl -m 16 -i 1 -e 0 -opt 1 -s 0
-        run -p a:10 s:201 r21:33 c:60
+        preproc "a:10 s:201 c:60" 3 r21 33 ${rMB[21]}
         run avl -m 20 -i 1 -e 0 -opt 1 -s 0
-        run -p a:12 s:237 r25:39 c:72
+        preproc "a:12 s:237 c:72" 3 r25 39 ${rMB[25]}
         run avl -m 24 -i 1 -e 0 -opt 1 -s 0
-        run -p m:1 a:30 s:867 r16:72 r16.2:2 c:72
+        preproc "m:1 a:30 s:867 r16.2:2 c:72" 26 r16 72 ${rMB[16]}
         run avl -m 16 -i 0 -e 1 -opt 1 -s 0
-        run -p m:1 a:36 s:1047 r20:87 r20.2:2 c:87
+        preproc "m:1 a:36 s:1047 r20.2:2 c:87" 263 r20 87 ${rMB[20]}
         run avl -m 20 -i 0 -e 1 -opt 1 -s 0
-        run -p m:1 a:43 s:1263 r24:105 r24.2:2 c:105
+        preproc "m:1 a:43 s:1263 r24.2:2 c:105" 3950 r24 105 ${rMB[24]}
         run avl -m 24 -i 0 -e 1 -opt 1 -s 0
     done
 fi
