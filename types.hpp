@@ -101,6 +101,17 @@ struct RegAS {
         return res;
     }
 
+    inline RegAS &operator<<=(nbits_t shift) {
+        this->ashare <<= shift;
+        return *this;
+    }
+
+    inline RegAS operator<<(nbits_t shift) const {
+        RegAS res = *this;
+        res <<= shift;
+        return res;
+    }
+
     // Multiply a scalar by a vector
     template <size_t N>
     inline std::array<RegAS,N> operator*(std::array<value_t,N> rhs) const {
