@@ -43,7 +43,7 @@ public:
     // return value is the share of the minimum value (the root)
     RegAS extract_min(MPCTIO &tio, yield_t & yield, int is_optimized = 1);
 
-    // Intializes the heap array with 0x7fffffffffffff
+    // Intializes the heap array with 0x7fffffffffffffff
     void init(MPCTIO &tio, yield_t & yield);
 
     // This function simply inits a heap with values 100,200,...,100*n

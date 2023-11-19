@@ -487,10 +487,10 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO &tio, yi
 }
 
 
-// Intializes the heap array with 0x7fffffffffffff
+// Intializes the heap array with 0x7fffffffffffffff
 void MinHeap::init(MPCTIO &tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
-    HeapArray.init(0x7fffffffffffff);
+    HeapArray.init(0x7fffffffffffffff);
     num_items = 0;
 }
 
@@ -506,7 +506,7 @@ void MinHeap::init(MPCTIO &tio, yield_t & yield, size_t n) {
         if (i >= 1 && i <= n) {
             return i*100;
         } else {
-            return size_t(0x7fffffffffffff);
+            return size_t(0x7fffffffffffffff);
         }
     });
 }
@@ -661,7 +661,7 @@ RegAS MinHeap::extract_min(MPCTIO &tio, yield_t & yield, int is_optimized) {
     minval = HeapArray[1];
     HeapArray[1] = RegAS(HeapArray[num_items]);
     RegAS v;
-    v.ashare = 0x7fffffffffffff * !tio.player();
+    v.ashare = 0x7fffffffffffffff * !tio.player();
     HeapArray[num_items] = v;
     num_items--;
 
