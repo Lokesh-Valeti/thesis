@@ -6,6 +6,7 @@
 #include "coroutine.hpp"
 #include "options.hpp"
 #include "mpcops.hpp"
+#include "duoram.hpp"
 
 class MinHeap {
 private:
