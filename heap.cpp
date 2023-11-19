@@ -491,6 +491,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_optimized(MPCTIO &tio, yi
 void MinHeap::init(MPCTIO &tio, yield_t & yield) {
     auto HeapArray = oram.flat(tio, yield);
     HeapArray.init(0x7fffffffffffff);
+    num_items = 0;
 }
 
 
