@@ -664,6 +664,12 @@ RegAS MinHeap::extract_min(MPCTIO &tio, yield_t & yield, int is_optimized) {
     v.ashare = 0x7fffffffffffff * !tio.player();
     HeapArray[num_items] = v;
     num_items--;
+
+    // If this was the last item, just return it
+    if (num_items == 0) {
+        return minval;
+    }
+
     auto outroot = restore_heap_property_at_explicit_index(tio, yield);
     RegXS smaller = outroot.first;
 
