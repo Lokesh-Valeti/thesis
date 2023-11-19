@@ -104,7 +104,9 @@ RegXS Duoram<RegAS>::Shape::binary_search(RegAS &target)
         // answer is here or to the left, so it must be 0.  If val <
         // target, the answer is strictly to the right, so it must be 1.
         // So just return lt.
-        return RegXS(lt);
+        RegXS ret;
+        ret.xshare = lt.bshare;
+        return ret;
     }
     auto oidx = P.oblivindex(depth-1);
     oidx.incr(lt);
