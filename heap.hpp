@@ -18,7 +18,7 @@ private:
     // Takes in as an input the XOR shares of the index at which
     // the heap property has to be restored
     // Returns the XOR shares of the index of the smaller child
-    RegXS restore_heap_property(MPCIO &mpcio, MPCTIO &tio, yield_t & yield, RegXS index);
+    RegXS restore_heap_property(MPCTIO &tio, yield_t & yield, RegXS index);
 
     // Optimized restore heap property at a secret shared index
     // Takes in as an input the XOR shares of the index at which
@@ -41,7 +41,7 @@ public:
     // and restores the heap property
     // and takes in a boolean parameter to decide if the basic or the optimized version needs to be run
     // return value is the share of the minimum value (the root)
-    RegAS extract_min(MPCIO &mpcio, MPCTIO &tio, yield_t & yield, int is_optimized);
+    RegAS extract_min(MPCTIO &tio, yield_t & yield, int is_optimized = 1);
 
     // Intializes the heap array with 0x7fffffffffffff
     void init(MPCTIO &tio, yield_t & yield);

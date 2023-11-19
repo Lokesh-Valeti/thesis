@@ -321,7 +321,7 @@ The total cost of the protocol includes:
 - 2 flag-word multiplications (performed in parallel).
 - 3 DORAM updates (performed in parallel).
 */
-RegXS MinHeap::restore_heap_property(MPCIO & mpcio, MPCTIO &tio, yield_t & yield, RegXS index) {
+RegXS MinHeap::restore_heap_property(MPCTIO &tio, yield_t & yield, RegXS index) {
     RegAS smallest;
     auto HeapArray = oram.flat(tio, yield);
     RegXS leftchildindex = index;
@@ -510,7 +510,6 @@ void MinHeap::init(MPCTIO &tio, yield_t & yield, size_t n) {
     });
 }
 
-
 // Note: This function is intended for debugging purposes only.
 // The purpose of this function is to reconstruct the heap and print its contents.
 // The function performs the necessary operations to reconstruct the heap, ensuring that the heap property is satisfied. It then prints the contents of the reconstructed heap.
@@ -653,7 +652,7 @@ std::pair<RegXS, RegBS> MinHeap::restore_heap_property_at_explicit_index(MPCTIO 
 // The choice of whether to use restore_heap_property or restore_heap_property_optimized
 // depends on whether it is a basic or optimized extraction of the minimum element.
 // These functions ensure that the heap property is maintained throughout the tree.
-RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO &tio, yield_t & yield, int is_optimized) {
+RegAS MinHeap::extract_min(MPCTIO &tio, yield_t & yield, int is_optimized) {
 
     size_t height = std::log2(num_items);
     RegAS minval;
@@ -680,7 +679,7 @@ RegAS MinHeap::extract_min(MPCIO & mpcio, MPCTIO &tio, yield_t & yield, int is_o
 
     if(is_optimized == 0) {
         for (size_t i = 0; i < height - 1; ++i) {
-            smaller = restore_heap_property(mpcio, tio, yield, smaller);
+            smaller = restore_heap_property(tio, yield, smaller);
         }
     }
 
@@ -771,7 +770,7 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         for (size_t j = 0; j < n_extracts; ++j) {
 
             if(run_sanity == 1) {
-                RegAS minval = tree.extract_min(mpcio, tio, yield, is_optimized);
+                RegAS minval = tree.extract_min(tio, yield, is_optimized);
                 uint64_t minval_reconstruction = mpc_reconstruct(tio, yield, minval);
                 std::cout << "minval_reconstruction = " << minval_reconstruction << std::endl;
                 if (have_lastextract) {
@@ -780,7 +779,7 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
                 lastextract = minval_reconstruction;
                 have_lastextract = true;
             } else {
-                tree.extract_min(mpcio, tio, yield, is_optimized);
+                tree.extract_min(tio, yield, is_optimized);
             }
 
             if (run_sanity == 1) {
