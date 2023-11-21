@@ -10,6 +10,7 @@
 #include "shapes.hpp"
 #include "bst.hpp"
 #include "avl.hpp"
+#include "heapsampler.hpp"
 
 static void online_test(MPCIO &mpcio,
     const PRACOptions &opts, char **args)
@@ -1691,6 +1692,12 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "heap")) {
         ++args;
         Heap(mpcio, opts, args);
+    } else if (!strcmp(*args, "heapsampler")) {
+        ++args;
+        heapsampler_test(mpcio, opts, args);
+    } else if (!strcmp(*args, "weightedcoin")) {
+        ++args;
+        weighted_coin_test(mpcio, opts, args);
     } else {
         std::cerr << "Unknown mode " << *args << "\n";
     }

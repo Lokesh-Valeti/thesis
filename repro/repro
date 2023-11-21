@@ -280,6 +280,54 @@ if [ "$whichexps" = "tab4" -o "$whichexps" = "all" ]; then
     done
 fi
 
+if [ "$whichexps" = "heapsampler" -o "$whichexps" = "all" ]; then
+    echo "Running heap sampler experiments..."
+    for iter in $(seq 1 $numiters); do
+        # Table 4
+        logname='heapsampler'
+        run -p m:1033 h:7497 a:3 s:118 r1:1 r2:6 r3:57 i1:6 i2:57 i1.3:2 i2.3:4 i3.3:57 c:610
+        run heapsampler 64 10
+        run -p m:2121 h:15561 a:6 s:246 r1:1 r2:6 r3:121 i1:6 i2:121 i1.3:2 i2.3:4 i3.3:121 c:1250
+        run heapsampler 128 10
+        run -p m:4297 h:31689 a:12 s:502 r1:1 r2:6 r3:249 i1:6 i2:249 i1.3:2 i2.3:4 i3.3:249 c:2530
+        run heapsampler 256 10
+        run -p m:8649 h:63945 a:24 s:1014 r1:1 r2:6 r3:505 i1:6 i2:505 i1.3:2 i2.3:4 i3.3:505 c:5090
+        run heapsampler 512 10
+        run -p m:17353 h:128457 a:48 s:2038 r1:1 r2:6 r3:1017 i1:6 i2:1017 i1.3:2 i2.3:4 i3.3:1017 c:10210
+        run heapsampler 1024 10
+        run -p m:34761 h:257481 a:96 s:4086 r1:1 r2:6 r3:2041 i1:6 i2:2041 i1.3:2 i2.3:4 i3.3:2041 c:20450
+        run heapsampler 2048 10
+        run -p m:1278 h:6237 a:4 s:167 r1:1 r2:6 r3:57 i1:6 i2:57 i1.3:2 i2.3:4 i3.3:8 i4.3:49 c:708
+        run heapsampler 64 30
+        run -p m:2686 h:14301 a:8 s:359 r1:1 r2:6 r3:121 i1:6 i2:121 i1.3:2 i2.3:4 i3.3:8 i4.3:113 c:1476
+        run heapsampler 128 30
+        run -p m:5502 h:30429 a:16 s:743 r1:1 r2:6 r3:249 i1:6 i2:249 i1.3:2 i2.3:4 i3.3:8 i4.3:241 c:3012
+        run heapsampler 256 30
+        run -p m:11134 h:62685 a:32 s:1511 r1:1 r2:6 r3:505 i1:6 i2:505 i1.3:2 i2.3:4 i3.3:8 i4.3:497 c:6084
+        run heapsampler 512 30
+        run -p m:22398 h:127197 a:64 s:3047 r1:1 r2:6 r3:1017 i1:6 i2:1017 i1.3:2 i2.3:4 i3.3:8 i4.3:1009 c:12228
+        run heapsampler 1024 30
+        run -p m:44926 h:256221 a:128 s:6119 r1:1 r2:6 r3:2041 i1:6 i2:2041 i1.3:2 i2.3:4 i3.3:8 i4.3:2033 c:24516
+        run heapsampler 2048 30
+        run -p m:3496 h:9891 a:11 s:521 r1:1 r2:6 r3:121 i1:6 i2:121 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:65 c:1800
+        run heapsampler 128 100
+        run -p m:7592 h:26019 a:23 s:1161 r1:1 r2:6 r3:249 i1:6 i2:249 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:193 c:3848
+        run heapsampler 256 100
+        run -p m:15784 h:58275 a:47 s:2441 r1:1 r2:6 r3:505 i1:6 i2:505 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:449 c:7944
+        run heapsampler 512 100
+        run -p m:32168 h:122787 a:95 s:5001 r1:1 r2:6 r3:1017 i1:6 i2:1017 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:961 c:16136
+        run heapsampler 1024 100
+        run -p m:64936 h:251811 a:191 s:10121 r1:1 r2:6 r3:2041 i1:6 i2:2041 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:1985 c:32520
+        run heapsampler 2048 100
+        run -p m:18994 h:45675 a:57 s:3083 r1:1 r2:6 r3:120 r4:385 i1:6 i2:120 i3:385 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:64 i7.3:128 i8.3:257 c:9613
+        run heapsampler 512 300
+        run -p m:40498 h:110187 a:121 s:6667 r1:1 r2:6 r3:120 r4:897 i1:6 i2:120 i3:897 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:64 i7.3:128 i8.3:769 c:20365
+        run heapsampler 1024 300
+        run -p m:83506 h:239211 a:249 s:13835 r1:1 r2:6 r3:120 r4:1921 i1:6 i2:120 i3:1921 i1.3:2 i2.3:4 i3.3:8 i4.3:16 i5.3:32 i6.3:64 i7.3:128 i8.3:1793 c:41869
+        run heapsampler 2048 300
+    done
+fi
+
 now=`date`
 echo "$now: Experiments complete"
 
@@ -408,6 +456,9 @@ echo
 egrep 'OptPRACPreprc avlDel [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
 echo
 egrep 'OptPRACOnln avlDel [0-9]+ 1 .* KiB$' data/prac.dat | sort -k3 -n
+echo
+echo '# Heap Sampler'
+egrep 'PRACTotl heapsampler [0-9]+ [0-9]+ .* s' data/prac.dat | sort -k3,3n -k4,4n
 echo
 echo "# End figures"
 

@@ -46,6 +46,8 @@ while(<>) {
             &parse_read($cmdline);
         } elsif ($cmdline =~ /^-- b?bsearch/) {
             &parse_bsearch($cmdline);
+        } elsif ($cmdline =~ /^-- heapsampler/) {
+            &parse_heapsampler($cmdline);
         } elsif ($cmdline =~ /^-- heap/) {
             &parse_heap($cmdline);
         } elsif ($cmdline =~ /^-- avl/) {
@@ -197,7 +199,9 @@ sub parse_read {
             next;
         }
         last if /===== End/;
-        # The log was malformed
+        # Try to recover from a malformed log
+        last if /^Max MB:/;
+        # It was too malformed
         die "Malformed log" if /===== Running/;
         if (/^(\d+) message bytes sent/) {
             $online_kib[$who] = $1 / 1024;
@@ -261,7 +265,9 @@ sub parse_bsearch {
             next;
         }
         last if /===== End/;
-        # The log was malformed
+        # Try to recover from a malformed log
+        last if /^Max MB:/;
+        # It was too malformed
         die "Malformed log" if /===== Running/;
         if ($section eq "BINARY SEARCH") {
             if (/^(\d+) message bytes sent/) {
@@ -335,7 +341,9 @@ sub parse_heap {
             next;
         }
         last if /===== End/;
-        # The log was malformed
+        # Try to recover from a malformed log
+        last if /^Max MB:/;
+        # It was too malformed
         die "Malformed log" if /===== Running/;
         my $rightsection = 0;
         if ($section eq "Insert" && $oper eq "Ins") {
@@ -417,7 +425,9 @@ sub parse_avl {
             next;
         }
         last if /===== End/;
-        # The log was malformed
+        # Try to recover from a malformed log
+        last if /^Max MB:/;
+        # It was too malformed
         die "Malformed log" if /===== Running/;
         my $rightsection = 0;
         if ($section eq "INSERTS" && $oper eq "Ins") {
@@ -450,6 +460,71 @@ sub parse_avl {
         }
     }
     my $label = "${optimized}PRAC avl$oper $netsetup$size $num";
+    &accum_data(\%preproc_s_data, $label, &maxarray(@preproc_seconds));
+    &accum_data(\%preproc_kib_data, $label, &avgarray(@preproc_kib));
+    &accum_data(\%preproc_latencies_data, $label, &maxarray(@preproc_latencies));
+    &accum_data(\%preproc_P0mem_mib_data, $label, $preproc_mem_mib[0]);
+    &accum_data(\%preproc_P1mem_mib_data, $label, $preproc_mem_mib[1]);
+    &accum_data(\%preproc_P2mem_mib_data, $label, $preproc_mem_mib[2]);
+    &accum_data(\%online_s_data, $label, &maxarray(@online_seconds));
+    &accum_data(\%online_kib_data, $label, &avgarray(@online_kib));
+    &accum_data(\%online_latencies_data, $label, &maxarray(@online_latencies));
+    &accum_data(\%online_P0mem_mib_data, $label, $online_mem_mib[0]);
+    &accum_data(\%online_P1mem_mib_data, $label, $online_mem_mib[1]);
+    &accum_data(\%online_P2mem_mib_data, $label, $online_mem_mib[2]);
+}
+
+sub parse_heapsampler {
+    my $cmdline = $_[0];
+    my $who = 0;
+    my $section = '';
+    my @online_seconds = (0, 0, 0);
+    my @online_kib = (0, 0, 0);
+    my @online_latencies = (0, 0, 0);
+    my @online_mem_mib = (0, 0, 0);
+
+    unless ($cmdline =~ /heapsampler (\d+) (\d+)/) {
+        die "Cannot parse heapsampler cmdline: $cmdline";
+    }
+    my ($num, $size) = ($1, $2);
+    while(<>) {
+        if (/===== P([012]) output/) {
+            $who = $1;
+            next;
+        }
+        if (/===== ([A-Z ]+) =====/) {
+            $section = $1;
+            next;
+        }
+        last if /===== End/;
+        # Try to recover from a malformed log
+        last if /^Max MB:/;
+        # It was too malformed
+        die "Malformed log" if /===== Running/;
+        if ($section eq "STREAMING") {
+            if (/^(\d+) message bytes sent/) {
+                $online_kib[$who] = $1 / 1024;
+            } elsif (/^(\d+) Lamport clock/) {
+                $online_latencies[$who] = $1;
+            } elsif (/^(\d+) milliseconds wall clock/) {
+                $online_seconds[$who] = $1 / 1000;
+            } elsif (/^Mem: (\d+) KiB/) {
+                $online_mem_mib[$who] = $1 / 1024;
+            }
+        }
+        if ($who == 0 && /^Precomputed values used: (.*)/) {
+            my %used_resources = ();
+            &parse_resources(\%used_resources, $1);
+            my $preproc_resources_str = &serialize_resources(\%preproc_resources);
+            my $used_resources_str = &serialize_resources(\%used_resources);
+            if ($preproc_resources_str ne $used_resources_str) {
+                warn "Resource usage does not match preprocessing:\n" .
+                    "Preproc: $preproc_resources_str\n" .
+                    "Used: $used_resources_str\n ";
+            }
+        }
+    }
+    my $label = "PRAC heapsampler $netsetup$size $num";
     &accum_data(\%preproc_s_data, $label, &maxarray(@preproc_seconds));
     &accum_data(\%preproc_kib_data, $label, &avgarray(@preproc_kib));
     &accum_data(\%preproc_latencies_data, $label, &maxarray(@preproc_latencies));
