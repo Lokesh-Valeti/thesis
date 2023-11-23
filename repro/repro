@@ -59,7 +59,7 @@ elif [ "$PRAC_P02_MAXGB" != "" ]; then
     # P0 and P2 share a NUMA memory pool, P1 gets its own
     max_preproc_p0_mb=$((PRAC_P02_MAXGB*990-5))
     max_mb=$((PRAC_P02_MAXGB*1990))
-elif [ "$PRAC_MAXGB" -gt 16 ]; then
+elif [[ "$PRAC_MAXGB" != "" && "$PRAC_MAXGB" -gt 16 ]]; then
     # All parties share one memory pool
     max_preproc_p0_mb=$((PRAC_MAXGB*497-5))
     max_mb=$((PRAC_MAXGB*1000))
@@ -80,7 +80,11 @@ run() {
     logfile="prac_${logname}.out${LOGSUFFIX}"
     mkdir -p data
     echo "Max MB: $max_mb" >> data/$logfile
-    ../docker/run-experiment $* >> data/$logfile
+    if [ "$PRAC_USE_SSH" = "1" ]; then
+        ../docker/run-experiment-ssh $* >> data/$logfile
+    else
+        ../docker/run-experiment $* >> data/$logfile
+    fi
 }
 
 # Run preprocessing, being careful to not exceed available memory. We
@@ -154,7 +158,8 @@ parse() {
 if [ "$whichexps" = "test" ]; then
     echo "Running test experiment..."
     logname='test'
-    run -o read 16 1
+    run -p r16:1
+    run read 16 1
     echo
     echo "# Test output"
     echo
