@@ -13,7 +13,7 @@
 
 # PRAC_SSH_P1_USERHOST: the user@host to ssh to for P1
 # PRAC_SSH_P1_SSHOPTS: any options to ssh you need to ssh to P1
-# PRAC_SSH_P1_IP: the IP address P0 can listen for connections on (P1
+# PRAC_SSH_P1_IP: the IP address P1 can listen for connections on (P1
 #     listens on port 2117)
 # PRAC_SSH_P1_DIR: the directory relative to the homedir where the prac
 #     repo is checked out and built
