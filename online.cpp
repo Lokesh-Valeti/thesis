@@ -1349,6 +1349,12 @@ static void bsearch_test(MPCIO &mpcio,
             }
         }
 
+        // Don't spend time reconstructing the database to check the
+        // answer if the database is huge
+        if (depth > 25) {
+            return;
+        }
+
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
 
