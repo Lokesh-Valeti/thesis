@@ -214,11 +214,11 @@ if [ "$whichexps" = "fig7" -o "$whichexps" = "all" ]; then
         done
         # Figure 7(b,c)
         logname='fig7bc'
-        for size in 16 18 20 22 24 26 28; do
+        for size in 16 18 20 22 24 26 28 30; do
             preproc "c:${size}" 1 i$((size-1)) 1 ${iMB[$((size-1))]}
             run bsearch $size 1
         done
-        for size in 16 18 20 22 24 26 28; do
+        for size in 16 18 20 22 24 26 28 30; do
             preproc "m:${size} c:${size}" 1 r${size} ${size} ${rMB[$size]}
             run bbsearch $size 1
         done
