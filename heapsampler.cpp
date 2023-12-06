@@ -135,7 +135,7 @@ void heapsampler_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&mpcio, &tio, n, k] (yield_t &yield) {
 
         std::cout << "\n===== STREAMING =====\n";
@@ -204,7 +204,7 @@ void weighted_coin_test(MPCIO &mpcio, const PRACOptions &opts, char **args)
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&mpcio, &tio, iters, m, k] (yield_t &yield) {
 
         size_t heads = 0, tails = 0;

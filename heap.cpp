@@ -698,7 +698,7 @@ RegAS MinHeap::extract_min(MPCTIO &tio, yield_t & yield, int is_optimized) {
 void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
 
     int nargs = 0;
 

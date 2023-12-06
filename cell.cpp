@@ -26,7 +26,7 @@ void cell(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&tio, depth] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         Duoram<Cell> oram(tio.player(), size);

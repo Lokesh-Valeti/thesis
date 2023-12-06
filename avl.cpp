@@ -1813,7 +1813,7 @@ void avl(MPCIO &mpcio,
     size_t init_size = (size_t(1)<<(depth));
     size_t oram_size = init_size + n_inserts;
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&tio, &mpcio, depth, oram_size, init_size, n_inserts, n_deletes, run_sanity, optimized] (yield_t &yield) {
         //printf("ORAM init_size = %ld, oram_size = %ld\n", init_size, oram_size);
         std::cout << "\n===== SETUP =====\n";
@@ -1891,7 +1891,7 @@ void avl_tests(MPCIO &mpcio,
     nbits_t depth=4;
     size_t items = (size_t(1)<<depth)-1;
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&tio, depth, items] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         bool player0 = tio.player()==0;

@@ -188,7 +188,7 @@ static void lamport_test(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_comm_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, niters, chunksize, numchunks] {
@@ -226,7 +226,7 @@ static void rdpf_test(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&tio, depth, num_iters, incremental] (yield_t &yield) {
         size_t &aes_ops = tio.aes_ops();
         nbits_t min_level = incremental ? 1 : depth;
@@ -341,7 +341,7 @@ static void rdpf_timing(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_comm_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, depth] {
@@ -385,10 +385,11 @@ static void rdpf_timing(MPCIO &mpcio,
     pool.join();
 }
 
-static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
+static value_t parallel_streameval_rdpf(MPCTIO &tio, const RDPF<1> &dpf,
     address_t start, int num_threads)
 {
     RDPF<1>::RegXSW scaled_xor[num_threads];
+    size_t aes_ops[num_threads];
     boost::asio::thread_pool pool(num_threads);
     address_t totsize = (address_t(1)<<dpf.depth());
     address_t threadstart = start;
@@ -397,8 +398,7 @@ static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         address_t threadsize = threadchunk + (address_t(thread_num) < threadextra);
         boost::asio::post(pool,
-            [&mpcio, &dpf, &scaled_xor, thread_num, threadstart, threadsize] {
-                MPCTIO tio(mpcio, thread_num);
+            [&tio, &dpf, &scaled_xor, &aes_ops, thread_num, threadstart, threadsize] {
 //printf("Thread %d from %X for %X\n", thread_num, threadstart, threadsize);
                 RDPF<1>::RegXSW local_xor;
                 size_t local_aes_ops = 0;
@@ -409,7 +409,7 @@ static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
                     local_xor ^= dpf.scaled_xs(leaf);
                 }
                 scaled_xor[thread_num] = local_xor;
-                tio.aes_ops() += local_aes_ops;
+                aes_ops[thread_num] = local_aes_ops;
 //printf("Thread %d complete\n", thread_num);
             });
         threadstart = (threadstart + threadsize) % totsize;
@@ -418,6 +418,7 @@ static value_t parallel_streameval_rdpf(MPCIO &mpcio, const RDPF<1> &dpf,
     RDPF<1>::RegXSW res;
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         res ^= scaled_xor[thread_num];
+        tio.aes_ops() += aes_ops[thread_num];
     }
     return res[0].xshare;
 }
@@ -437,15 +438,15 @@ static void rdpfeval_timing(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_cpu_threads;
     MPCTIO tio(mpcio, 0, num_threads);
-    run_coroutines(tio, [&mpcio, &tio, depth, start, num_threads] (yield_t &yield) {
+    run_coroutines(tio, [&tio, depth, start, num_threads] (yield_t &yield) {
         if (tio.player() == 2) {
             RDPFPair<1> dp = tio.rdpfpair(yield, depth);
             for (int i=0;i<2;++i) {
                 RDPF<1> &dpf = dp.dpf[i];
                 value_t scaled_xor =
-                    parallel_streameval_rdpf(mpcio, dpf, start, num_threads);
+                    parallel_streameval_rdpf(tio, dpf, start, num_threads);
                 printf("%016lx\n%016lx\n", scaled_xor,
                     dpf.li[0].scaled_xor[0].xshare);
                 printf("\n");
@@ -455,7 +456,7 @@ static void rdpfeval_timing(MPCIO &mpcio,
             for (int i=0;i<3;++i) {
                 RDPF<1> &dpf = dt.dpf[i];
                 value_t scaled_xor =
-                    parallel_streameval_rdpf(mpcio, dpf, start, num_threads);
+                    parallel_streameval_rdpf(tio, dpf, start, num_threads);
                 printf("%016lx\n%016lx\n", scaled_xor,
                     dpf.li[0].scaled_xor[0].xshare);
                 printf("\n");
@@ -479,7 +480,7 @@ static void par_rdpfeval_timing(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_cpu_threads;
     MPCTIO tio(mpcio, 0, num_threads);
     run_coroutines(tio, [&tio, depth, start, num_threads] (yield_t &yield) {
         if (tio.player() == 2) {
@@ -533,7 +534,7 @@ static void tupleeval_timing(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_cpu_threads;
     MPCTIO tio(mpcio, 0, num_threads);
     run_coroutines(tio, [&tio, depth, start] (yield_t &yield) {
         size_t &aes_ops = tio.aes_ops();
@@ -595,7 +596,7 @@ static void par_tupleeval_timing(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_cpu_threads;
     MPCTIO tio(mpcio, 0, num_threads);
     run_coroutines(tio, [&tio, depth, start, num_threads] (yield_t &yield) {
         size_t &aes_ops = tio.aes_ops();
@@ -663,7 +664,7 @@ static void duoram_test(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&tio, depth, share, len] (yield_t &yield) {
         // size_t &aes_ops = tio.aes_ops();
         Duoram<T> oram(tio.player(), len);
@@ -781,7 +782,7 @@ static void duoram(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&mpcio, &tio, depth, items] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         address_t mask = (depth < ADDRESS_MAX_BITS ?
@@ -912,7 +913,7 @@ static void read_test(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&mpcio, &tio, depth, items] (yield_t &yield) {
         size_t size = size_t(1)<<depth;
         Duoram<T> oram(tio.player(), size);
@@ -951,7 +952,7 @@ static void cdpf_test(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_comm_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, query, target, iters] {
@@ -1087,7 +1088,7 @@ static void compare_test(MPCIO &mpcio,
         ++args;
     }
 
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_comm_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, thread_num, target, x] {
@@ -1135,7 +1136,7 @@ static void sort_test(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&tio, depth, len] (yield_t &yield) {
         address_t size = address_t(1)<<depth;
         // size_t &aes_ops = tio.aes_ops();
@@ -1194,7 +1195,7 @@ static void pad_test(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&mpcio, &tio, depth, len] (yield_t &yield) {
         int player = tio.player();
         Duoram<RegAS> oram(player, len);
@@ -1282,7 +1283,7 @@ static void bsearch_test(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&tio, &mpcio, depth, len, iters, target, is_presorted] (yield_t &yield) {
         RegAS tshare;
         std::cout << "\n===== SETUP =====\n";
@@ -1425,7 +1426,7 @@ static void related(MPCIO &mpcio,
     }
     assert(layer < depth);
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&mpcio, &tio, depth, layer] (yield_t &yield) {
         size_t size = size_t(1)<<(depth+1);
         Duoram<T> oram(tio.player(), size);
@@ -1524,7 +1525,7 @@ static void path(MPCIO &mpcio,
         ++args;
     }
 
-    MPCTIO tio(mpcio, 0, opts.num_threads);
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
     run_coroutines(tio, [&mpcio, &tio, depth, target_node] (yield_t &yield) {
         size_t size = size_t(1)<<(depth+1);
         Duoram<T> oram(tio.player(), size);

@@ -8,11 +8,12 @@
 
 static void usage(const char *progname)
 {
-    std::cerr << "Usage: " << progname << " [-p | -a | -o] [-t num] [-e] [-x] player_num player_addrs args ...\n";
+    std::cerr << "Usage: " << progname << " [-p | -a | -o] [-C num] [-t num] [-e] [-x] player_num player_addrs args ...\n";
     std::cerr << "-p: preprocessing mode\n";
     std::cerr << "-a: append to files in preprocessing mode (implies -p)\n";
     std::cerr << "-o: online-only mode\n";
-    std::cerr << "-t num: use num threads\n";
+    std::cerr << "-C num: use num communication threads\n";
+    std::cerr << "-t num: use num CPU threads per communication thread\n";
     std::cerr << "-e: store DPFs expanded (default is compressed)\n";
     std::cerr << "-x: use XOR-shared database (default is additive)\n";
     std::cerr << "player_num = 0 or 1 for the computational players\n";
@@ -29,7 +30,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
 {
     std::deque<tcp::socket> peersocks, serversocks;
     mpcio_setup_computational(player, io_context, p0addr,
-        opts.num_threads, peersocks, serversocks);
+        opts.num_comm_threads, peersocks, serversocks);
     MPCPeerIO mpcio(player, opts.mode, peersocks, serversocks);
 
     // Queue up the work to be done
@@ -55,7 +56,7 @@ static void server_player_main(boost::asio::io_context &io_context,
 {
     std::deque<tcp::socket> p0socks, p1socks;
     mpcio_setup_server(io_context, p0addr, p1addr,
-        opts.num_threads, p0socks, p1socks);
+        opts.num_comm_threads, p0socks, p1socks);
     MPCServerIO mpcserverio(opts.mode, p0socks, p1socks);
 
     // Queue up the work to be done
@@ -94,10 +95,20 @@ int main(int argc, char **argv)
         } else if (!strcmp("-o", *args)) {
             opts.mode = MODE_ONLINEONLY;
             ++args;
+        } else if (!strcmp("-C", *args)) {
+            if (args[1]) {
+                opts.num_comm_threads = atoi(args[1]);
+                if (opts.num_comm_threads < 1) {
+                    usage(argv[0]);
+                }
+                args += 2;
+            } else {
+                usage(argv[0]);
+            }
         } else if (!strcmp("-t", *args)) {
             if (args[1]) {
-                opts.num_threads = atoi(args[1]);
-                if (opts.num_threads < 1) {
+                opts.num_cpu_threads = atoi(args[1]);
+                if (opts.num_cpu_threads < 1) {
                     usage(argv[0]);
                 }
                 args += 2;

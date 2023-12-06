@@ -74,7 +74,6 @@ void Openfiles::closeall()
 //   0x82: AND triple
 //   0x83: Select triple
 //   0x8e: Counter (for testing)
-//   0x8f: Set number of CPU threads for this communication thread
 //   0x00: End of preprocessing
 //
 // One byte: subtype (not sent for type == 0x00)
@@ -90,11 +89,11 @@ void Openfiles::closeall()
 
 void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_comm_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcio, &opts, thread_num] {
-            MPCTIO tio(mpcio, thread_num);
+            MPCTIO tio(mpcio, thread_num, opts.num_cpu_threads);
             Openfiles ofiles(opts.append_to_files);
             std::vector<coro_t> coroutines;
             while(1) {
@@ -249,8 +248,6 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
                                 }
                             }
                         });
-                } else if (type == 0x8f) {
-                    tio.cpu_nthreads(num);
                 }
             }
             run_coroutines(tio, coroutines);
@@ -262,12 +259,12 @@ void preprocessing_comp(MPCIO &mpcio, const PRACOptions &opts, char **args)
 
 void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char **args)
 {
-    int num_threads = opts.num_threads;
+    int num_threads = opts.num_comm_threads;
     boost::asio::thread_pool pool(num_threads);
     for (int thread_num = 0; thread_num < num_threads; ++thread_num) {
         boost::asio::post(pool, [&mpcsrvio, &opts, thread_num, args] {
             char **threadargs = args;
-            MPCTIO stio(mpcsrvio, thread_num);
+            MPCTIO stio(mpcsrvio, thread_num, opts.num_cpu_threads);
             Openfiles ofiles(opts.append_to_files);
             std::vector<coro_t> coroutines;
             if (*threadargs && threadargs[0][0] == 'T') {
@@ -505,17 +502,6 @@ void preprocessing_server(MPCServerIO &mpcsrvio, const PRACOptions &opts, char *
                             }
                         });
 
-                } else if (!strcmp(type, "p")) {
-                    unsigned char typetag = 0x8f;
-                    unsigned char subtypetag = 0x00;
-                    stio.queue_p0(&typetag, 1);
-                    stio.queue_p0(&subtypetag, 1);
-                    stio.queue_p0(&num, 4);
-                    stio.queue_p1(&typetag, 1);
-                    stio.queue_p1(&subtypetag, 1);
-                    stio.queue_p1(&num, 4);
-
-                    stio.cpu_nthreads(num);
 		}
                 free(arg);
                 ++threadargs;
