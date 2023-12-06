@@ -6,4 +6,4 @@ if [[ $BASH_SOURCE = */* ]]; then
 fi
 
 cd ..
-docker build $* -t prac -f docker/Dockerfile .
+docker build $* -t ${PRAC_DOCKER_PREFIX}prac -f docker/Dockerfile .

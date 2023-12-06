@@ -15,6 +15,6 @@ if [ "$2" != "" ]; then
     bw="$2"
 fi
 ./unset-networking
-docker exec --privileged prac_p0 tc qdisc add dev eth0 root netem delay $latency rate $bw
-docker exec --privileged prac_p1 tc qdisc add dev eth0 root netem delay $latency rate $bw
-docker exec --privileged prac_p2 tc qdisc add dev eth0 root netem delay $latency rate $bw
+docker exec --privileged ${PRAC_DOCKER_PREFIX}prac_p0 tc qdisc add dev eth0 root netem delay $latency rate $bw
+docker exec --privileged ${PRAC_DOCKER_PREFIX}prac_p1 tc qdisc add dev eth0 root netem delay $latency rate $bw
+docker exec --privileged ${PRAC_DOCKER_PREFIX}prac_p2 tc qdisc add dev eth0 root netem delay $latency rate $bw

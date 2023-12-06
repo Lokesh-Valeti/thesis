@@ -52,28 +52,9 @@ if [ "$whichexps" != "none" ]; then
     ncores_p2=`ssh -n $PRAC_SSH_P2_SSHOPTS $PRAC_SSH_P2_USERHOST $PRAC_NUMA_P2 nproc 2>/dev/null`
 fi
 
-if [ $ncores_p0 != $ncores_p1 -o $ncores_p1 != $ncores_p2 ]; then
-    echo "Error: all players must have the same number of cores available to use." >&2
-    echo "Use PRAC_NUMA_P[012] to set that if needed." >&2
-    exit 1
-fi
-
-ptarg_p0=""
-ptarg_p1=""
-ptarg_p2=""
-targ_p0=""
-targ_p1=""
-targ_p2=""
-
-if [ "$preproc" = 1 ]; then
-    ptarg_p0="p:${ncores_p0}"
-    ptarg_p1="p:${ncores_p1}"
-    ptarg_p2="p:${ncores_p2}"
-else
-    targ_p0="-t ${ncores_p0}"
-    targ_p1="-t ${ncores_p1}"
-    targ_p2="-t ${ncores_p2}"
-fi
+targ_p0="-t ${ncores_p0}"
+targ_p1="-t ${ncores_p1}"
+targ_p2="-t ${ncores_p2}"
 
 echo ===== Running prac $opts -- $*
 date "+===== Start %s %F %T"
@@ -82,9 +63,9 @@ date "+===== Start %s %F %T"
 savefile0=$$.p0.out
 savefile1=$$.p1.out
 savefile2=$$.p2.out
-ssh -n $PRAC_SSH_P0_SSHOPTS $PRAC_SSH_P0_USERHOST "cd $PRAC_SSH_P0_DIR && $PRAC_NUMA_P0 stdbuf -o 0 ./prac $opts $targ_p0 0 $* $ptarg_p0 > $savefile0 2>&1" &
-ssh -n $PRAC_SSH_P1_SSHOPTS $PRAC_SSH_P1_USERHOST "cd $PRAC_SSH_P1_DIR && $PRAC_NUMA_P1 stdbuf -o 0 ./prac $opts $targ_p1 1 $p0addr $* $ptarg_p1 > $savefile1 2>&1" &
-ssh -n $PRAC_SSH_P2_SSHOPTS $PRAC_SSH_P2_USERHOST "cd $PRAC_SSH_P2_DIR && $PRAC_NUMA_P2 stdbuf -o 0 ./prac $opts $targ_p2 2 $p0addr $p1addr $* $ptarg_p2 > $savefile2 2>&1" &
+ssh -n $PRAC_SSH_P0_SSHOPTS $PRAC_SSH_P0_USERHOST "cd $PRAC_SSH_P0_DIR && $PRAC_NUMA_P0 stdbuf -o 0 ./prac $opts $targ_p0 0 $* > $savefile0 2>&1" &
+ssh -n $PRAC_SSH_P1_SSHOPTS $PRAC_SSH_P1_USERHOST "cd $PRAC_SSH_P1_DIR && $PRAC_NUMA_P1 stdbuf -o 0 ./prac $opts $targ_p1 1 $p0addr $* > $savefile1 2>&1" &
+ssh -n $PRAC_SSH_P2_SSHOPTS $PRAC_SSH_P2_USERHOST "cd $PRAC_SSH_P2_DIR && $PRAC_NUMA_P2 stdbuf -o 0 ./prac $opts $targ_p2 2 $p0addr $p1addr $* > $savefile2 2>&1" &
 wait
 echo ===== P0 output
 ssh -n $PRAC_SSH_P0_SSHOPTS $PRAC_SSH_P0_USERHOST "cd $PRAC_SSH_P0_DIR && cat $savefile0 && rm -f $savefile0"

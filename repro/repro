@@ -149,7 +149,7 @@ parse() {
     if [ "$PRAC_PARSE_HOST" = "1" ]; then
         ./parse_logs $*
     else
-        cat $* | docker exec -w /root/prac/repro -i prac_p0 ./parse_logs
+        cat $* | docker exec -w /root/prac/repro -i ${PRAC_DOCKER_PREFIX}prac_p0 ./parse_logs
     fi
 }
 
