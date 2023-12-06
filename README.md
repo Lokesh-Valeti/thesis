@@ -1,6 +1,8 @@
 # PRAC: Private Random Access Computations
 
-Ian Goldberg, iang@uwaterloo.ca
+Ian Goldberg, iang@uwaterloo.ca  
+Sajin Sasy, ssasy@uwaterloo.ca  
+Adithya Vadapalli, avadapalli@cse.iitk.ac.in
 
 PRAC implements three-party secure computation, with a particular focus on computations that require random access to memory.  Parties 0 and 1 are the computational peers, while party 2 is the server.  The server aids the computation, but generally does much less than the two computational peers.
 
@@ -46,7 +48,8 @@ For preprocessing mode:
   - <code>_opts_</code> should be `-p` to indicate preprocessing mode
   - You can also add `-a` to indicate that the resources being computed should be _appended_ to existing resource files, rather than replacing them.  This is useful if you want to create for example a large number of large DPFs.  Each DPF creation consumes a lot of memory, and all the DPFs are computed simultaneously in order to save network round trips.  To compute them in smaller batches if your memory is limited, run `./prac` several times, each with the `-a` option.
   - The `-e` option means to store precomputed DPFs in expanded form.  This can take a lot of disk space for large DPFs, and depending on your disk speed and CPU capabilities and number of local processing threads, it can actually be faster to recompute the expansion than to read it from disk.
-  - Use the <code>-t _num_</code> option to enable <code>_num_</code> _communication_ threads during preprocessing mode.  As above, this is probably not what you want.
+  - Use the <code>-C _num_</code> option to enable <code>_num_</code> _communication_ threads.  As above, this is probably not what you want.
+  - Use the <code>-t _num_</code> option to enable <code>_num_</code> local processing threads.
 
 Then the <code>_args_</code> specify what resources to compute.  You actually only need to provide the args to player 2 (the server) in preprocessing mode; it will inform the other players what is being computed.  The other players will ignore their arguments in preprocessing mode.
 
@@ -57,17 +60,17 @@ The args in preprocessing mode are each of the form <code>_type_:_num_</code> to
   - `a`: an AND triple
   - `s`: a select triple
   - <code>r*d*</code>: A DPF of depth <code>_d_</code> for random accesses to memory (RDPF).  A DPF of depth _d_ can be used to process 2<sup>_d_</sup> memory locations.
+    Can optionally take a suffix <code>.*w*</code> (for example, `r26.3`) where <code>*w*</code> is an integer between 1 and 5 to indicate the _width_ of the RDPF (the default is 1).
+  - <code>i*d*</code>: An Incremental DPF of depth <code>_d_</code> for random accesses to memory (IDPF).  Can take an optional width suffix as above.
   - `c`: a DPF for comparisons (CDPF)
 
-If you do have multiple communication threads, you can optionally specify different sets of resources to create in each one by prefixing communication thread _i_'s list with <code>T_i_</code> (_i_ starts at 0).  If the args do not start with such an indication, each communication thread will use a copy of the provided list.
-
-You can also include the pseudo-resource argument <code>p:_num_</code> to indicate that you want to use <code>_num_</code> local processing threads for this communication thread.
+If you do have multiple communication threads, you can optionally specify different sets of resources to create in each one by prefixing communication thread _i_'s list with <code>T*i*</code> (_i_ starts at 0).  If the args do not start with such an indication, each communication thread will use a copy of the provided list.
 
 Example:  In three terminals on the same host, run:
 
-  - `./prac -p 0`
-  - `./prac -p 1 localhost`
-  - `./prac -p 2 localhost localhost t:100 r6:10 r20:5 c:50 p:8`
+  - `./prac -t 8 -p 0`
+  - `./prac -t 8 -p 1 localhost`
+  - `./prac -t 8 -p 2 localhost localhost m:100 r6:10 r20:5 c:50`
 
 to create 100 multiplication triples, 10 RDPFs of depth 6, 5 RDPFs of depth 20, and 50 CDPFs, using 8 local processing threads.
 
@@ -75,12 +78,20 @@ For online mode:
 
 The useful options in online mode are:
 
-   - <code>-t _num_</code> in online mode specifies the number of threads to use. It is up to the particular computation being run to allocate them as communication or local processing threads.
+   - <code>-C _num_</code> specifies the number of communication threads to use.
+   - <code>-t _num_</code> specifies the number of processing threads to use.
    - `-x` indicates that you wish to use an XOR-shared memory instead of the default additive-shared memory.  Some computations can work with either type (and respect this option) while others cannot (and ignore this option).
 
-The args in online mode specify what computation to do.  These are currently mostly just unit tests.  The interesting one for now:
+The args in online mode specify what computation to do.  These are mostly unit tests and benchmarks.  The interesting ones for now:
 
   - <code>duoram _depth_ _items_</code>: in a memory of size 2<sup>_depth_</sup>, do _items_ dependent updates, _items_ dependent reads, _items_ independent reads, _items_ independent updates, _items_ dependent writes, and _items_ dependent interleaved reads and writes.  Each batch is timed and measured independently.
+  - <code>read _depth_ _items_</code>: similar, but only time dependent reads.
+  - <code>bbsearch [-r] _depth_ _iters_</code>: _iters_ iterations of basic binary search on an array of size 2<sup>_depth_</sup>-1.  The `-r` flag means to generate (and sort, so it's more expensive) a random array rather than using a pre-sorted array.
+  - <code>bsearch [-r] _depth_ _iters_</code>: as above, but for our optimized binary search rather than the basic one.
+  - <code>heap -m _maxsize_ -d _datasize_ -i _numinserts_ -e _numextracts_ -opt _optflag_ -s _sanityflag_</code>: the heap benchmark.  Allocate a heap of maximum size 2<sup>_maxsize_</sup>-1 elements, and initialize the first 2<sup>_datasize_</sup> elements of it.  Perform _numinserts_ insertions and _numextracts_ extractions.  Set _optflag_ to 1 to use the optimized heap algorithms, or 0 otherwise.  Set _sanityflag_ to 1 to check the results after each operation, or 0 otherwise.
+  - <code>avl -m _size_ -i _numinserts_ -e _numextracts_ -opt _optflag_ -s _sanityflag_</code>: the AVL benchmark.  Initialize an AVL tree with 2<sup>_size_</sup> elements. Insert _numinseerts_ more elements, and delete _numextracts_ elements.  Set _optflag_ to 1 to use the optimized AVL algorithms, or 0 otherwise.  Set _sanityflag_ to 1 to check the results after each operation, or 0 otherwise.
+  - <code>avl_tests</code>: unit tests for the AVL algorithms
+  - <code>heapsampler _n_ _k_</code>: the heap-based oblivious stream sampler benchmark.  Obliviously select a random subset of _k_ elements from a stream arriving one element at a time, using O(_k_) memory.  Stop after _n_ elements.
 
 It is vital that all three players are told the same computation to run!
 
@@ -88,9 +99,9 @@ The output of online mode (for each player) includes timings (real and CPU time)
 
 Example: In three terminals on the same host, run:
 
-  - `./prac -p 0`
-  - `./prac -p 1 localhost`
-  - `./prac -p 2 localhost localhost r20:90 p:8`
+  - `./prac -t 8 -p 0`
+  - `./prac -t 8 -p 1 localhost`
+  - `./prac -t 8 -p 2 localhost localhost r20:90`
 
 to complete the preprocessing required for the following computation,
 using 8 threads, and then:
@@ -99,8 +110,8 @@ using 8 threads, and then:
   - `./prac -t 8 1 localhost duoram 20 10`
   - `./prac -t 8 2 localhost localhost duoram 20 10`
 
-to do the online portion of the computation, also using 8 threads (which
-will be local processing threads for the duoram computation).
+to do the online portion of the computation, also using 8 local
+processing threads.
 
 For online-only mode:
 
@@ -146,7 +157,9 @@ Run experiments:
   - <code>./run-experiment _opts_ _args_</code>
     - opts and args are those of `./prac` above, *not including* the
       player number and other players' addresses, which are filled in
-      automatically.
+      automatically.  The number of processing threads for each player
+      is also automatically set to the number of cores available in the
+      given `PRAC_NUMA_P{0,1,2}` configuration.
 
 When you're all done:
 
