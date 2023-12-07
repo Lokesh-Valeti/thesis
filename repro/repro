@@ -11,10 +11,10 @@ if [[ $BASH_SOURCE = */* ]]; then
 fi
 
 # Allow running only subsets of the experiment suite.  Valid values are
-# "test", "all", "none".  ("none" is useful if you just want to re-parse
-# the output of existing logs.)  You can also say "single" followed by
-# all the arguments to "run" (below) to run a single experiment; for
-# example:
+# "test", "fig6", "fig7", "fig8", "fig9", "tab3", "tab4", "all", "none".
+# ("none" is useful if you just want to re-parse the output of existing
+# logs.)  You can also say "single" followed by all the arguments to
+# "run" (below) to run a single experiment; for example:
 # ./repro single read 20 1
 if [ "$1" = "" ]; then
     whichexps="test"
@@ -285,11 +285,11 @@ if [ "$whichexps" = "tab4" -o "$whichexps" = "all" ]; then
     done
 fi
 
-if [ "$whichexps" = "heapsampler" -o "$whichexps" = "all" ]; then
-    echo "Running heap sampler experiments..."
+if [ "$whichexps" = "fig9" -o "$whichexps" = "all" ]; then
+    echo "Running Figure 9 experiments..."
     for iter in $(seq 1 $numiters); do
         # Table 4
-        logname='heapsampler'
+        logname='fig9'
         run -p m:1033 h:7497 a:3 s:118 r1:1 r2:6 r3:57 i1:6 i2:57 i1.3:2 i2.3:4 i3.3:57 c:610
         run heapsampler 64 10
         run -p m:2121 h:15561 a:6 s:246 r1:1 r2:6 r3:121 i1:6 i2:121 i1.3:2 i2.3:4 i3.3:121 c:1250
