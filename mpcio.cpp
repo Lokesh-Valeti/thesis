@@ -983,6 +983,13 @@ void mpcio_setup_computational(unsigned player,
     } else {
         std::cerr << "Invalid player number passed to mpcio_setup_computational\n";
     }
+
+    // Read the start signal from P2
+    char ack[1];
+    boost::asio::read(serversocks[0], boost::asio::buffer(ack, 1));
+
+    // Send the start ack to P2
+    boost::asio::write(serversocks[0], boost::asio::buffer("", 1));
 }
 
 void mpcio_setup_server(boost::asio::io_context &io_context,
@@ -1025,4 +1032,13 @@ void mpcio_setup_server(boost::asio::io_context &io_context,
             boost::asio::buffer(&thread_num, sizeof(thread_num)));
         p1socks.push_back(std::move(p1sock));
     }
+
+    // Send the start signal to P0 and P1
+    boost::asio::write(p0socks[0], boost::asio::buffer("", 1));
+    boost::asio::write(p1socks[0], boost::asio::buffer("", 1));
+
+    // Read the start ack from P0 and P1
+    char ack[1];
+    boost::asio::read(p0socks[0], boost::asio::buffer(ack, 1));
+    boost::asio::read(p1socks[0], boost::asio::buffer(ack, 1));
 }
