@@ -149,7 +149,7 @@ sub parse_preproc {
             $preproc_kib[$who] += $1 / 1024;
         } elsif (/^(\d+) Lamport clock/) {
             $preproc_latencies[$who] += $1;
-        } elsif (/^(\d+) milliseconds wall clock/) {
+        } elsif (/^(\d+) milliseconds? wall clock/) {
             $preproc_seconds[$who] += $1 / 1000;
         } elsif (/^Mem: (\d+) KiB/) {
             $preproc_mem_mib[$who] += $1 / 1024;
@@ -207,7 +207,7 @@ sub parse_read {
             $online_kib[$who] = $1 / 1024;
         } elsif (/^(\d+) Lamport clock/) {
             $online_latencies[$who] = $1;
-        } elsif (/^(\d+) milliseconds wall clock/) {
+        } elsif (/^(\d+) milliseconds? wall clock/) {
             $online_seconds[$who] = $1 / 1000;
         } elsif (/^Mem: (\d+) KiB/) {
             $online_mem_mib[$who] = $1 / 1024;
@@ -274,7 +274,7 @@ sub parse_bsearch {
                 $online_kib[$who] = $1 / 1024;
             } elsif (/^(\d+) Lamport clock/) {
                 $online_latencies[$who] = $1;
-            } elsif (/^(\d+) milliseconds wall clock/) {
+            } elsif (/^(\d+) milliseconds? wall clock/) {
                 $online_seconds[$who] = $1 / 1000;
             } elsif (/^Mem: (\d+) KiB/) {
                 $online_mem_mib[$who] = $1 / 1024;
@@ -357,7 +357,7 @@ sub parse_heap {
                 $online_kib[$who] = $1 / 1024;
             } elsif (/^(\d+) Lamport clock/) {
                 $online_latencies[$who] = $1;
-            } elsif (/^(\d+) milliseconds wall clock/) {
+            } elsif (/^(\d+) milliseconds? wall clock/) {
                 $online_seconds[$who] = $1 / 1000;
             } elsif (/^Mem: (\d+) KiB/) {
                 $online_mem_mib[$who] = $1 / 1024;
@@ -441,7 +441,7 @@ sub parse_avl {
                 $online_kib[$who] = $1 / 1024;
             } elsif (/^(\d+) Lamport clock/) {
                 $online_latencies[$who] = $1;
-            } elsif (/^(\d+) milliseconds wall clock/) {
+            } elsif (/^(\d+) milliseconds? wall clock/) {
                 $online_seconds[$who] = $1 / 1000;
             } elsif (/^Mem: (\d+) KiB/) {
                 $online_mem_mib[$who] = $1 / 1024;
@@ -506,7 +506,7 @@ sub parse_heapsampler {
                 $online_kib[$who] = $1 / 1024;
             } elsif (/^(\d+) Lamport clock/) {
                 $online_latencies[$who] = $1;
-            } elsif (/^(\d+) milliseconds wall clock/) {
+            } elsif (/^(\d+) milliseconds? wall clock/) {
                 $online_seconds[$who] = $1 / 1000;
             } elsif (/^Mem: (\d+) KiB/) {
                 $online_mem_mib[$who] = $1 / 1024;
