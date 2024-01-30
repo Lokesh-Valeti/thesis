@@ -23,10 +23,6 @@
 # PRAC_SSH_P2_DIR: the directory relative to the homedir where the prac
 #     repo is checked out and built
 
-# In addition, all three players must have the same number of cores
-# available.  Use PRAC_NUMA_P[012] to set all the players to use the
-# same number of cores if needed.
-
 # Get the IP addresses
 p0addr=$PRAC_SSH_P0_IP
 p1addr=$PRAC_SSH_P1_IP
