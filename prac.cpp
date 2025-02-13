@@ -38,7 +38,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
         if (opts.mode == MODE_PREPROCESSING) {
             preprocessing_comp(mpcio, opts, args);
         } else {
-            online_main(mpcio, opts, args);
+            online_main(player,mpcio, opts, args);
         }
     });
 
@@ -50,7 +50,7 @@ static void comp_player_main(boost::asio::io_context &io_context,
     mpcio.dump_stats(std::cout);
 }
 
-static void server_player_main(boost::asio::io_context &io_context,
+static void server_player_main(boost::asio::io_context &io_context,unsigned player,
     const PRACOptions &opts, const char *p0addr,
     const char *p1addr, char **args)
 {
@@ -64,7 +64,7 @@ static void server_player_main(boost::asio::io_context &io_context,
         if (opts.mode == MODE_PREPROCESSING) {
             preprocessing_server(mpcserverio, opts, args);
         } else {
-            online_main(mpcserverio, opts, args);
+            online_main(player,mpcserverio, opts, args);
         }
     });
 
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
     if (player < 2) {
         comp_player_main(io_context, player, opts, p0addr, args);
     } else {
-        server_player_main(io_context, opts, p0addr, p1addr, args);
+        server_player_main(io_context,player, opts, p0addr, p1addr, args);
     }
 
     return 0;

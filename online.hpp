@@ -4,6 +4,6 @@
 #include "mpcio.hpp"
 #include "options.hpp"
 
-void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args);
+void online_main(unsigned player,MPCIO &mpcio, const PRACOptions &opts, char **args);
 
 #endif

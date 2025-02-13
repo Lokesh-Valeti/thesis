@@ -10,6 +10,7 @@
 #include "shapes.hpp"
 #include "bst.hpp"
 #include "avl.hpp"
+#include "trie.hpp"
 #include "heapsampler.hpp"
 
 static void online_test(MPCIO &mpcio,
@@ -1579,7 +1580,7 @@ static void path(MPCIO &mpcio,
     });
 }
 
-void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
+void online_main(unsigned player,MPCIO &mpcio, const PRACOptions &opts, char **args)
 {
     if (!*args) {
         std::cerr << "Mode is required as the first argument when not preprocessing.\n";
@@ -1699,6 +1700,9 @@ void online_main(MPCIO &mpcio, const PRACOptions &opts, char **args)
     } else if (!strcmp(*args, "heap")) {
         ++args;
         Heap(mpcio, opts, args);
+    } else if (!strcmp(*args, "trie")) {
+        ++args;
+        Trie(player,mpcio, opts, args);
     } else if (!strcmp(*args, "heapsampler")) {
         ++args;
         heapsampler_test(mpcio, opts, args);

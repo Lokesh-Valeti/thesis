@@ -693,7 +693,7 @@ RegAS MinHeap::extract_min(MPCTIO &tio, yield_t & yield, int is_optimized) {
     return minval;
 }
 
-
+//#define HEAP_VERBOSE
 
 void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
@@ -736,25 +736,25 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         // This form of init with a third parameter of n sets the heap
         // to contain 100, 200, 300, ..., 100*n.
         tree.init(tio, yield, (size_t(1) << heapdepth) - 1);
-        std::cout << "\n===== Init Stats =====\n";
+        std::cout << "\n===== Init Stats hi  =====\n";
         tio.sync_lamport();
         mpcio.dump_stats(std::cout);
         mpcio.reset_stats();
-        tio.reset_lamport();
+        tio.reset_lamport();    
         for (size_t j = 0; j < n_inserts; ++j) {
 
             RegAS inserted_val;
             inserted_val.randomize(8);
-
-            #ifdef HEAP_VERBOSE
+            //#ifdef HEAP_VERBOSE
             inserted_val.ashare = inserted_val.ashare;
             uint64_t inserted_val_rec = mpc_reconstruct(tio, yield, inserted_val);
-            std::cout << "inserted_val_rec = " << inserted_val_rec << std::endl << std::endl;
-            #endif
+            std::cout  << "inserted_val_rec = " << inserted_val_rec << std::endl << std::endl;
+            //#endif
 
             if(is_optimized > 0)  tree.insert_optimized(tio, yield, inserted_val);
             if(is_optimized == 0) tree.insert(tio, yield, inserted_val);
         }
+
 
         std::cout << "\n===== Insert Stats =====\n";
         tio.sync_lamport();

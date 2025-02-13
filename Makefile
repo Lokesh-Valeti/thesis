@@ -9,7 +9,7 @@ LDLIBS=-lbsd -lboost_system -lboost_context -lboost_chrono -lboost_thread -lpthr
 
 BIN=prac
 SRCS=prac.cpp mpcio.cpp preproc.cpp online.cpp mpcops.cpp rdpf.cpp \
-    cdpf.cpp duoram.cpp cell.cpp bst.cpp avl.cpp heap.cpp \
+    cdpf.cpp duoram.cpp cell.cpp bst.cpp avl.cpp heap.cpp trie.cpp \
     heapsampler.cpp
 OBJS=$(SRCS:.cpp=.o)
 ASMS=$(SRCS:.cpp=.s)
@@ -67,6 +67,10 @@ heap.o: types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp mpcio.tcc
 heap.o: coroutine.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc mpcops.hpp
 heap.o: mpcops.tcc duoram.tcc cdpf.hpp cdpf.tcc cell.hpp options.hpp
 heap.o: shapes.hpp shapes.tcc heap.hpp
+trie.o: types.hpp bitutils.hpp duoram.hpp mpcio.hpp corotypes.hpp mpcio.tcc
+trie.o: coroutine.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp rdpf.tcc mpcops.hpp
+trie.o: mpcops.tcc duoram.tcc cdpf.hpp cdpf.tcc cell.hpp options.hpp
+trie.o: shapes.hpp shapes.tcc trie.hpp
 heapsampler.o: heapsampler.hpp mpcio.hpp types.hpp bitutils.hpp corotypes.hpp
 heapsampler.o: mpcio.tcc coroutine.hpp heap.hpp options.hpp mpcops.hpp
 heapsampler.o: mpcops.tcc duoram.hpp rdpf.hpp dpf.hpp prg.hpp aes.hpp
