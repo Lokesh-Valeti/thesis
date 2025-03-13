@@ -167,6 +167,13 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
 void mpc_or(MPCTIO &tio, yield_t &yield,
     RegBS &z, RegBS x, RegBS y);
 
+
+void mpc_and(MPCTIO &tio, yield_t &yield,
+    RegXS &z, const RegXS &x, const RegXS &y,nbits_t nbits);
+
+void mpc_not(RegXS &z, RegXS x, nbits_t nbits);
+
+
 #include "mpcops.tcc"
 
 #endif

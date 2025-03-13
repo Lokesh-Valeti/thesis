@@ -420,3 +420,61 @@ void mpc_or(MPCTIO &tio, yield_t &yield,
         z.bshare = !z.bshare;
     }
 }
+
+
+// P0 and P1 hold XOR shares x0 and x1 of x, and y0 and y1 of y;
+// compute XOR shares of z = x & y.
+//
+// Cost:
+// 2 words sent in 1 message
+// consumes 1 AndTriple
+void mpc_and(MPCTIO &tio, yield_t &yield,
+    RegXS &z, const RegXS &x, const RegXS &y,
+    nbits_t nbits)
+{
+    const value_t mask = MASKBITS(static_cast<size_t>(nbits));
+    size_t nbytes = BITBYTES(static_cast<size_t>(nbits));
+
+    // Fetch an AND triple (A, B, C) such that A & B = C
+    auto [A, B, C] = tio.andtriple(yield);
+
+    // Compute blinded values
+    value_t blind_x = (x.xshare ^ A) & mask;
+    value_t blind_y = (y.xshare ^ B) & mask;
+
+    // Send blinded values to the peer
+    tio.queue_peer(&blind_x, nbytes);
+    tio.queue_peer(&blind_y, nbytes);
+
+    yield();
+
+    // Receive peer's blinded values
+    value_t peer_blind_x = 0, peer_blind_y = 0;
+    tio.recv_peer(&peer_blind_x, nbytes);
+    tio.recv_peer(&peer_blind_y, nbytes);
+
+    // Compute the output share
+    z.xshare = ((blind_x & peer_blind_y) ^ (peer_blind_x & blind_y) ^ C) & mask;
+}
+
+
+
+void mpc_not(RegXS &z, RegXS x, nbits_t nbits) {
+    const value_t mask = MASKBITS(nbits);
+    z.xshare = (~x.xshare) & mask;
+    std::cout<<z.xshare<<" ";
+}
+
+
+// void mpc_bitwise_not(MPCTIO &tio, yield_t &yield, RegXS &z, const RegXS &x, nbits_t nbits) {
+//     const value_t mask = MASKBITS(static_cast<size_t>(nbits));
+
+//     // Compute NOT using MPC principles
+//     value_t x_reconstructed = mpc_reconstruct(tio, yield, x, nbits);  // Reconstruct the original value
+//     value_t not_x = (~x_reconstructed) & mask;  // Perform bitwise NOT on the reconstructed value
+
+//     // Secret-share the NOT result again
+//     z = mpc_secret_share(tio, yield, not_x, nbits);
+// }
+
+

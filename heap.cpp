@@ -802,9 +802,9 @@ void Heap(MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
        tio.sync_lamport();
        mpcio.dump_stats(std::cout);
 
-       #ifdef HEAP_VERBOSE
+       //#ifdef HEAP_VERBOSE
        tree.print_heap(tio, yield);
-       #endif
+       //#endif
 
 
        if(run_sanity == 1 && n_extracts != 0) tree.verify_heap_property(tio, yield);

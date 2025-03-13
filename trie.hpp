@@ -8,9 +8,10 @@
 #include "mpcops.hpp"
 #include "duoram.hpp"
 
-class MinHeap1 {
+class TrieClass {
 private:
-    Duoram < RegAS > oram;
+    //Duoram < RegAS > oram;
+    Duoram < RegXS> oram;
     size_t MAX_SIZE;
     size_t num_items;
 
@@ -18,24 +19,24 @@ private:
     // Takes in as an input the XOR shares of the index at which
     // the heap property has to be restored
     // Returns the XOR shares of the index of the smaller child
-    RegXS restore_heap_property(MPCTIO &tio, yield_t & yield, RegXS index);
+    // RegXS restore_heap_property(MPCTIO &tio, yield_t & yield, RegXS index);
 
     // Optimized restore heap property at a secret shared index
     // Takes in as an input the XOR shares of the index at which
     // the heap property has to be restored
     // Returns the XOR shares of the index of the smaller child and
     // comparison between the left and right child
-    std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO &tio, yield_t & yield, RegXS index, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
+    //std::pair<RegXS, RegBS> restore_heap_property_optimized(MPCTIO &tio, yield_t & yield, RegXS index, size_t layer, typename Duoram<RegAS>::template OblivIndex<RegXS,3> oidx);
 
     // Restore heap property at an index in clear
     // Takes in as an input the index (in clear) at which
     // the heap property has to be restored
     // Returns the XOR shares of the index of the smaller child and
     // comparison between the left and right child
-    std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO &tio, yield_t & yield,  size_t index);
+    //std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO &tio, yield_t & yield,  size_t index);
 
 public:
-    MinHeap1(int player_num, size_t size) : oram(player_num, size) {};
+    TrieClass(int player_num, size_t size) : oram(player_num, size) {};
 
     // The extractmin protocol returns the minimum element (the root), removes it
     // and restores the heap property
@@ -54,7 +55,9 @@ public:
     // The Basic Insert Protocol
     // Takes in the additive share of the value to be inserted
     // And adds the the value into the heap while keeping the heap property intact
-    void insert(MPCTIO &tio, yield_t & yield, RegAS val);
+    void insert(MPCTIO &tio, yield_t & yield, RegXS val, RegXS y);
+
+    RegXS search(MPCTIO &TIO, yield_t & yield, RegXS val);
 
     // The Optimized Insert Protocol
     // Takes in the additive share of the value to be inserted
@@ -66,8 +69,8 @@ public:
     void verify_heap_property(MPCTIO &tio, yield_t & yield);
 
 
-    // Prints the current heap
-    void print_heap(MPCTIO &tio, yield_t & yield);
+    // Prints the current trie
+    void print_trie(MPCTIO &tio, yield_t & yield, size_t size);
 };
 
 void Trie(unsigned player,MPCIO &mpcio, const PRACOptions &opts, char **args);
