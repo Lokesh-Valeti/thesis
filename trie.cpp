@@ -8,17 +8,50 @@
 #include "trie.hpp"
 
 
-void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS val, RegXS y) {
+// void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS val, RegXS y,unsigned player) {
+//     auto TrieArray = oram.flat(tio, yield);
+//     num_items++;
+//     RegXS b = TrieArray[val];
+//     //mpc_reconstruct()
+//     RegXS x;
+//     value_t check = mpc_reconstruct(tio,yield,b,64);
+//     std::cout<< check << " ";
+//     // std::cout<< b.xshare <<"  ";     
+//     // RegXS z;  
+//     // RegXS b_not;
+//     // mpc_not(b_not, b, 1);
+//     // mpc_and(tio, yield,z, b_not, y, 1);
+//     // std::cout<< mpc_reconstruct(tio,yield,z,1)<<"  ";
+
+//     if(check==0)
+//     b.xshare = 0;
+//     if(check==1)
+//     b.xshare=player;
+//     mpc_xor_if(tio,yield,x,y,b,player);
+//     TrieArray[val] = x; 
+// }
+
+
+void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS index, RegXS &m, unsigned player) {
     auto TrieArray = oram.flat(tio, yield);
     num_items++;
-    RegXS b = TrieArray[val];
-    std::cout<< b.xshare <<"  ";     
-    RegXS z;  
-    RegXS b_not;
-    mpc_not(b_not, b, 1);
-    mpc_and(tio, yield,z, b_not, y, 1);
-    std::cout<< mpc_reconstruct(tio,yield,z,1)<<"  ";
-    TrieArray[val] = b ^ z;  
+
+    RegXS b = TrieArray[index];
+    //std::cout<<b<<" ";
+    
+    // Get reconstructed value
+    value_t check = mpc_reconstruct(tio, yield, index, 64);
+    std::cout << index << " ";
+
+    if (check == 0)
+        b.xshare = 0;
+    else if (check == 1)
+        b.xshare = player;
+
+    RegXS x;  
+    mpc_xor_if(tio, yield, x, m, b, player);
+
+    TrieArray[index] = x;  
 }
 
 
@@ -133,17 +166,33 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
                 y.xshare = 1;
                 share.randomize(8);
                 size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize);
-                std::cout<< inserted_index<<" ";
                 if(player==1){
                     share.xshare = inserted_index^share.xshare;
                     y.xshare = 0;
                 }
-                
+                std::cout<< inserted_index<<" "<< y.xshare;
+
                 //if(is_optimized > 1)   tree.insert_optimized(tio, yield, share);
                 //if(is_optimized == 1)  tree.insert_semi_optimized(tio, yield, share);
-                if(is_optimized == 0) tree.insert(tio, yield,share,y);
+                if(is_optimized == 0) tree.insert(tio, yield,share,y,player);
 
             }
+            
+            // RegXS input;
+            // RegXS output;
+            // RegXS cond;
+            // if(player == 0) cond.xshare = 0;
+            // if(player == 1) cond.xshare = 1;  
+            
+            // if(player == 0) input.xshare = 0;
+            // if(player == 1) input.xshare = 1; 
+
+
+            // if(player == 0) output.xshare = 0;
+            // if(player == 1) output.xshare = 1; 
+            
+            // mpc_xor_if(tio, yield, input, output, cond, player);
+
             std::cout << "inserted value is " << insertArray[i] << std::endl;
             tree.print_trie(tio, yield,size);
             std::cout<<"\n";

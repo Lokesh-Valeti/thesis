@@ -458,6 +458,26 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
 }
 
 
+// void mpc_xor_if(MPCTIO &tio, yield_t &yield,  const RegXS &x, const RegXS &y, const RegXS &condition, unsigned player)
+// {
+//         RegXS not_condition;
+//         not_condition.xshare = 1 - condition.xshare; // not operation
+//         RegXS mpc_and_out; 
+//         mpc_and(tio, yield,  mpc_and_out, condition, y, 64); // remeber that n_bits is hardcoded to 64
+
+//         x = condition ^ mpc_and_out;
+// }
+
+void mpc_xor_if(MPCTIO &tio, yield_t &yield, RegXS &x, const RegXS &m, RegXS &condition, unsigned player) {
+    RegXS not_condition;
+    not_condition.xshare = 1 - condition.xshare; // NOT operation
+    
+    RegXS mpc_and_out; 
+    mpc_and(tio, yield, mpc_and_out, condition, m, 64); // AND with 64-bit hardcoded
+
+    x.xshare = condition.xshare ^ mpc_and_out.xshare; // XOR operation on xshare
+}
+
 
 void mpc_not(RegXS &z, RegXS x, nbits_t nbits) {
     const value_t mask = MASKBITS(nbits);

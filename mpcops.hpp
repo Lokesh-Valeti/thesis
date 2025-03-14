@@ -172,7 +172,7 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
     RegXS &z, const RegXS &x, const RegXS &y,nbits_t nbits);
 
 void mpc_not(RegXS &z, RegXS x, nbits_t nbits);
-
+void mpc_xor_if(MPCTIO &tio, yield_t &yield, RegXS &x, const RegXS &y, RegXS &condition, unsigned player);
 
 #include "mpcops.tcc"
 
