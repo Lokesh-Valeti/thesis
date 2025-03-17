@@ -175,6 +175,10 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
     }
 
     run_coroutines(tio, [ & tio, alphasize, triedepth, n_inserts, n_searches, is_optimized, run_sanity,player, &mpcio](yield_t & yield) {
+        
+        
+        if(is_optimized==0){
+        
         size_t size = sumOfPowers(alphasize,triedepth)+1;
         std::cout << size<<"\n";
         TrieClass tree(tio.player(), size);
@@ -196,47 +200,20 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
                 insert_value.xshare = 1;
                 share.xshare = 1000;
                 size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
-                if(is_optimized==1){
-                    size = Power(alphasize,j);
-                    TrieClass tree(tio.player(),size);
-                    tree.init(tio,yield,size);
-                    inserted_index = letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
-                }
-                //size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize);
                 RegXS i_index;
                 i_index.xshare = inserted_index;
-                //std::cout<< i_index.xshare<<" ";
-                //std::cout<< share.xshare<<" ";
 
                 if(player==0){
                     share = i_index^share;
                     insert_value.xshare = 0;
                 }
-                //std::cout<< mpc_reconstruct(tio,yield,share,64)<<" " ;
-
-                //if(is_optimized > 1)   tree.insert_optimized(tio, yield, share);
-                //if(is_optimized == 1)  tree.insert_semi_optimized(tio, yield, share);
+               
                 tree.insert(tio, yield,share,insert_value,player);
                 if(is_optimized==1){
                     tree.print_trie(tio,yield,size);
                     std::cout<<"\n";
                 }
             }
-            
-            // RegXS input;
-            // RegXS output;
-            // RegXS cond;
-            // if(player == 0) cond.xshare = 0;
-            // if(player == 1) cond.xshare = 1;  
-            
-            // if(player == 0) input.xshare = 0;
-            // if(player == 1) input.xshare = 1; 
-
-
-            // if(player == 0) output.xshare = 0;
-            // if(player == 1) output.xshare = 1; 
-            
-            // mpc_xor_if(tio, yield, input, output, cond, player);
 
             std::cout << "\ninserted value is " << insertArray[i] << std::endl;
             tree.print_trie(tio, yield,size);
@@ -274,12 +251,8 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
                 size_t inserted_index =  letterToIndex(searchArray[i][j],j,alphasize,is_optimized);
 
 
-                if(is_optimized==1){
-                    size = Power(alphasize,j);
-                    TrieClass tree(tio.player(),size);
-                    tree.init(tio,yield,size);
-                    inserted_index = letterToIndex(searchArray[i][j],j,alphasize,is_optimized);
-                }
+    
+                inserted_index = letterToIndex(searchArray[i][j],j,alphasize,is_optimized);
                 RegXS i_index;
                 i_index.xshare = inserted_index;
                 
@@ -307,5 +280,89 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
        mpcio.dump_stats(std::cout);
 
     }
+    else if(is_optimized==1){
+
+
+        TrieClass* trieArray[triedepth];  // Declaring an array of pointers
+        for(int i = 0 ; i< triedepth; i++){
+            size_t size  = Power(alphasize,i);
+            trieArray[i] = new TrieClass(tio.player(),size);
+
+        }
+
+        std::string insertArray[] = {"dad","aab","aca","dca"};
+        std::string searchArray[] = {"ddd","aab","aca","dca"};
+
+        for(size_t i=0;i<n_inserts;i++){
+
+            for(size_t j = 0 ; j < insertArray[i].length() ; j++){
+
+                size_t size  = Power(alphasize,j);
+                RegXS share;
+                RegXS insert_value;
+                insert_value.xshare = 1;
+                share.xshare = 1000;
+                size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
+                RegXS i_index;
+                i_index.xshare = inserted_index;
+
+                if(player==0){
+                    share = i_index^share;
+                    insert_value.xshare = 0;
+                }
+               
+                trieArray[j]->insert(tio, yield,share,insert_value,player);
+                    trieArray[j]->print_trie(tio,yield,size);
+                    std::cout<<"\n";
+
+            }
+
+            std::cout << "\ninserted value is " << insertArray[i] << std::endl;
+            
+            
+        }
+
+        for(size_t i = 0 ; i< n_searches; i++){
+            RegBS Z;
+            if(player==0){
+                Z.bshare=false;
+            }
+            else{
+                Z.bshare=true;
+            }
+            //std::cout<<mpc_reconstruct(tio,yield,Z)<< "  "<<  Z.bshare<<"    ";
+            for(size_t j = 0;j<searchArray[i].length();j++){
+                RegXS share;
+                
+                share.xshare = 2000;
+
+                size_t inserted_index =  letterToIndex(searchArray[i][j],j,alphasize,is_optimized);
+
+
+    
+                inserted_index = letterToIndex(searchArray[i][j],j,alphasize,is_optimized);
+                RegXS i_index;
+                i_index.xshare = inserted_index;
+                
+
+                if(player==0){
+                    share = i_index^share;
+                    
+                }
+                std::cout<<mpc_reconstruct(tio,yield,share,64)<<" ";
+                trieArray[j]->search(tio,yield,share,Z,player);
+                               
+        }
+
+        //mpc_reconstruct(tio,yield,Z,64);
+        if(mpc_reconstruct(tio,yield,Z))
+        std::cout << "\nThe value  " << searchArray[i] << " is present" << std::endl;
+        else
+        std::cout << "\nthe value " << searchArray[i] << " is not present" << std::endl;
+       }
+        
+    }
+    }
+    
     );
 }
