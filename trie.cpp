@@ -104,8 +104,15 @@ void TrieClass::print_trie(MPCTIO &tio, yield_t &yield, size_t size){
 #define HEAP_VERBOSE
 
 int preIndex[10];
-int letterToIndex(char x, int pos, int alphasize){
-    char ch = x-'a'+1;
+
+int letterToIndex(char x, int pos, int alphasize,int is_optimized){
+    int ch;
+    if(is_optimized==1){
+        ch = x - 'a';
+    }
+    else{
+        ch = x - 'a' + 1;
+    }
     if(pos==0){
         preIndex[pos]=ch;
         return ch;
@@ -123,6 +130,14 @@ size_t sumOfPowers(size_t n, size_t m) {
     return (n * (std::pow(n, m) - 1)) / (n - 1);
 }
 
+// size_t PowerOfLevel(size_t n, size_t level, is_optimized){
+//     return 
+// }
+
+
+size_t Power(size_t x, size_t y) {
+    return static_cast<size_t>(std::pow(x, (y+1)));
+}
 
 void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
@@ -180,8 +195,14 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
                 RegXS insert_value;
                 insert_value.xshare = 1;
                 share.xshare = 1000;
-
-                size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize);
+                size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
+                if(is_optimized==1){
+                    size = Power(alphasize,j);
+                    TrieClass tree(tio.player(),size);
+                    tree.init(tio,yield,size);
+                    inserted_index = letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
+                }
+                //size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize);
                 RegXS i_index;
                 i_index.xshare = inserted_index;
                 //std::cout<< i_index.xshare<<" ";
@@ -195,8 +216,11 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
                 //if(is_optimized > 1)   tree.insert_optimized(tio, yield, share);
                 //if(is_optimized == 1)  tree.insert_semi_optimized(tio, yield, share);
-                if(is_optimized == 0) tree.insert(tio, yield,share,insert_value,player);
-
+                tree.insert(tio, yield,share,insert_value,player);
+                if(is_optimized==1){
+                    tree.print_trie(tio,yield,size);
+                    std::cout<<"\n";
+                }
             }
             
             // RegXS input;
@@ -247,7 +271,15 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
                 
                 share.xshare = 2000;
 
-                size_t inserted_index =  letterToIndex(searchArray[i][j],j,alphasize);
+                size_t inserted_index =  letterToIndex(searchArray[i][j],j,alphasize,is_optimized);
+
+
+                if(is_optimized==1){
+                    size = Power(alphasize,j);
+                    TrieClass tree(tio.player(),size);
+                    tree.init(tio,yield,size);
+                    inserted_index = letterToIndex(searchArray[i][j],j,alphasize,is_optimized);
+                }
                 RegXS i_index;
                 i_index.xshare = inserted_index;
                 
