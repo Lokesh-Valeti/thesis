@@ -32,33 +32,51 @@
 // }
 
 
-void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS index, RegXS &m, unsigned player) {
+void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS index, RegXS &insert_value, unsigned player) {
     auto TrieArray = oram.flat(tio, yield);
     num_items++;
+    std::cout<< mpc_reconstruct(tio,yield,index,64)<<" " ;
 
     RegXS b = TrieArray[index];
     //std::cout<<b<<" ";
     
     // Get reconstructed value
-    value_t check = mpc_reconstruct(tio, yield, index, 64);
-    std::cout << index << " ";
-
-    if (check == 0)
-        b.xshare = 0;
-    else if (check == 1)
-        b.xshare = player;
-
+    value_t check = mpc_reconstruct(tio, yield, b, 64);
+    //std::cout << check << " "<<b.xshare<<" ";
+    RegXS input;
+    if(check == 0){
+        input.xshare = player;
+    }
+    else{
+        input.xshare = 0;
+    }
+    //std::cout << input.xshare<<" ";
     RegXS x;  
-    mpc_xor_if(tio, yield, x, m, b, player);
+    mpc_xor_if(tio, yield, x, insert_value,b,input, player);
 
     TrieArray[index] = x;  
 }
 
 
-RegXS TrieClass::search(MPCTIO &tio, yield_t & yield, RegXS val){
-    auto TrieArray = oram.flat(tio,yield);
-    return TrieArray[val];
+void TrieClass::search(MPCTIO &tio, yield_t & yield, RegXS index,RegBS &Z){
+    auto TrieArray = oram.flat(tio, yield);
+    RegXS val =  TrieArray[index];
+    RegBS bval;
+
+    std::cout<<"val reconstruct"<<mpc_reconstruct(tio,yield,val,64);
+    if(val.xshare==0){
+        bval.bshare = false;
+    }
+    else if(val.xshare=0){
+        bval.bshare = true;
+    }
+    RegBS temp;
+    mpc_and(tio,yield,temp,bval,Z);
+    Z = temp;
+    //std::cout<<"Z share "<<Z.bshare<<" z recobstruct "<<mpc_reconstruct(tio,yield,Z)<<" ";
+         
 }
+
 
 void TrieClass::init(MPCTIO &tio, yield_t & yield) {
     auto TrieArray = oram.flat(tio, yield);
@@ -81,7 +99,7 @@ void TrieClass::print_trie(MPCTIO &tio, yield_t &yield, size_t size){
     auto HeapArray = oram.flat(tio, yield);
     auto Pjreconstruction = HeapArray.reconstruct();
     for(size_t i = 0 ; i< size ; i++){
-        std::cout << Pjreconstruction[i].share()<<" ";
+        std::cout <<i<<"->"<< Pjreconstruction[i].share()<<"   ";
     }
 
 }
@@ -162,19 +180,25 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
             for(size_t j = 0 ; j < insertArray[i].length() ; j++){
                 RegXS share;
-                RegXS y;
-                y.xshare = 1;
-                share.randomize(8);
+                RegXS insert_value;
+                insert_value.xshare = 1;
+                share.xshare = 1000;
+
                 size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize);
-                if(player==1){
-                    share.xshare = inserted_index^share.xshare;
-                    y.xshare = 0;
+                RegXS i_index;
+                i_index.xshare = inserted_index;
+                //std::cout<< i_index.xshare<<" ";
+                //std::cout<< share.xshare<<" ";
+
+                if(player==0){
+                    share = i_index^share;
+                    insert_value.xshare = 0;
                 }
-                std::cout<< inserted_index<<" "<< y.xshare;
+                //std::cout<< mpc_reconstruct(tio,yield,share,64)<<" " ;
 
                 //if(is_optimized > 1)   tree.insert_optimized(tio, yield, share);
                 //if(is_optimized == 1)  tree.insert_semi_optimized(tio, yield, share);
-                if(is_optimized == 0) tree.insert(tio, yield,share,y,player);
+                if(is_optimized == 0) tree.insert(tio, yield,share,insert_value,player);
 
             }
             
@@ -193,7 +217,7 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
             
             // mpc_xor_if(tio, yield, input, output, cond, player);
 
-            std::cout << "inserted value is " << insertArray[i] << std::endl;
+            std::cout << "\ninserted value is " << insertArray[i] << std::endl;
             tree.print_trie(tio, yield,size);
             std::cout<<"\n";
         }        
@@ -210,26 +234,39 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         #ifdef HEAP_VERBOSE
         //tree.print_heap(tio, yield);
         #endif
-
+        tree.print_trie(tio,yield,size);
         for(size_t i = 0 ; i< n_searches; i++){
-            RegXS Z0;
-            Z0.xshare = 0;
+            RegBS Z;
+            if(player==0){
+                Z.bshare=false;
+            }
+            else{
+                Z.bshare=true;
+            }
+            std::cout<<mpc_reconstruct(tio,yield,Z)<< "  "<<  Z.bshare<<"    ";
             for(size_t j = 0;j<searchArray[i].length();j++){
                 RegXS share;
-                share.randomize(8);
-                int inserted_val =  letterToIndex(searchArray[i][j],j,alphasize);
-                if(player==1){
-                    share.xshare = inserted_val^share.xshare;
+                
+                share.xshare = 2000;
+
+                size_t inserted_index =  letterToIndex(searchArray[i][j],j,alphasize);
+                RegXS i_index;
+                i_index.xshare = inserted_index;
+                
+
+                if(player==0){
+                    share = i_index^share;
+                    
                 }
-                RegXS b = tree.search(tio,yield,share);
-                Z0 = Z0^b;
+                std::cout<<mpc_reconstruct(tio,yield,share,64)<<" ";
+                tree.search(tio,yield,share,Z);
                                
         }
-        value_t result =  mpc_reconstruct(tio,yield,Z0,10);
-        if(result==0)
-        std::cout << "The value  " << searchArray[i] << " is not present" << std::endl;
+        //mpc_reconstruct(tio,yield,Z,64);
+        if(mpc_reconstruct(tio,yield,Z))
+        std::cout << "The value  " << searchArray[i] << " is present" << std::endl;
         else
-        std::cout << "the value " << searchArray[i] << " is present" << std::endl;
+        std::cout << "the value " << searchArray[i] << " is not present" << std::endl;
        }
 
     

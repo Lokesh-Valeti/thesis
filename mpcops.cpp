@@ -379,6 +379,7 @@ void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
 void mpc_and(MPCTIO &tio, yield_t &yield,
     RegBS &z, RegBS x, RegBS y)
 {
+    std::cout<<"Array Value "<<mpc_reconstruct(tio,yield,x) <<" z_Value "<<mpc_reconstruct(tio,yield,y)<<" ";
     // Compute XOR shares of x & y
     auto T = tio.bitselecttriple(yield);
     bit_t blind_x = x.bshare ^ T.X;
@@ -401,6 +402,8 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
     // Compute our share of x & y
     z.bshare = (x.bshare & peer_blind_y) ^ (T.Y & peer_blind_x) ^
         (x.bshare & y.bshare) ^ T.Z;
+        std::cout<<mpc_reconstruct(tio,yield,z)<<" ";
+
 }
 
 // P0 and P1 hold bit shares of x and y.  Set z to bit shares of x | y.
@@ -428,34 +431,31 @@ void mpc_or(MPCTIO &tio, yield_t &yield,
 // Cost:
 // 2 words sent in 1 message
 // consumes 1 AndTriple
-void mpc_and(MPCTIO &tio, yield_t &yield,
-    RegXS &z, const RegXS &x, const RegXS &y,
-    nbits_t nbits)
+void mpc_and(MPCTIO &tio, yield_t &yield, RegXS &z, const RegXS &x, const RegXS &y)
 {
-    const value_t mask = MASKBITS(static_cast<size_t>(nbits));
-    size_t nbytes = BITBYTES(static_cast<size_t>(nbits));
-
     // Fetch an AND triple (A, B, C) such that A & B = C
     auto [A, B, C] = tio.andtriple(yield);
 
     // Compute blinded values
-    value_t blind_x = (x.xshare ^ A) & mask;
-    value_t blind_y = (y.xshare ^ B) & mask;
+    value_t blind_x = x.xshare ^ A;
+    value_t blind_y = y.xshare ^ B;
 
     // Send blinded values to the peer
-    tio.queue_peer(&blind_x, nbytes);
-    tio.queue_peer(&blind_y, nbytes);
+    uint8_t v = (blind_x << 1) | blind_y;
+    tio.queue_peer(&v, sizeof(v));
 
     yield();
 
-    // Receive peer's blinded values
-    value_t peer_blind_x = 0, peer_blind_y = 0;
-    tio.recv_peer(&peer_blind_x, nbytes);
-    tio.recv_peer(&peer_blind_y, nbytes);
+    // Receive the peer's blinded values
+    uint8_t peer_v = 0;
+    tio.recv_peer(&peer_v, sizeof(peer_v));
+    value_t peer_blind_x = (peer_v >> 1) & 1;
+    value_t peer_blind_y = peer_v & 1;
 
     // Compute the output share
-    z.xshare = ((blind_x & peer_blind_y) ^ (peer_blind_x & blind_y) ^ C) & mask;
+    z.xshare = (x.xshare & peer_blind_y) ^ (y.xshare & peer_blind_x) ^ (x.xshare & y.xshare) ^ C;
 }
+
 
 
 // void mpc_xor_if(MPCTIO &tio, yield_t &yield,  const RegXS &x, const RegXS &y, const RegXS &condition, unsigned player)
@@ -468,13 +468,32 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
 //         x = condition ^ mpc_and_out;
 // }
 
-void mpc_xor_if(MPCTIO &tio, yield_t &yield, RegXS &x, const RegXS &m, RegXS &condition, unsigned player) {
-    RegXS not_condition;
-    not_condition.xshare = 1 - condition.xshare; // NOT operation
-    
-    RegXS mpc_and_out; 
-    mpc_and(tio, yield, mpc_and_out, condition, m, 64); // AND with 64-bit hardcoded
+void mpc_xor_if(MPCTIO &tio, yield_t &yield, RegXS &x, const RegXS &insert_value, RegXS &condition,RegXS &input, unsigned player) {
+    RegXS not_input;
+    not_input.xshare = 1 - input.xshare; // NOT operation
+    RegBS not_boolean; 
+    if(not_input.xshare==1)
+    not_boolean.bshare = true;
+    else
+    not_boolean.bshare = false;
 
+    RegBS insert;
+    if(insert_value.xshare==1)
+    insert.bshare = true;
+    else
+    insert.bshare = false;
+
+    //std::cout<<" not value "<<not_input.xshare<<" insert value "<< insert_value.xshare<<" ";
+    RegXS mpc_and_out;
+    RegBS mpcand;
+
+    mpc_and(tio, yield, mpcand,not_boolean,insert); // AND with 64-bit hardcoded
+    if(mpcand.bshare ==true)
+    mpc_and_out.xshare = 1;
+    else
+    mpc_and_out.xshare=0;
+
+    //std::cout<<"mpc and "<< mpc_and_out<<" and output "<<mpc_reconstruct(tio,yield,mpc_and_out,64)<<" ";
     x.xshare = condition.xshare ^ mpc_and_out.xshare; // XOR operation on xshare
 }
 
