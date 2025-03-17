@@ -57,7 +57,7 @@ public:
     // And adds the the value into the heap while keeping the heap property intact
     void insert(MPCTIO &tio, yield_t &yield, RegXS val, RegXS &y, unsigned player);
 
-    void search(MPCTIO &TIO, yield_t & yield, RegXS val,RegBS &Z);
+    void search(MPCTIO &TIO, yield_t & yield, RegXS val,RegBS &Z,unsigned player);
 
     // The Optimized Insert Protocol
     // Takes in the additive share of the value to be inserted

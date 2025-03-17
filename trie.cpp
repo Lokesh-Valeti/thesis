@@ -58,18 +58,15 @@ void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS index, RegXS &insert_v
 }
 
 
-void TrieClass::search(MPCTIO &tio, yield_t & yield, RegXS index,RegBS &Z){
+void TrieClass::search(MPCTIO &tio, yield_t & yield, RegXS index,RegBS &Z,unsigned player){
     auto TrieArray = oram.flat(tio, yield);
     RegXS val =  TrieArray[index];
     RegBS bval;
-
-    std::cout<<"val reconstruct"<<mpc_reconstruct(tio,yield,val,64);
-    if(val.xshare==0){
-        bval.bshare = false;
+    if(mpc_reconstruct(tio,yield,val,64)==1){
+        bval.bshare = player;
     }
-    else if(val.xshare=0){
-        bval.bshare = true;
-    }
+    else bval.bshare = 0;
+    //std::cout<<"val reconstruct"<<mpc_reconstruct(tio,yield,val,64);
     RegBS temp;
     mpc_and(tio,yield,temp,bval,Z);
     Z = temp;
@@ -235,6 +232,7 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         //tree.print_heap(tio, yield);
         #endif
         tree.print_trie(tio,yield,size);
+        std::cout<<"\n";
         for(size_t i = 0 ; i< n_searches; i++){
             RegBS Z;
             if(player==0){
@@ -243,7 +241,7 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
             else{
                 Z.bshare=true;
             }
-            std::cout<<mpc_reconstruct(tio,yield,Z)<< "  "<<  Z.bshare<<"    ";
+            //std::cout<<mpc_reconstruct(tio,yield,Z)<< "  "<<  Z.bshare<<"    ";
             for(size_t j = 0;j<searchArray[i].length();j++){
                 RegXS share;
                 
@@ -259,14 +257,15 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
                     
                 }
                 std::cout<<mpc_reconstruct(tio,yield,share,64)<<" ";
-                tree.search(tio,yield,share,Z);
+                tree.search(tio,yield,share,Z,player);
                                
         }
+
         //mpc_reconstruct(tio,yield,Z,64);
         if(mpc_reconstruct(tio,yield,Z))
-        std::cout << "The value  " << searchArray[i] << " is present" << std::endl;
+        std::cout << "\nThe value  " << searchArray[i] << " is present" << std::endl;
         else
-        std::cout << "the value " << searchArray[i] << " is not present" << std::endl;
+        std::cout << "\nthe value " << searchArray[i] << " is not present" << std::endl;
        }
 
     

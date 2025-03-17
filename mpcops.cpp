@@ -379,7 +379,7 @@ void mpc_reconstruct_choice(MPCTIO &tio, yield_t &yield,
 void mpc_and(MPCTIO &tio, yield_t &yield,
     RegBS &z, RegBS x, RegBS y)
 {
-    std::cout<<"Array Value "<<mpc_reconstruct(tio,yield,x) <<" z_Value "<<mpc_reconstruct(tio,yield,y)<<" ";
+    //std::cout<<"Array Value "<<mpc_reconstruct(tio,yield,x) <<" z_Value "<<mpc_reconstruct(tio,yield,y)<<" ";
     // Compute XOR shares of x & y
     auto T = tio.bitselecttriple(yield);
     bit_t blind_x = x.bshare ^ T.X;
@@ -402,7 +402,7 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
     // Compute our share of x & y
     z.bshare = (x.bshare & peer_blind_y) ^ (T.Y & peer_blind_x) ^
         (x.bshare & y.bshare) ^ T.Z;
-        std::cout<<mpc_reconstruct(tio,yield,z)<<" ";
+       // std::cout<<mpc_reconstruct(tio,yield,z)<<" ";
 
 }
 
