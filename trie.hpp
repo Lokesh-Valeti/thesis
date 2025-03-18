@@ -59,6 +59,8 @@ public:
 
     void search(MPCTIO &TIO, yield_t & yield, RegXS val,RegBS &Z,unsigned player);
 
+    void basic(MPCIO &MPCIO, yield_t &yield, int alphasize, int triedepth, size_t n_inserts, size_t n_searches , int is_optimized, unsigned player);
+
     // The Optimized Insert Protocol
     // Takes in the additive share of the value to be inserted
     // And adds the the value into the heap while keeping the heap property intact

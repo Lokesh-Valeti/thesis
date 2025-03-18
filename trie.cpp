@@ -35,7 +35,7 @@
 void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS index, RegXS &insert_value, unsigned player) {
     auto TrieArray = oram.flat(tio, yield);
     num_items++;
-    std::cout<< mpc_reconstruct(tio,yield,index,64)<<" " ;
+    std::cout<< mpc_reconstruct(tio,yield,index,64)<<"  --  " ;
 
     RegXS b = TrieArray[index];
     //std::cout<<b<<" ";
@@ -139,47 +139,9 @@ size_t Power(size_t x, size_t y) {
     return static_cast<size_t>(std::pow(x, (y+1)));
 }
 
-void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
-
-    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
-
-    int nargs = 0;
-
-    while (args[nargs] != nullptr) {
-        ++nargs;
-    }
-    unsigned player = p;
-    int alphasize = 0;
-    int triedepth = 0;
-    size_t n_inserts = 0;
-    size_t n_searches = 0;
-    int is_optimized = 0;
-    int run_sanity = 0;
-
-    for (int i = 0; i < nargs; i += 2) {
-        std::string option = args[i];
-        if (option == "-m" && i + 1 < nargs) {
-            alphasize = std::atoi(args[i + 1]);
-        } else if (option == "-d" && i + 1 < nargs) {
-            triedepth = std::atoi(args[i + 1]);
-        } else if (option == "-i" && i + 1 < nargs) {
-            n_inserts = std::atoi(args[i + 1]);
-        } else if (option == "-e" && i + 1 < nargs) {
-            n_searches = std::atoi(args[i + 1]);
-        } else if (option == "-opt" && i + 1 < nargs) {
-            is_optimized = std::atoi(args[i + 1]);
-        } else if (option == "-s" && i + 1 < nargs) {
-            run_sanity = std::atoi(args[i + 1]);
-        }
-    }
-
-    run_coroutines(tio, [ & tio, alphasize, triedepth, n_inserts, n_searches, is_optimized, run_sanity,player, &mpcio](yield_t & yield) {
-        
-        
-        if(is_optimized==0){
-        
-        size_t size = sumOfPowers(alphasize,triedepth)+1;
+void basic(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_inserts, size_t n_searches , int is_optimized, unsigned player, MPCTIO &tio){
+    size_t size = sumOfPowers(alphasize,triedepth)+1;
         std::cout << size<<"\n";
         TrieClass tree(tio.player(), size);
         tree.init(tio, yield, size);
@@ -279,11 +241,11 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
        tio.sync_lamport();
        mpcio.dump_stats(std::cout);
 
-    }
-    else if(is_optimized==1){
+}
 
 
-        TrieClass* trieArray[triedepth];  // Declaring an array of pointers
+void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_inserts, size_t n_searches , int is_optimized, unsigned player, MPCTIO &tio){
+    TrieClass* trieArray[triedepth];  // Declaring an array of pointers
         for(int i = 0 ; i< triedepth; i++){
             size_t size  = Power(alphasize,i);
             trieArray[i] = new TrieClass(tio.player(),size);
@@ -317,7 +279,7 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
             }
 
-            std::cout << "\ninserted value is " << insertArray[i] << std::endl;
+            std::cout << "inserted value is " << insertArray[i] << std::endl;
             
             
         }
@@ -360,8 +322,52 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         else
         std::cout << "\nthe value " << searchArray[i] << " is not present" << std::endl;
        }
-        
+}
+
+void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
+
+
+    MPCTIO tio(mpcio, 0, opts.num_cpu_threads);
+
+    int nargs = 0;
+
+    while (args[nargs] != nullptr) {
+        ++nargs;
     }
+    unsigned player = p;
+    int alphasize = 0;
+    int triedepth = 0;
+    size_t n_inserts = 0;
+    size_t n_searches = 0;
+    int is_optimized = 0;
+    int run_sanity = 0;
+
+    for (int i = 0; i < nargs; i += 2) {
+        std::string option = args[i];
+        if (option == "-m" && i + 1 < nargs) {
+            alphasize = std::atoi(args[i + 1]);
+        } else if (option == "-d" && i + 1 < nargs) {
+            triedepth = std::atoi(args[i + 1]);
+        } else if (option == "-i" && i + 1 < nargs) {
+            n_inserts = std::atoi(args[i + 1]);
+        } else if (option == "-e" && i + 1 < nargs) {
+            n_searches = std::atoi(args[i + 1]);
+        } else if (option == "-opt" && i + 1 < nargs) {
+            is_optimized = std::atoi(args[i + 1]);
+        } else if (option == "-s" && i + 1 < nargs) {
+            run_sanity = std::atoi(args[i + 1]);
+        }
+    }
+
+    run_coroutines(tio, [ & tio, alphasize, triedepth, n_inserts, n_searches, is_optimized, run_sanity,player, &mpcio](yield_t & yield) {
+        
+        
+        if(is_optimized==0){
+            basic(mpcio,yield,alphasize,triedepth,n_inserts,n_searches,is_optimized,player,tio);        
+        }
+        else if(is_optimized==1){
+            semi_optimized(mpcio,yield,alphasize,triedepth,n_inserts,n_searches,is_optimized,player,tio);
+        }
     }
     
     );
