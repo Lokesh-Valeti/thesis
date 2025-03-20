@@ -83,17 +83,29 @@ void TrieClass::init(MPCTIO &tio, yield_t & yield) {
 
 void TrieClass::init(MPCTIO &tio, yield_t &yield, size_t n) {
     auto TrieArray = oram.flat(tio, yield);  // Get a flat representation of the ORAM.
-
+    auto StringArray = second_oram.flat(tio,yield);
     num_items = n;  // Store the number of elements in the heap.
 
     // Initialize all elements with zero
     TrieArray.init([](size_t i) {
         return size_t(0);  // Always return 0 for all elements.
     });
+    StringArray.init([](size_t i) {
+        return size_t(0);  // Always return 0 for all elements.
+    });
 }
 
 void TrieClass::print_trie(MPCTIO &tio, yield_t &yield, size_t size){
     auto HeapArray = oram.flat(tio, yield);
+    auto Pjreconstruction = HeapArray.reconstruct();
+    for(size_t i = 0 ; i< size ; i++){
+        std::cout <<i<<"->"<< Pjreconstruction[i].share()<<"   ";
+    }
+
+}
+
+void TrieClass::print_trie_stringcheck(MPCTIO &tio, yield_t &yield, size_t size){
+    auto HeapArray = second_oram.flat(tio, yield);
     auto Pjreconstruction = HeapArray.reconstruct();
     for(size_t i = 0 ; i< size ; i++){
         std::cout <<i<<"->"<< Pjreconstruction[i].share()<<"   ";
@@ -155,9 +167,10 @@ void basic(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_
         std::string insertArray[] = {"dad","aab","aca","dca"};
         std::string searchArray[] = {"ddd","aab","aca","dca"};
         for(size_t i=0;i<n_inserts;i++){
-
-            for(size_t j = 0 ; j < insertArray[i].length() ; j++){
-                RegXS share;
+            
+            RegXS share;
+            for(size_t j = 0; j < insertArray[i].length() ; j++){
+                
                 RegXS insert_value;
                 insert_value.xshare = 1;
                 share.xshare = 1000;
@@ -171,14 +184,26 @@ void basic(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_
                 }
                
                 tree.insert(tio, yield,share,insert_value,player);
+
                 if(is_optimized==1){
                     tree.print_trie(tio,yield,size);
                     std::cout<<"\n";
                 }
             }
+            RegXS check;
+            check.xshare=player;
+            //std::cout<<"  ----- "<< mpc_reconstruct(tio, yield,check)<<"  ------ ";
+
+            auto End_String = tree.second_oram.flat(tio, yield);
+            End_String[share] = check;
+
+            //std::cout<<"  ----- "<< mpc_reconstruct(tio, yield,End_String[share])<<"  ------ ";
 
             std::cout << "\ninserted value is " << insertArray[i] << std::endl;
             tree.print_trie(tio, yield,size);
+            std::cout<<"\n";
+            std::cout<<"String presence array \n";
+            tree.print_trie_stringcheck(tio,yield,size);
             std::cout<<"\n";
         }        
         
@@ -205,8 +230,9 @@ void basic(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_
                 Z.bshare=true;
             }
             //std::cout<<mpc_reconstruct(tio,yield,Z)<< "  "<<  Z.bshare<<"    ";
+            RegXS share;
             for(size_t j = 0;j<searchArray[i].length();j++){
-                RegXS share;
+                
                 
                 share.xshare = 2000;
 
@@ -227,6 +253,21 @@ void basic(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_
                 tree.search(tio,yield,share,Z,player);
                                
         }
+        auto End_String = tree.second_oram.flat(tio, yield);
+        RegXS check = End_String[share];
+        RegBS temp;
+
+        //std::cout<<"  ----- "<< mpc_reconstruct(tio, yield,check)<<"  ------ ";
+        // mpc and between check and Z but we are reconstructing the check value because as of now we dont have mpc_ and
+        if(mpc_reconstruct(tio, yield,check)==1){
+            temp.bshare = player;
+        }
+        else{
+            temp.bshare=0;
+        }
+        RegBS value;
+        mpc_and(tio,yield,value,temp,Z);
+        Z = value;
 
         //mpc_reconstruct(tio,yield,Z,64);
         if(mpc_reconstruct(tio,yield,Z))
@@ -256,11 +297,12 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
         std::string searchArray[] = {"ddd","aab","aca","dca"};
 
         for(size_t i=0;i<n_inserts;i++){
-
-            for(size_t j = 0 ; j < insertArray[i].length() ; j++){
+            RegXS share;
+            size_t j = 0; 
+            for(; j < insertArray[i].length() ; j++){
 
                 size_t size  = Power(alphasize,j);
-                RegXS share;
+                
                 RegXS insert_value;
                 insert_value.xshare = 1;
                 share.xshare = 1000;
@@ -278,6 +320,12 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
                     std::cout<<"\n";
 
             }
+            RegXS check;
+            check.xshare=player;
+            //std::cout<<"  ----- "<< mpc_reconstruct(tio, yield,check)<<"  ------ ";
+
+            auto End_String = trieArray[j-1]->second_oram.flat(tio, yield);
+            End_String[share] = check;
 
             std::cout << "inserted value is " << insertArray[i] << std::endl;
             
@@ -292,9 +340,11 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
             else{
                 Z.bshare=true;
             }
+            size_t j = 0;
+            RegXS share;
             //std::cout<<mpc_reconstruct(tio,yield,Z)<< "  "<<  Z.bshare<<"    ";
-            for(size_t j = 0;j<searchArray[i].length();j++){
-                RegXS share;
+            for(;j<searchArray[i].length();j++){
+                
                 
                 share.xshare = 2000;
 
@@ -315,6 +365,21 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
                 trieArray[j]->search(tio,yield,share,Z,player);
                                
         }
+        auto End_String = trieArray[j-1]->second_oram.flat(tio, yield);
+        RegXS check = End_String[share];
+        RegBS temp;
+
+        //std::cout<<"  ----- "<< mpc_reconstruct(tio, yield,check)<<"  ------ ";
+        // mpc and between check and Z but we are reconstructing the check value because as of now we dont have mpc_ and
+        if(mpc_reconstruct(tio, yield,check)==1){
+            temp.bshare = player;
+        }
+        else{
+            temp.bshare=0;
+        }
+        RegBS value;
+        mpc_and(tio,yield,value,temp,Z);
+        Z = value;
 
         //mpc_reconstruct(tio,yield,Z,64);
         if(mpc_reconstruct(tio,yield,Z))

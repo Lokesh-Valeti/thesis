@@ -9,9 +9,10 @@
 #include "duoram.hpp"
 
 class TrieClass {
-private:
+public:
     //Duoram < RegAS > oram;
     Duoram < RegXS> oram;
+    Duoram < RegXS> second_oram;
     size_t MAX_SIZE;
     size_t num_items;
 
@@ -36,7 +37,7 @@ private:
     //std::pair<RegXS, RegBS> restore_heap_property_at_explicit_index(MPCTIO &tio, yield_t & yield,  size_t index);
 
 public:
-    TrieClass(int player_num, size_t size) : oram(player_num, size) {};
+    TrieClass(int player_num, size_t size) : oram(player_num, size), second_oram(player_num,size) {};
 
     // The extractmin protocol returns the minimum element (the root), removes it
     // and restores the heap property
@@ -51,6 +52,10 @@ public:
     // We use this function only to set up our heap
     // to do timing experiments on insert and extractmins
     void init(MPCTIO &tio, yield_t & yield, size_t n);
+
+    void print_trie_stringcheck(MPCTIO &tio, yield_t &yield, size_t size);
+
+    //Duoram <RegXS> getSecondOram() { return second_oram; };
 
     // The Basic Insert Protocol
     // Takes in the additive share of the value to be inserted
