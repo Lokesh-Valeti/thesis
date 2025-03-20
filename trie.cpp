@@ -389,6 +389,41 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
        }
 }
 
+
+void optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_inserts, size_t n_searches , int is_optimized, unsigned player, MPCTIO &tio){
+    std::string insertArray[] = {"dad","aab","aca","dca"};
+    std::string searchArray[] = {"ddd","aab","aca","dca"};
+    size_t size  =  std::pow(alphasize,triedepth);
+    size_t two_powersize =1;
+    while( two_powersize <= size){
+        two_powersize*=2;
+    }
+    TrieClass tree(tio.player(), size);
+    tree.init(tio, yield, size);
+
+    for(int i = 0 ; i < n_inserts; i++){
+        RegXS share;
+            size_t j = 0; 
+            for(; j < insertArray[i].length() ; j++){
+
+                size_t size  = Power(alphasize,j);
+                
+                RegXS insert_value;
+                insert_value.xshare = 1;
+                share.xshare = 1000;
+                size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
+                RegXS i_index;
+                i_index.xshare = inserted_index;
+
+                if(player==0){
+                    share = i_index^share;
+                    insert_value.xshare = 0;
+                }
+            }
+
+    }
+}
+
 void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
 
 
@@ -432,6 +467,9 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
         }
         else if(is_optimized==1){
             semi_optimized(mpcio,yield,alphasize,triedepth,n_inserts,n_searches,is_optimized,player,tio);
+        }
+        else if(is_optimized==2){
+            optimized(mpcio,yield,alphasize,triedepth,n_inserts,n_searches,is_optimized,player,tio);
         }
     }
     
