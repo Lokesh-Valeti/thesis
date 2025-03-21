@@ -395,31 +395,48 @@ void optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_
     std::string searchArray[] = {"ddd","aab","aca","dca"};
     size_t size  =  std::pow(alphasize,triedepth);
     size_t two_powersize =1;
+    nbits_t depth = 0;
     while( two_powersize <= size){
         two_powersize*=2;
+        depth++;
     }
-    TrieClass tree(tio.player(), size);
-    tree.init(tio, yield, size);
+    // TrieClass tree(tio.player(), size);
+    // tree.init(tio, yield, size);
+
+    Duoram<RegXS>::Pad P(*this, tio, yield, two_powersize);
+    auto oidx = P.oblivindex(depth-1);
 
     for(int i = 0 ; i < n_inserts; i++){
         RegXS share;
-            size_t j = 0; 
-            for(; j < insertArray[i].length() ; j++){
+        size_t j = 0; 
+        for(; j < insertArray[i].length() ; j++){
 
-                size_t size  = Power(alphasize,j);
+            // trie_layer size
+            size_t size  = Power(alphasize,j);
                 
-                RegXS insert_value;
-                insert_value.xshare = 1;
-                share.xshare = 1000;
-                size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
-                RegXS i_index;
-                i_index.xshare = inserted_index;
+            RegXS insert_value;
+            insert_value.xshare = 1;
+            share.xshare = 1000;
+            size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize,is_optimized);                RegXS i_index;
+            i_index.xshare = inserted_index;
 
-                if(player==0){
-                    share = i_index^share;
-                    insert_value.xshare = 0;
+            if(player==0){
+                share = i_index^share;
+                insert_value.xshare = 0;
                 }
             }
+
+        Duoram<RegXS>::Stride S(P, tio, yield, 0,1);
+        
+        RegBS lt;
+        lt.bshare=0;
+
+        //tree-layer size <= trie-layer size
+        while(xyzkjhdf<=size){
+            oidx.incr(lt);
+        }
+
+
 
     }
 }
