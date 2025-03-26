@@ -43,18 +43,22 @@ void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS index, RegXS &insert_v
     // Get reconstructed value
     value_t check = mpc_reconstruct(tio, yield, b, 64);
     //std::cout << check << " "<<b.xshare<<" ";
-    RegXS input;
-    if(check == 0){
-        input.xshare = player;
-    }
-    else{
-        input.xshare = 0;
-    }
-    //std::cout << input.xshare<<" ";
-    RegXS x;  
-    mpc_xor_if(tio, yield, x, insert_value,b,input, player);
+    // RegXS input;
+    // if(check == 0){
+    //     input.xshare = player;
+    // }
+    // else{
+    //     input.xshare = 0;
+    // }
+    // //std::cout << input.xshare<<" ";
+    // RegXS x;  
+    // mpc_xor_if(tio, yield, x, insert_value,b,input, player);
 
-    TrieArray[index] = x;  
+    //TrieArray[index] = x;
+    
+    RegXS x;
+    x.xshare = player;
+    TrieArray[index] = x;
 }
 
 
