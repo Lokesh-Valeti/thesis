@@ -119,7 +119,7 @@ int preIndex[10];
 
 int letterToIndex(char x, int pos, int alphasize,int is_optimized){
     int ch;
-    if(is_optimized==1){
+    if(is_optimized>0){
         ch = x - 'a';
     }
     else{
@@ -391,35 +391,63 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
 
 
 void optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_inserts, size_t n_searches , int is_optimized, unsigned player, MPCTIO &tio){
-    std::string insertArray[] = {"dad","aab","aca","dca"};
+    std::string insertArray[] = {"aaa","aab","aca","dca"};
     std::string searchArray[] = {"ddd","aab","aca","dca"};
-    size_t size  =  std::pow(alphasize,triedepth);
-    size_t two_powersize =1;
-    while( two_powersize <= size){
-        two_powersize*=2;
-    }
-    TrieClass tree(tio.player(), size);
-    tree.init(tio, yield, size);
 
-    for(int i = 0 ; i < n_inserts; i++){
+    size_t max  =  std::pow(alphasize,triedepth);
+    std::cout<< "  .."<< max<<"    ...   ";
+
+    size_t current = 1;
+    size_t size=0;
+    while(current <= max){
+        size+=current;
+        current=current<<1;
+    }
+    
+    TrieClass tree(tio.player(), size);
+    tree.init(tio,yield,size);
+    Duoram<RegXS> :: Flat F(tree.oram,tio,yield);
+
+    for(size_t i = 0 ; i < n_inserts; i++){
         RegXS share;
-            size_t j = 0; 
+            size_t j = 0;
+            size_t tree_layer=1,trie_layer=alphasize,sum=0; 
             for(; j < insertArray[i].length() ; j++){
 
-                size_t size  = Power(alphasize,j);
+               // size_t size  = Power(alphasize,j);
                 
                 RegXS insert_value;
                 insert_value.xshare = 1;
                 share.xshare = 1000;
+                while(tree_layer<trie_layer){
+                    sum+=tree_layer;
+                    tree_layer=tree_layer<<1;
+                }
+
                 size_t inserted_index =  letterToIndex(insertArray[i][j],j,alphasize,is_optimized);
+                //std::cout<<"   "<< inserted_index<<"   ";
+                std::cout<< "..."<<inserted_index;
                 RegXS i_index;
-                i_index.xshare = inserted_index;
+                i_index.xshare = (inserted_index);
 
                 if(player==0){
                     share = i_index^share;
                     insert_value.xshare = 0;
                 }
-            }
+
+                std::cout<<"  ..  "<<mpc_reconstruct(tio,yield,share,64)<<" ..  ";
+                
+                
+                trie_layer = trie_layer*trie_layer;
+                Duoram<RegXS>::Stride S(F,tio,yield,sum,1);
+                //auto Trie_Array = tree.oram.Stride(this,tio,yield,sum,1);
+                //Trie_Array[share] = insert_value;
+                //share.xshare = sum + share.xshare;
+                //doubt...needs to be verified
+                //S[share]=insert_value;
+
+            }std::cout<<"\n";
+            tree.print_trie(tio,yield,size);
 
     }
 }
@@ -469,6 +497,7 @@ void Trie(unsigned p,MPCIO & mpcio,  const PRACOptions & opts, char ** args) {
             semi_optimized(mpcio,yield,alphasize,triedepth,n_inserts,n_searches,is_optimized,player,tio);
         }
         else if(is_optimized==2){
+            std::cout<<"hello";
             optimized(mpcio,yield,alphasize,triedepth,n_inserts,n_searches,is_optimized,player,tio);
         }
     }
