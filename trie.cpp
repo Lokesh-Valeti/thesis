@@ -34,43 +34,20 @@
 
 void TrieClass::insert(MPCTIO &tio, yield_t &yield, RegXS index, RegXS &insert_value, unsigned player) {
     auto TrieArray = oram.flat(tio, yield);
-    num_items++;
     std::cout<< mpc_reconstruct(tio,yield,index,64)<<"  --  " ;
-
-    RegXS b = TrieArray[index];
-    //std::cout<<b<<" ";
-    
-    // Get reconstructed value
-    value_t check = mpc_reconstruct(tio, yield, b, 64);
-    //std::cout << check << " "<<b.xshare<<" ";
-    RegXS input;
-    if(check == 0){
-        input.xshare = player;
-    }
-    else{
-        input.xshare = 0;
-    }
-    //std::cout << input.xshare<<" ";
     RegXS x;  
-    mpc_xor_if(tio, yield, x, insert_value,b,input, player);
+    x.xshare=player;
 
     TrieArray[index] = x;  
 }
 
 
-void TrieClass::search(MPCTIO &tio, yield_t & yield, RegXS index,RegBS &Z,unsigned player){
+void TrieClass::search(MPCTIO &tio, yield_t & yield, RegXS index,RegXS &Z,unsigned player){
     auto TrieArray = oram.flat(tio, yield);
     RegXS val =  TrieArray[index];
-    RegBS bval;
-    if(mpc_reconstruct(tio,yield,val,64)==1){
-        bval.bshare = player;
-    }
-    else bval.bshare = 0;
-    //std::cout<<"val reconstruct"<<mpc_reconstruct(tio,yield,val,64);
-    RegBS temp;
-    mpc_and(tio,yield,temp,bval,Z);
-    Z = temp;
-    //std::cout<<"Z share "<<Z.bshare<<" z recobstruct "<<mpc_reconstruct(tio,yield,Z)<<" ";
+    RegXS temp;
+    mpc_and_XS(tio,yield,temp,val,Z);
+    Z = temp;    
          
 }
 
@@ -222,12 +199,10 @@ void basic(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_
         tree.print_trie(tio,yield,size);
         std::cout<<"\n";
         for(size_t i = 0 ; i< n_searches; i++){
-            RegBS Z;
-            if(player==0){
-                Z.bshare=false;
-            }
-            else{
-                Z.bshare=true;
+            RegXS Z;
+            Z.xshare = 0;
+            if(player==1){
+                Z.xshare=1;
             }
             //std::cout<<mpc_reconstruct(tio,yield,Z)<< "  "<<  Z.bshare<<"    ";
             RegXS share;
@@ -255,28 +230,15 @@ void basic(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_
         }
         auto End_String = tree.second_oram.flat(tio, yield);
         RegXS check = End_String[share];
-        RegBS temp;
+        RegXS temp;
 
-        //std::cout<<"  ----- "<< mpc_reconstruct(tio, yield,check)<<"  ------ ";
-        // mpc and between check and Z but we are reconstructing the check value because as of now we dont have mpc_ and
-        if(mpc_reconstruct(tio, yield,check)==1){
-            temp.bshare = player;
-        }
-        else{
-            temp.bshare=0;
-        }
-        RegBS value;
-        mpc_and(tio,yield,value,temp,Z);
-        Z = value;
+        mpc_and_XS(tio,yield,temp,check,Z);
 
-        //mpc_reconstruct(tio,yield,Z,64);
-        if(mpc_reconstruct(tio,yield,Z))
+        if(mpc_reconstruct(tio,yield,temp))
         std::cout << "\nThe value  " << searchArray[i] << " is present" << std::endl;
         else
         std::cout << "\nthe value " << searchArray[i] << " is not present" << std::endl;
        }
-
-    
 
        std::cout << "\n=====  Search Stats =====\n";
        tio.sync_lamport();
@@ -333,12 +295,12 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
         }
 
         for(size_t i = 0 ; i< n_searches; i++){
-            RegBS Z;
+            RegXS Z;
             if(player==0){
-                Z.bshare=false;
+                Z.xshare=0;
             }
             else{
-                Z.bshare=true;
+                Z.xshare=1;
             }
             size_t j = 0;
             RegXS share;
@@ -367,28 +329,19 @@ void semi_optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, 
         }
         auto End_String = trieArray[j-1]->second_oram.flat(tio, yield);
         RegXS check = End_String[share];
-        RegBS temp;
+        RegXS temp;
 
         //std::cout<<"  ----- "<< mpc_reconstruct(tio, yield,check)<<"  ------ ";
         // mpc and between check and Z but we are reconstructing the check value because as of now we dont have mpc_ and
-        if(mpc_reconstruct(tio, yield,check)==1){
-            temp.bshare = player;
-        }
-        else{
-            temp.bshare=0;
-        }
-        RegBS value;
-        mpc_and(tio,yield,value,temp,Z);
-        Z = value;
+        mpc_and_XS(tio,yield,temp,Z,check);
 
         //mpc_reconstruct(tio,yield,Z,64);
-        if(mpc_reconstruct(tio,yield,Z))
+        if(mpc_reconstruct(tio,yield,temp))
         std::cout << "\nThe value  " << searchArray[i] << " is present" << std::endl;
         else
         std::cout << "\nthe value " << searchArray[i] << " is not present" << std::endl;
        }
 }
-
 
 void optimized(MPCIO &mpcio, yield_t &yield, int alphasize, int triedepth, size_t n_inserts, size_t n_searches , int is_optimized, unsigned player, MPCTIO &tio){
     std::string insertArray[] = {"aaa","aab","aca","dca"};

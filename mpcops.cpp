@@ -406,6 +406,40 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
 
 }
 
+
+void mpc_and_XS(MPCTIO &tio, yield_t &yield, RegXS &z, const RegXS &x, const RegXS &y)
+{
+    // Fetch an AND triple (A, B, C) such that A & B = C
+    auto [A, B, C] = tio.andtriple(yield);
+
+    // Compute blinded values
+    value_t blind_x = x.xshare ^ A;
+    value_t blind_y = y.xshare ^ B;
+
+    // Send blinded values to the peer
+    //uint8_t v = (blind_x << 1) | blind_y;
+    tio.queue_peer(&blind_x, sizeof(blind_x));
+
+    yield();
+
+    // Receive the peer's blinded values
+    size_t peer_blind_x = 0;
+    tio.recv_peer(&peer_blind_x, sizeof(peer_blind_x));
+
+    tio.queue_peer(&blind_y, sizeof(blind_y));
+
+    yield();
+
+    // Receive the peer's blinded values
+    size_t peer_blind_y = 0;
+    tio.recv_peer(&peer_blind_y, sizeof(peer_blind_y));
+
+
+    // Compute the output share
+    z.xshare = (x.xshare & (y.xshare ^ peer_blind_y)) ^ B & peer_blind_x ^ C;
+
+}
+
 // P0 and P1 hold bit shares of x and y.  Set z to bit shares of x | y.
 //
 // Cost:

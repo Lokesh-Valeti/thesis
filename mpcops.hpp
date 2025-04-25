@@ -167,8 +167,11 @@ void mpc_and(MPCTIO &tio, yield_t &yield,
 void mpc_or(MPCTIO &tio, yield_t &yield,
     RegBS &z, RegBS x, RegBS y);
 
+    void mpc_and_xs(MPCTIO &tio, yield_t &yield,
+        RegXS &z, const RegXS &x, const RegXS &y);
 
-void mpc_and(MPCTIO &tio, yield_t &yield,
+
+void mpc_and_XS(MPCTIO &tio, yield_t &yield,
     RegXS &z, const RegXS &x, const RegXS &y);
 
 void mpc_not(RegXS &z, RegXS x, nbits_t nbits);
